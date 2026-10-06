@@ -298,6 +298,20 @@ h2::after{content:"";position:absolute;left:0;bottom:0;width:60px;height:3px;bac
 .card .ph img,.line-item .ph img{object-fit:contain}
 
 #ver{position:fixed;left:6px;bottom:3px;font-size:11px;color:#777;opacity:.7;z-index:1;pointer-events:none}
+
+/* окно результата сохранения */
+.doneov{position:fixed;inset:0;background:rgba(20,20,20,.58);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px}
+.donecard{background:var(--white);border-radius:18px;max-width:420px;width:100%;padding:28px 20px 22px;text-align:center;box-shadow:0 22px 56px rgba(0,0,0,.4);border-top:6px solid var(--gold);max-height:92vh;overflow:auto}
+.doneico{width:68px;height:68px;border-radius:50%;background:var(--gold);margin:0 auto 14px;display:flex;align-items:center;justify-content:center}
+.doneico svg{width:36px;height:36px;stroke:var(--black);fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.donecard h2{font-family:'Playfair Display',Georgia,serif;font-size:28px;margin:0 0 8px;color:var(--black)}
+.donename{font-size:20px;font-weight:700;margin:0 0 4px;color:var(--black);word-break:break-word}
+.donesub{font-size:18px;color:var(--muted);margin:0 0 14px}
+.donewarn{font-size:17px;background:#F7EFE3;border-radius:10px;padding:10px 12px;margin:0 0 14px;color:var(--black);text-align:left}
+.doneacts{display:grid;gap:10px;margin-top:6px}
+.donecard.fail{border-top-color:#7A2E2E}
+.donecard.fail .doneico{background:#7A2E2E}
+.donecard.fail .doneico svg{stroke:#fff}
 </style>
 </head>
 <body>
@@ -508,10 +522,11 @@ async function getFull(id){
   return FULLC[id]=norm(id,sn.data());
 }
 async function syncLite(id,p){
-  if(!LITE||!fdb)return;
+  if(!LITE||!fdb)return null;
   const th=await makeThumb((p.images||[])[0]);
   const rec=liteFrom(p,th);if(p._new)rec.createdAt=serverTimestamp();
-  await setDoc(doc(fdb,'catalog',id),rec,{merge:true});
+  await wt(setDoc(doc(fdb,'catalog',id),rec,{merge:true}));
+  return rec;
 }
 function buildCats(){
   const base=(FBCATS&&FBCATS.length)?FBCATS:BUILTIN_CATS.map(c=>({...c}));
@@ -548,14 +563,67 @@ async function loadData(){
   DB.loaded=true;
   if(!LOAD_ERR)saveCache();
 }
+/* ---- результат сохранения: понятные окна и ошибки ---- */
+const WRITE_MS=()=>window.__WRITE_MS||45000;
+const wt=(pr)=>Promise.race([pr,new Promise((_,rej)=>setTimeout(()=>rej({code:'write-timeout'}),WRITE_MS()))]);
+function fbErrText(err){
+  const code=String(err&&err.code||''),msg=String(err&&err.message||err||'');
+  if(/permission|insufficient/i.test(code+msg))return 'Firebase не разрешает запись. Откройте запись в правилах Firestore (вкладка Rules) для базы «'+DBNAME+'».';
+  if(/resource-exhausted|quota/i.test(code+msg))return 'Лимит базы «'+DBNAME+'» исчерпан. Именная база AI Studio работает на общей квоте. Откройте админку по ссылке с ?db=default, чтобы работать с базой (default).';
+  if(/write-timeout/.test(code))return 'База «'+DBNAME+'» не ответила за '+Math.round(WRITE_MS()/1000)+' секунд. Проверьте интернет. Если фото тяжёлые, уберите одно. Частые причины: закрытые правила записи или исчерпанная квота базы.';
+  if(/unavailable|network/i.test(code+msg))return 'Нет связи с Firebase. Проверьте интернет и нажмите «Сохранить» ещё раз.';
+  if(/Слишком большие фото/.test(msg))return msg;
+  return 'Не удалось сохранить: '+(msg||code||'неизвестная ошибка');
+}
+function closeDone(){const o=document.getElementById('doneov');if(o)o.remove()}
+function openDone(html,cls){
+  closeDone();
+  const o=document.createElement('div');o.id='doneov';o.className='doneov';
+  o.innerHTML='<div class="donecard '+(cls||'')+'" role="dialog" aria-live="polite">'+html+'</div>';
+  o.addEventListener('click',e=>{
+    const b=e.target.closest('[data-done]');
+    if(b){const k=b.dataset.done;closeDone();if(k==='again'){editing=blankProduct();render();window.scrollTo(0,0)}return}
+    if(e.target===o||e.target.closest('[data-close]'))closeDone();
+  });
+  document.body.appendChild(o);
+}
+function showDone({isNew,p,sid,warn}){
+  const price=(Number(p.price)||0).toLocaleString('ru-RU').replace(/\u00a0/g,' ')+' ₸';
+  openDone('<div class="doneico"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>'
+    +'<h2>'+(isNew?'Товар добавлен':'Изменения сохранены')+'</h2>'
+    +'<p class="donename">'+esc(p.name.ru)+'</p>'
+    +'<p class="donesub">'+price+' · '+(isNew?'уже виден покупателям':'обновлено на сайте')+'</p>'
+    +(warn?'<p class="donewarn">'+esc(warn)+'</p>':'')
+    +'<div class="doneacts"><a class="btn gold block" href="#/product/'+esc(sid)+'" data-close>ОТКРЫТЬ НА САЙТЕ</a>'
+    +(isNew?'<button class="btn line block" type="button" data-done="again">Добавить ещё товар</button>':'')
+    +'<button class="btn line block" type="button" data-done="close">К списку товаров</button></div>','');
+}
+function showFail(text){
+  openDone('<div class="doneico"><svg viewBox="0 0 24 24"><path d="M12 6v8M12 18v.5"/></svg></div>'
+    +'<h2>Товар не сохранён</h2><p class="donesub" style="color:var(--black)">'+esc(text)+'</p>'
+    +'<div class="doneacts"><button class="btn gold block" type="button" data-done="close">Понятно</button></div>','fail');
+}
+function localPut(sid,p,rec){
+  const old=DB.products.find(x=>x.id===sid);
+  const created=p._new?Math.floor(Date.now()/1000):((old&&old.created)||0);
+  let np;
+  if(LITE&&rec)np=normLite(sid,{...rec,createdAt:{seconds:created}});
+  else np=norm(sid,{titleRu:p.name.ru,titleKz:p.name.kk||'',price:p.price,oldPrice:p.old||0,categoryId:p.cat,description:p.desc.ru,descriptionKz:p.desc.kk||'',images:p.images||[],inStock:p.status!=='out',hidden:p.status==='hidden',qty:p.qty||0,sku:p.sku||'',specs:p.specs.ru,specsKz:p.specs.kk||'',isNew:!!p.isNew,popular:!!p.popular,featured:!!p.featured,createdAt:{seconds:created}});
+  const i=DB.products.findIndex(x=>x.id===sid);
+  if(i>=0)DB.products[i]=np;else DB.products.unshift(np);
+  DB.products.sort((a,b)=>(b.created-a.created)||a.name.ru.localeCompare(b.name.ru));
+  DB.cats=buildCats();
+  saveCache();
+}
 async function saveProductFB(p){
   const data={titleRu:p.name.ru,titleKz:p.name.kk||'',price:p.price,oldPrice:p.old||0,categoryId:p.cat,
     description:p.desc.ru,descriptionKz:p.desc.kk||'',images:p.images||[],inStock:p.status!=='out',hidden:p.status==='hidden',
     qty:p.qty||0,sku:p.sku||'',specs:p.specs.ru,specsKz:p.specs.kk||'',isNew:!!p.isNew,popular:!!p.popular,featured:!!p.featured,
     updatedAt:serverTimestamp()};
   if(JSON.stringify(data).length>950000)throw new Error('Слишком большие фото: уберите одно или два.');
-  if(p._new){data.createdAt=serverTimestamp();const r=await addDoc(collection(fdb,'products'),data);return r.id}
-  await setDoc(doc(fdb,'products',p.id),data,{merge:true});return p.id;
+  if(!fdb)throw new Error('Firebase не подключён. Откройте сайт на GitHub Pages в Chrome.');
+  if(p._new){data.createdAt=serverTimestamp();const r=await wt(addDoc(collection(fdb,'products'),data));return r.id}
+  await wt(setDoc(doc(fdb,'products',p.id),data,{merge:true}));return p.id;
 }
 const visible=()=>DB.products.filter(p=>p.status!=='hidden');
 const prod=slug=>DB.products.find(p=>p.slug===slug);
@@ -604,7 +672,7 @@ const LOCK='<a class="lock" href="#/admin" aria-label="Вход для влад�
 function banner(){
   if(!CONFIGURED)return `<div class="note" style="margin-top:20px">Магазин ещё не подключён к базе товаров (Firebase).</div>`;
   if(LOAD_ERR)return `<div class="note" style="margin-top:20px">${t('err_load')}</div>`;
-  if(!DB.loaded)return `<div class="note" style="margin-top:20px">Загрузка товаров… (v8)</div>`;
+  if(!DB.loaded)return `<div class="note" style="margin-top:20px">Загрузка товаров… (v10)</div>`;
   if(DB.loaded&&!DB.products.length)return `<div class="note" style="margin-top:20px">Скоро здесь появятся товары.</div>`;
   return '';
 }
@@ -844,7 +912,7 @@ async function bkRun(){
   render();
   toast(bad?('Записано '+ok+', ошибок '+bad+': '+lastErr):('Готово. Записано: '+ok+(LITE?'. Нажмите «Обновить лёгкий каталог»':'')));
 }
-document.body.insertAdjacentHTML('beforeend','<div id="ver">v8</div>');
+document.body.insertAdjacentHTML('beforeend','<div id="ver">v10</div>');
 document.addEventListener('change',e=>{if(e.target&&e.target.id==='bkfile')bkLoad(e.target.files&&e.target.files[0])});
 async function buildLite(){
   if(!fdb)return;
@@ -1006,7 +1074,7 @@ function renderChrome(){
     <div><h3>MUSLIM SHOP</h3><div>АТЫРАУ • РЫНОК ДИНА • БУТИК 24${LOCK}</div><div style="margin-top:6px">${esc(t('addr_txt'))}</div><div style="margin-top:6px"><a href="tel:+77781754241">${CONTACT.phone}</a></div><div style="margin-top:6px">${lang==='kk'?'Күн сайын 10:00–19:00':'Ежедневно 10:00–19:00'}</div></div>
     <div><h3>${t('menu_nav')}</h3><a href="#/">${t('home')}</a><a href="#/catalog">${t('catalog')}</a><a href="#/cart">${t('cart')}</a></div>
     <div><h3>${t('social')}</h3><a href="${CONTACT.ig}" target="_blank" rel="noopener">Instagram @musliim_shop06</a><a href="${CONTACT.tt}" target="_blank" rel="noopener">TikTok @muslim_shop06</a><a href="${CONTACT.tg}" target="_blank" rel="noopener">Telegram @muslim_shop06</a><a href="${CONTACT.gis}" target="_blank" rel="noopener">2ГИС — ${lang==='kk'?'картада':'мы на карте'}</a></div>
-    </div><div class="wrap copy">© MUSLIM SHOP, Атырау · v8 </div></footer>`;
+    </div><div class="wrap copy">© MUSLIM SHOP, Атырау · v10 </div></footer>`;
   updateBadge();
 }
 window.addEventListener('hashchange',()=>{ROUTE=null;closeMenu();render()});
@@ -1136,12 +1204,24 @@ async function handleForm2(f){
     p.status=fd.get('status');p.qty=Number(fd.get('qty'))||0;p.sku=String(fd.get('sku')).trim();
     p.desc={ru:String(fd.get('dr')),kk:String(fd.get('dk'))};p.specs={ru:String(fd.get('sr')),kk:String(fd.get('sk'))};
     p.isNew=fd.get('isNew')?1:0;p.popular=fd.get('popular')?1:0;p.featured=fd.get('featured')?1:0;
-    if(!p.name.ru||p.price<=0){toast('Укажите название и цену');return}
-    toast('Сохраняю…');
-    const sid=await saveProductFB(p);
-    try{await syncLite(sid,p)}catch(e){toast('Сохранено, но лёгкий каталог не обновился: '+(e&&e.message||e));await new Promise(r=>setTimeout(r,1500))}
-    delete FULLC[sid];delete FULLERR[sid];
-    editing=null;await loadData();render();toast('Сохранено');return;
+    if(!p.name.ru){toast('Укажите название товара');return}
+    if(p.price<=0){toast('Укажите цену товара');return}
+    const btn=f.querySelector('button[type=submit]'),lbl=btn?btn.textContent:'';
+    if(btn){btn.disabled=true;btn.textContent='СОХРАНЯЮ…'}
+    const isNew=!!p._new;
+    try{
+      const sid=await saveProductFB(p);
+      let rec=null,warn='';
+      try{rec=await syncLite(sid,p)}catch(e){warn='Товар сохранён, но быстрый каталог не обновился. Откройте админку и нажмите «Обновить лёгкий каталог».'}
+      delete FULLC[sid];delete FULLERR[sid];
+      localPut(sid,p,rec);
+      editing=null;render();window.scrollTo(0,0);
+      showDone({isNew,p,sid,warn});
+    }catch(err){
+      if(btn){btn.disabled=false;btn.textContent=lbl||'СОХРАНИТЬ'}
+      showFail(fbErrText(err));
+    }
+    return;
   }
 }
 document.addEventListener('change',e=>{
