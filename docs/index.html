@@ -338,7 +338,7 @@ h2::after{content:"";position:absolute;left:0;bottom:0;width:60px;height:3px;bac
   addEventListener('error',function(e){show((e.message||'')+(e.lineno?' [строка '+e.lineno+']':''))});
   addEventListener('unhandledrejection',function(e){var r=e.reason;show(String(r&&(r.code||r.message)||r))});
 })();
-let initializeApp,getFirestore,collection,getDocs,getDoc,query,limit,doc,setDoc,addDoc,deleteDoc,serverTimestamp,Timestamp,getAuth,initializeAuth,browserLocalPersistence,inMemoryPersistence,signInWithEmailAndPassword,onAuthStateChanged,signOut;
+let initializeApp,getFirestore,collection,getDocs,getDoc,query,limit,orderBy,onSnapshot,doc,setDoc,addDoc,deleteDoc,serverTimestamp,Timestamp,getAuth,initializeAuth,browserLocalPersistence,inMemoryPersistence,signInWithEmailAndPassword,onAuthStateChanged,signOut;
 
 /* ============ Firebase: вставьте сюда настройки вашего веб-приложения ============
    Firebase Console → ⚙ Project settings → Your apps → Web app → firebaseConfig.
@@ -362,7 +362,7 @@ const FBP=CONFIGURED?(async()=>{
     const V='10.12.2',B='https://www.gstatic.com/firebasejs/'+V+'/';
     const [A,F,Au]=await Promise.all([import(B+'firebase-app.js'),import(B+'firebase-firestore.js'),import(B+'firebase-auth.js')]);
     ({initializeApp}=A);
-    ({getFirestore,collection,getDocs,getDoc,query,limit,doc,setDoc,addDoc,deleteDoc,serverTimestamp,Timestamp}=F);
+    ({getFirestore,collection,getDocs,getDoc,query,limit,orderBy,onSnapshot,doc,setDoc,addDoc,deleteDoc,serverTimestamp,Timestamp}=F);
     ({getAuth,initializeAuth,browserLocalPersistence,inMemoryPersistence,signInWithEmailAndPassword,onAuthStateChanged,signOut}=Au);
   }catch(e){FBLOAD_ERR='Не удалось загрузить Firebase: '+String(e&&e.message||e)}
 })():Promise.resolve();
@@ -539,6 +539,33 @@ const TTL=5*60*1000;
 let META=null;
 const stampOf=u=>(u&&u.seconds!=null)?(u.seconds+'.'+(u.nanoseconds||0)):null;
 async function metaStamp(){if(!fdb)return null;const sn=await getDoc(doc(fdb,'catalog','_meta'));return sn.exists()?stampOf(sn.data().updatedAt):null}
+let metaUnsub=null;
+function watchMeta(){
+  if(metaUnsub||!fdb||!LITE||!onSnapshot)return;
+  let first=true;
+  try{metaUnsub=onSnapshot(doc(fdb,'catalog','_meta'),sn=>{
+    const m=sn.exists()?stampOf(sn.data().updatedAt):null;
+    if(first){first=false;return}
+    if(m&&m!==META){(async()=>{const before=dataSig();await loadData();if(dataSig()!==before){KEEP=true;render()}})()}
+  },()=>{})}catch(e){}
+}
+async function checkDbs(){
+  const out=[];
+  for(let i=0;i<fdbs.length;i++){
+    let line=(i+1)+') '+DB_IDS[i]+(fdbs[i]===fdb?'   <-- ЭТУ БАЗУ СЕЙЧАС ИСПОЛЬЗУЕТ САЙТ':'')+'\n';
+    for(const col of ['catalog','products']){
+      try{
+        const sn=await getDocs(query(collection(fdbs[i],col),orderBy('createdAt','desc'),limit(1)));
+        const d=sn.docs[0]&&sn.docs[0].data();
+        const dt=d&&d.createdAt&&d.createdAt.seconds?new Date(d.createdAt.seconds*1000).toLocaleString('ru-RU'):'';
+        line+='   '+col+': '+(d?('новейший товар: '+(d.titleRu||d.nameRu||d.name||sn.docs[0].id)+' ('+dt+')'):'пусто')+'\n';
+      }catch(e){line+='   '+col+': ошибка '+(e&&(e.code||e.message)||e)+'\n'}
+    }
+    out.push(line);
+  }
+  let sv='';try{sv=localStorage.getItem('ms_db')||''}catch(e){}
+  return out.join('\n')+'\nВ этом браузере запомнена база: '+(sv===''?'нет':(DB_IDS[+sv]||sv))+'\nРежим быстрого каталога: '+(LITE?'включён':'выключен');
+}
 async function touchMeta(){if(!fdb||!LITE)return;await setDoc(doc(fdb,'catalog','_meta'),{done:true,updatedAt:serverTimestamp()},{merge:true});try{META=await metaStamp()}catch(e){}}
 function idb(){return new Promise((res,rej)=>{try{const r=indexedDB.open('ms-cache',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}})}
 async function cacheGet(){return Promise.race([cacheGet0(),new Promise(r=>setTimeout(()=>r(null),1500))])}
@@ -599,7 +626,7 @@ function showDone({isNew,p,sid,warn}){
   openDone('<div class="doneico"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>'
     +'<h2>'+(isNew?'Товар добавлен':'Изменения сохранены')+'</h2>'
     +'<p class="donename">'+esc(p.name.ru)+'</p>'
-    +'<p class="donesub">'+price+' · '+(isNew?'уже виден покупателям':'обновлено на сайте')+'</p>'
+    +'<p class="donesub">'+price+' · '+(isNew?'уже виден покупателям':'обновлено на сайте')+'<br><small>Записано в базу: '+esc(DBNAME)+'</small>'+'</p>'
     +(warn?'<p class="donewarn">'+esc(warn)+'</p>':'')
     +'<div class="doneacts"><a class="btn gold block" href="#/product/'+esc(sid)+'" data-close>ОТКРЫТЬ НА САЙТЕ</a>'
     +(isNew?'<button class="btn line block" type="button" data-done="again">Добавить ещё товар</button>':'')
@@ -629,6 +656,7 @@ async function saveProductFB(p){
     updatedAt:serverTimestamp()};
   if(JSON.stringify(data).length>950000)throw new Error('Слишком большие фото: уберите одно или два.');
   if(!fdb)throw new Error('Firebase не подключён. Откройте сайт на GitHub Pages в Chrome.');
+  await pickDb();
   if(p._new){data.createdAt=serverTimestamp();const r=await wt(addDoc(collection(fdb,'products'),data));return r.id}
   await wt(setDoc(doc(fdb,'products',p.id),data,{merge:true}));return p.id;
 }
@@ -1085,7 +1113,7 @@ function adminList(){
   <button class="btn line block" data-act="acats" style="margin-bottom:12px">Категории (${DB.cats.length})</button>
   <div class="two" style="margin-bottom:12px"><button class="btn sm line" data-act="asel-demo">Отметить демо-товары</button><button class="btn sm line" data-act="asel-none">Снять все отметки</button></div>
   <button class="btn sm block" id="delsel" data-act="adel-sel" style="margin-bottom:14px">${selLabel()}</button>
-  <div class="note" style="margin-bottom:14px"><b>Быстрая загрузка (лёгкий каталог)</b><br>Состояние: ${LITE?'включён, товаров: '+DB.products.length:'не создан, сайт грузит полные карточки (медленно)'}<br><button class="btn sm line block" data-act="sync-now" style="margin-top:8px">Синхронизировать (обновить у всех)</button><button class="btn sm gold block" data-act="lite-build" style="margin-top:8px">${LITE?'Обновить лёгкий каталог':'Создать лёгкий каталог'}</button></div>
+  <div class="note" style="margin-bottom:14px"><b>Быстрая загрузка (лёгкий каталог)</b><br>Состояние: ${LITE?'включён, товаров: '+DB.products.length:'не создан, сайт грузит полные карточки (медленно)'}<br><button class="btn sm line block" data-act="dbs-check" style="margin-top:8px">Проверить базы (покажет, где лежат товары)</button><pre id="dbsout" style="white-space:pre-wrap;font-size:14px;margin-top:8px"></pre><button class="btn sm line block" data-act="sync-now" style="margin-top:8px">Синхронизировать (обновить у всех)</button><button class="btn sm gold block" data-act="lite-build" style="margin-top:8px">${LITE?'Обновить лёгкий каталог':'Создать лёгкий каталог'}</button></div>
   <details class="note" style="margin-bottom:14px"><summary><b>Диагностика полей товаров</b></summary><button class="btn sm line" data-act="diag" style="margin:8px 0">Показать поля 2 товаров</button><pre id="diag" style="white-space:pre-wrap;font-size:15px"></pre></details>
   <div class="note" style="margin-bottom:14px"><b>Восстановить из резервной копии</b><br>Выберите файл .json. Сначала покажу, что в нём найдено, потом спрошу подтверждение.<br><input type="file" id="bkfile" accept=".json,application/json" style="margin:8px 0"><div id="bkinfo"></div><button class="btn sm gold block" id="bkrun" data-act="bk-run" disabled style="margin-top:8px">Восстановить всё (товары и категории)</button><button class="btn sm line block" id="bkdesc" data-act="bk-desc" disabled style="margin-top:8px">Восстановить только описания</button></div>
   <div class="note" style="margin-bottom:14px"><b>Перевод на казахский</b><br>Без перевода: <b>${needTr().length}</b> из ${DB.products.length}<br><button class="btn sm line" data-act="atr-copy" style="margin:8px 0">Подготовить 15 товаров</button><textarea id="trout" readonly rows="3" style="width:100%">${esc(TR_OUT)}</textarea><textarea id="trin" rows="3" placeholder="Вставьте сюда готовый перевод" style="width:100%;margin-top:8px"></textarea><button class="btn sm gold block" data-act="atr-save" style="margin-top:8px">Записать перевод</button></div>
@@ -1244,6 +1272,7 @@ document.addEventListener('click',e=>{
     case 'bk-desc':bkDesc().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'diag':diagRun().catch(err=>{const b=$('#diag');if(b)b.textContent='Ошибка: '+(err&&err.message||err)});break;
     case 'bk-run':bkRun().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
+    case 'dbs-check':(async()=>{const o=$('#dbsout');if(o)o.textContent='Проверяю…';try{const r=await checkDbs();if(o)o.textContent=r}catch(err){if(o)o.textContent='Ошибка: '+(err&&err.message||err)}})();break;
     case 'sync-now':(async()=>{try{toast('Синхронизирую…');await touchMeta();await loadData();render();toast('Готово. Товаров: '+DB.products.length+'. У покупателей обновится при следующем заходе.')}catch(err){toast('Ошибка: '+(err&&err.message||err))}})();break;
     case 'lite-build':buildLite().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'atr-save':trSave().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
@@ -1401,13 +1430,16 @@ document.addEventListener('input',e=>{
   if(c&&c.v===3&&Array.isArray(c.products)&&c.products.length){LITE=!!c.lite;DB.products=c.products;FBCATS=c.cats||null;DB.cats=buildCats();DB.loaded=true}
   render();started=true;
   await fbInitP;
+  if(c&&!dbPicked&&FORCE_I<0){const ix=DB_IDS.indexOf(c.db);if(ix>=0&&fdbs[ix]){fdb=fdbs[ix];DBNAME=DB_IDS[ix];dbPicked=true}}
   let fresh=c&&c.v===3&&(Date.now()-c.t<TTL);
+  if(fresh&&!c.meta)fresh=false;
   if(fresh&&c.meta){try{await pickDb();const m=await metaStamp();if(m&&m!==c.meta)fresh=false}catch(e){}}
   if(!fresh){
     const before=DB.loaded?dataSig():'';
     await loadData();
     if(!DB.loaded||dataSig()!==before||LOAD_ERR){KEEP=DB.loaded&&!!before;render()}
   }
+  watchMeta();
 })();
 </script>
 </body>
