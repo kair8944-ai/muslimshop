@@ -394,10 +394,16 @@ const BUILTIN_CATS=[
 ];
 /* В проекте две базы Firestore: именная (создана в Google AI Studio) и (default). Сайт сам находит ту, где лежат товары. */
 const DB_IDS=['ai-studio-muslimshop-6c5697f5-1412-4eb6-8d95-aa2cc7a70c7b','(default)'];
+/* Какую базу использовать: 'auto' (сайт ищет сам), 'default' или 'named'. Для админа можно открыть ссылку с ?db=default */
+const MAIN_DB='auto';
+const URLDB=(()=>{try{return new URLSearchParams(location.search).get('db')}catch(e){return null}})();
+const FORCE=(URLDB==='default'||URLDB==='named')?URLDB:(MAIN_DB==='default'||MAIN_DB==='named'?MAIN_DB:'');
+const FORCE_I=FORCE==='default'?1:FORCE==='named'?0:-1;
 let fdb=null,fdbs=[],dbPicked=false,DBNAME='',fauth=null,authUser=null,LOAD_ERR=FBLOAD_ERR,started=false,FBCATS=null;
 async function fbInit(){await FBP;if(FBLOAD_ERR)LOAD_ERR=FBLOAD_ERR;if(CONFIGURED&&initializeApp){try{const app=initializeApp(FIREBASE_CONFIG);fdbs=[getFirestore(app,DB_IDS[0]),getFirestore(app)];fdb=fdbs[0];DBNAME=DB_IDS[0];fauth=getAuth(app)}catch(e){LOAD_ERR=String(e&&e.message||e)}}}
 async function pickDb(){
   if(dbPicked||!fdbs.length)return;
+  if(FORCE_I>=0){fdb=fdbs[FORCE_I];DBNAME=DB_IDS[FORCE_I];dbPicked=true;return}
   let saved=-1;try{saved=parseInt(localStorage.getItem('ms_db')||'-1',10)}catch(e){}
   const order=saved===1?[1,0]:[0,1];
   let fb=null;
@@ -485,7 +491,7 @@ function idb(){return new Promise((res,rej)=>{try{const r=indexedDB.open('ms-cac
 async function cacheGet(){return Promise.race([cacheGet0(),new Promise(r=>setTimeout(()=>r(null),1500))])}
 async function cacheGet0(){try{const d=await idb();return await new Promise(res=>{try{const q=d.transaction('kv').objectStore('kv').get('data');q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null)}catch(e){res(null)}})}catch(e){return null}}
 async function cacheSet(v){try{const d=await idb();d.transaction('kv','readwrite').objectStore('kv').put(v,'data')}catch(e){}}
-const saveCache=()=>{if(DB.products.length)cacheSet({v:3,t:Date.now(),lite:LITE,products:DB.products.filter(p=>p.lite||!LITE),cats:FBCATS})};
+const saveCache=()=>{if(DB.products.length)cacheSet({v:3,t:Date.now(),db:DBNAME,lite:LITE,products:DB.products.filter(p=>p.lite||!LITE),cats:FBCATS})};
 const dataSig=()=>JSON.stringify(DB.products.map(p=>[p.id,p.price,p.old,p.status,p.name.ru,p.name.kk,p.desc.ru.length,p.desc.kk.length,p.images.length,p.img.length,p.cat,p.isNew,p.popular,p.featured]))+JSON.stringify(FBCATS||'');
 let KEEP=false;
 async function loadData(){
@@ -564,7 +570,7 @@ const LOCK='<a class="lock" href="#/admin" aria-label="Вход для влад�
 function banner(){
   if(!CONFIGURED)return `<div class="note" style="margin-top:20px">Магазин ещё не подключён к базе товаров (Firebase).</div>`;
   if(LOAD_ERR)return `<div class="note" style="margin-top:20px">${t('err_load')}</div>`;
-  if(!DB.loaded)return `<div class="note" style="margin-top:20px">Загрузка товаров… (v7)</div>`;
+  if(!DB.loaded)return `<div class="note" style="margin-top:20px">Загрузка товаров… (v8)</div>`;
   if(DB.loaded&&!DB.products.length)return `<div class="note" style="margin-top:20px">Скоро здесь появятся товары.</div>`;
   return '';
 }
@@ -802,7 +808,7 @@ async function bkRun(){
   render();
   toast(bad?('Записано '+ok+', ошибок '+bad+': '+lastErr):('Готово. Записано: '+ok+(LITE?'. Нажмите «Обновить лёгкий каталог»':'')));
 }
-document.body.insertAdjacentHTML('beforeend','<div id="ver">v7</div>');
+document.body.insertAdjacentHTML('beforeend','<div id="ver">v8</div>');
 document.addEventListener('change',e=>{if(e.target&&e.target.id==='bkfile')bkLoad(e.target.files&&e.target.files[0])});
 async function buildLite(){
   if(!fdb)return;
@@ -962,7 +968,7 @@ function renderChrome(){
     <div><h3>MUSLIM SHOP</h3><div>АТЫРАУ • РЫНОК ДИНА • БУТИК 24${LOCK}</div><div style="margin-top:6px">${esc(t('addr_txt'))}</div><div style="margin-top:6px"><a href="tel:+77781754241">${CONTACT.phone}</a></div></div>
     <div><h3>${t('menu_nav')}</h3><a href="#/">${t('home')}</a><a href="#/catalog">${t('catalog')}</a><a href="#/cart">${t('cart')}</a></div>
     <div><h3>${t('social')}</h3><a href="${CONTACT.ig}" target="_blank" rel="noopener">Instagram @musliim_shop06</a><a href="${CONTACT.tt}" target="_blank" rel="noopener">TikTok @muslim_shop06</a><a href="${CONTACT.tg}" target="_blank" rel="noopener">Telegram @muslim_shop06</a></div>
-    </div><div class="wrap copy">© MUSLIM SHOP, Атырау · v7 </div></footer>`;
+    </div><div class="wrap copy">© MUSLIM SHOP, Атырау · v8 </div></footer>`;
   updateBadge();
 }
 window.addEventListener('hashchange',()=>{ROUTE=null;closeMenu();render()});
@@ -1110,7 +1116,8 @@ document.addEventListener('input',e=>{
 
 /* ============ Start ============ */
 (async()=>{
-  const c=await cacheGet();
+  let c=await cacheGet();
+  if(c&&FORCE_I>=0&&c.db!==DB_IDS[FORCE_I])c=null;
   if(c&&c.v===3&&Array.isArray(c.products)&&c.products.length){LITE=!!c.lite;DB.products=c.products;FBCATS=c.cats||null;DB.cats=buildCats();DB.loaded=true}
   render();started=true;
   await fbInitP;
