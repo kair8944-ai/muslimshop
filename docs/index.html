@@ -291,6 +291,12 @@ h2::after{content:"";position:absolute;left:0;bottom:0;width:60px;height:3px;bac
 <div id="toast" role="status"></div>
 
 <script type="module">
+/* показывает любую ошибку на экране красной плашкой (нажмите, чтобы закрыть) */
+(function(){
+  function show(m){let b=document.getElementById('errbar');if(!b){b=document.createElement('div');b.id='errbar';b.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:9999;background:#7A2E2E;color:#fff;padding:12px 14px;border-radius:8px;font:15px/1.35 sans-serif;word-break:break-word';b.onclick=function(){b.remove()};document.body.appendChild(b)}b.textContent='Ошибка: '+m+' (нажмите, чтобы закрыть)'}
+  addEventListener('error',function(e){show((e.message||'')+(e.lineno?' [строка '+e.lineno+']':''))});
+  addEventListener('unhandledrejection',function(e){var r=e.reason;show(String(r&&(r.code||r.message)||r))});
+})();
 let initializeApp,getFirestore,collection,getDocs,getDoc,query,limit,doc,setDoc,addDoc,deleteDoc,serverTimestamp,Timestamp,getAuth,signInWithEmailAndPassword,onAuthStateChanged,signOut;
 
 /* ============ Firebase: вставьте сюда настройки вашего веб-приложения ============
@@ -853,6 +859,7 @@ function viewAdmin(){
     <form class="form" data-form="login">
       <div><label for="pn">PIN</label><input id="pn" name="pn" type="password" inputmode="numeric" autocomplete="current-password" required></div>
       <button class="btn gold block" type="submit">Войти</button>
+      <div id="loginmsg" class="note" style="display:none"></div>
     </form>`;
   return `<h1 style="margin-top:16px">Управление магазином</h1>
   <div class="note" style="margin-bottom:14px">Вы вошли как <b>${esc(authUser.email||'')}</b>. Всё, что вы сохраняете здесь, сразу записывается в Firebase и видно покупателям. База: <b>${esc(DBNAME)}</b></div>
@@ -939,7 +946,8 @@ function parse(){
   const q={};(qs||'').split('&').filter(Boolean).forEach(kv=>{const[i,v]=kv.split('=');q[decodeURIComponent(i)]=decodeURIComponent(v||'')});
   return {path,q};
 }
-function render(){
+function render(){try{renderInner()}catch(e){console.error(e);window.dispatchEvent(new ErrorEvent('error',{message:'экран не отрисовался: '+(e&&e.message||e)}))}}
+function renderInner(){
   const {path,q}=parse();const app=$('#app');
   document.title='MUSLIM SHOP — Атырау';
   let html='',after=null;
@@ -1049,7 +1057,7 @@ document.addEventListener('click',e=>{
 });
 let busy=false;
 async function handleForm(f){
-  if(busy)return;busy=true;
+  if(busy)return;busy=true;setTimeout(()=>{busy=false},30000);
   try{await handleForm2(f)}catch(err){toast('Ошибка: '+(err&&err.message||err))}finally{busy=false}
 }
 async function handleForm2(f){
@@ -1063,14 +1071,21 @@ async function handleForm2(f){
     window.open('https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(txt),'_blank','noopener');return;
   }
   if(kind==='login'){
-    if(!fauth||typeof signInWithEmailAndPassword!=='function'){toast('Firebase не загружен. Откройте сайт на GitHub Pages в Chrome');return}
+    const msg=m=>{const b=$('#loginmsg');if(b){b.style.display='block';b.textContent=m}toast(m)};
+    if(!fauth||typeof signInWithEmailAndPassword!=='function'){msg('Firebase не загружен. Откройте сайт на GitHub Pages в Chrome'+(FBLOAD_ERR?' ('+FBLOAD_ERR+')':''));return}
     const pin=String(fd.get('pn')||'').trim();let lastCode='';
+    msg('Проверяю PIN…');
     for(const em of ADMIN_EMAILS){
-      try{await signInWithEmailAndPassword(fauth,em,pin);toast('Вы вошли');return}
-      catch(err){lastCode=(err&&err.code)||String(err&&err.message||err);if(/operation-not-allowed|unauthorized-domain|network|too-many/.test(lastCode))break}
+      try{
+        const cr=await Promise.race([signInWithEmailAndPassword(fauth,em,pin),new Promise((_,rej)=>setTimeout(()=>rej({code:'timeout'}),20000))]);
+        if(cr&&cr.user)authUser=cr.user;
+        msg('Вы вошли как '+((cr&&cr.user&&cr.user.email)||em)+'. Открываю управление…');
+        render();
+        return;
+      }catch(err){lastCode=(err&&err.code)||String(err&&err.message||err);if(/operation-not-allowed|unauthorized-domain|network|too-many|timeout/.test(lastCode))break}
     }
     const c=lastCode;
-    toast(c.includes('operation-not-allowed')?'В Firebase не включён вход Email/Password':c.includes('unauthorized-domain')?'Домен сайта не добавлен в Authorized domains (Firebase)':c.includes('network')?'Нет связи с Firebase':c.includes('too-many')?'Слишком много попыток, подождите':'Неверный PIN или пользователя нет в Firebase ('+c+')');
+    msg(c.includes('operation-not-allowed')?'В Firebase не включён вход Email/Password':c.includes('unauthorized-domain')?'Домен сайта не добавлен в Authorized domains (Firebase)':c.includes('network')?'Нет связи с Firebase':c.includes('timeout')?'Нет ответа от Firebase. Проверьте интернет и нажмите ещё раз':c.includes('too-many')?'Слишком много попыток, подождите несколько минут':'Неверный PIN или пользователя нет в Firebase ('+c+')');
     return;
   }
   if(!isAdmin())return;
