@@ -297,7 +297,7 @@ h2::after{content:"";position:absolute;left:0;bottom:0;width:60px;height:3px;bac
   addEventListener('error',function(e){show((e.message||'')+(e.lineno?' [строка '+e.lineno+']':''))});
   addEventListener('unhandledrejection',function(e){var r=e.reason;show(String(r&&(r.code||r.message)||r))});
 })();
-let initializeApp,getFirestore,collection,getDocs,getDoc,query,limit,doc,setDoc,addDoc,deleteDoc,serverTimestamp,Timestamp,getAuth,signInWithEmailAndPassword,onAuthStateChanged,signOut;
+let initializeApp,getFirestore,collection,getDocs,getDoc,query,limit,doc,setDoc,addDoc,deleteDoc,serverTimestamp,Timestamp,getAuth,initializeAuth,browserLocalPersistence,inMemoryPersistence,signInWithEmailAndPassword,onAuthStateChanged,signOut;
 
 /* ============ Firebase: вставьте сюда настройки вашего веб-приложения ============
    Firebase Console → ⚙ Project settings → Your apps → Web app → firebaseConfig.
@@ -322,7 +322,7 @@ const FBP=CONFIGURED?(async()=>{
     const [A,F,Au]=await Promise.all([import(B+'firebase-app.js'),import(B+'firebase-firestore.js'),import(B+'firebase-auth.js')]);
     ({initializeApp}=A);
     ({getFirestore,collection,getDocs,getDoc,query,limit,doc,setDoc,addDoc,deleteDoc,serverTimestamp,Timestamp}=F);
-    ({getAuth,signInWithEmailAndPassword,onAuthStateChanged,signOut}=Au);
+    ({getAuth,initializeAuth,browserLocalPersistence,inMemoryPersistence,signInWithEmailAndPassword,onAuthStateChanged,signOut}=Au);
   }catch(e){FBLOAD_ERR='Не удалось загрузить Firebase: '+String(e&&e.message||e)}
 })():Promise.resolve();
 
@@ -406,7 +406,7 @@ const URLDB=(()=>{try{return new URLSearchParams(location.search).get('db')}catc
 const FORCE=(URLDB==='default'||URLDB==='named')?URLDB:(MAIN_DB==='default'||MAIN_DB==='named'?MAIN_DB:'');
 const FORCE_I=FORCE==='default'?1:FORCE==='named'?0:-1;
 let fdb=null,fdbs=[],dbPicked=false,DBNAME='',fauth=null,authUser=null,LOAD_ERR=FBLOAD_ERR,started=false,FBCATS=null;
-async function fbInit(){await FBP;if(FBLOAD_ERR)LOAD_ERR=FBLOAD_ERR;if(CONFIGURED&&initializeApp){try{const app=initializeApp(FIREBASE_CONFIG);fdbs=[getFirestore(app,DB_IDS[0]),getFirestore(app)];fdb=fdbs[0];DBNAME=DB_IDS[0];fauth=getAuth(app)}catch(e){LOAD_ERR=String(e&&e.message||e)}}}
+async function fbInit(){await FBP;if(FBLOAD_ERR)LOAD_ERR=FBLOAD_ERR;if(CONFIGURED&&initializeApp){try{const app=initializeApp(FIREBASE_CONFIG);fdbs=[getFirestore(app,DB_IDS[0]),getFirestore(app)];fdb=fdbs[0];DBNAME=DB_IDS[0];try{fauth=initializeAuth(app,{persistence:[browserLocalPersistence,inMemoryPersistence]})}catch(e2){fauth=getAuth(app)}}catch(e){LOAD_ERR=String(e&&e.message||e)}}}
 async function pickDb(){
   if(dbPicked||!fdbs.length)return;
   if(FORCE_I>=0){fdb=fdbs[FORCE_I];DBNAME=DB_IDS[FORCE_I];dbPicked=true;return}
@@ -1071,13 +1071,22 @@ async function handleForm2(f){
     window.open('https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(txt),'_blank','noopener');return;
   }
   if(kind==='login'){
+    const probe=async(em,pin)=>{
+      const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),8000);
+      try{
+        const r=await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+encodeURIComponent(FIREBASE_CONFIG.apiKey),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:em,password:pin,returnSecureToken:false}),signal:ctl.signal});
+        const j=await r.json().catch(()=>({}));clearTimeout(to);
+        if(r.ok)return 'пароль верный, но библиотека Firebase не отвечает';
+        return String((j.error&&j.error.message)||r.status);
+      }catch(e){clearTimeout(to);return 'нет ответа ('+((e&&e.name)||e)+')'}
+    };
     const msg=m=>{const b=$('#loginmsg');if(b){b.style.display='block';b.textContent=m}toast(m)};
     if(!fauth||typeof signInWithEmailAndPassword!=='function'){msg('Firebase не загружен. Откройте сайт на GitHub Pages в Chrome'+(FBLOAD_ERR?' ('+FBLOAD_ERR+')':''));return}
     const pin=String(fd.get('pn')||'').trim();let lastCode='';
     msg('Проверяю PIN…');
     for(const em of ADMIN_EMAILS){
       try{
-        const cr=await Promise.race([signInWithEmailAndPassword(fauth,em,pin),new Promise((_,rej)=>setTimeout(()=>rej({code:'timeout'}),20000))]);
+        const cr=await Promise.race([signInWithEmailAndPassword(fauth,em,pin),new Promise((_,rej)=>setTimeout(()=>rej({code:'timeout'}),12000))]);
         if(cr&&cr.user)authUser=cr.user;
         msg('Вы вошли как '+((cr&&cr.user&&cr.user.email)||em)+'. Открываю управление…');
         render();
@@ -1085,6 +1094,7 @@ async function handleForm2(f){
       }catch(err){lastCode=(err&&err.code)||String(err&&err.message||err);if(/operation-not-allowed|unauthorized-domain|network|too-many|timeout/.test(lastCode))break}
     }
     const c=lastCode;
+    if(c.includes('timeout')){msg('Нет ответа от Firebase. Проверяю напрямую…');const d=[];for(const em of ADMIN_EMAILS)d.push(em+' → '+await probe(em,pin));msg('Нет ответа от Firebase. Диагностика: '+d.join(' | '));return}
     msg(c.includes('operation-not-allowed')?'В Firebase не включён вход Email/Password':c.includes('unauthorized-domain')?'Домен сайта не добавлен в Authorized domains (Firebase)':c.includes('network')?'Нет связи с Firebase':c.includes('timeout')?'Нет ответа от Firebase. Проверьте интернет и нажмите ещё раз':c.includes('too-many')?'Слишком много попыток, подождите несколько минут':'Неверный PIN или пользователя нет в Firebase ('+c+')');
     return;
   }
