@@ -535,12 +535,16 @@ function buildCats(){
   return base.map((c,i)=>({c,i})).sort((x,y)=>((x.c.order!=null?x.c.order:1e6+x.i)-(y.c.order!=null?y.c.order:1e6+y.i))).map(x=>x.c);
 }
 /* кэш товаров в IndexedDB: повторное открытие сайта показывает всё мгновенно */
-const TTL=30*60*1000;
+const TTL=5*60*1000;
+let META=null;
+const stampOf=u=>(u&&u.seconds!=null)?(u.seconds+'.'+(u.nanoseconds||0)):null;
+async function metaStamp(){if(!fdb)return null;const sn=await getDoc(doc(fdb,'catalog','_meta'));return sn.exists()?stampOf(sn.data().updatedAt):null}
+async function touchMeta(){if(!fdb||!LITE)return;await setDoc(doc(fdb,'catalog','_meta'),{done:true,updatedAt:serverTimestamp()},{merge:true});try{META=await metaStamp()}catch(e){}}
 function idb(){return new Promise((res,rej)=>{try{const r=indexedDB.open('ms-cache',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}})}
 async function cacheGet(){return Promise.race([cacheGet0(),new Promise(r=>setTimeout(()=>r(null),1500))])}
 async function cacheGet0(){try{const d=await idb();return await new Promise(res=>{try{const q=d.transaction('kv').objectStore('kv').get('data');q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null)}catch(e){res(null)}})}catch(e){return null}}
 async function cacheSet(v){try{const d=await idb();d.transaction('kv','readwrite').objectStore('kv').put(v,'data')}catch(e){}}
-const saveCache=()=>{if(DB.products.length)cacheSet({v:3,t:Date.now(),db:DBNAME,lite:LITE,products:DB.products.filter(p=>p.lite||!LITE),cats:FBCATS})};
+const saveCache=()=>{if(DB.products.length)cacheSet({v:3,t:Date.now(),meta:META,db:DBNAME,lite:LITE,products:DB.products.filter(p=>p.lite||!LITE),cats:FBCATS})};
 const dataSig=()=>JSON.stringify(DB.products.map(p=>[p.id,p.price,p.old,p.status,p.name.ru,p.name.kk,p.desc.ru.length,p.desc.kk.length,p.images.length,p.img.length,p.cat,p.isNew,p.popular,p.featured]))+JSON.stringify(FBCATS||'');
 let KEEP=false;
 function catFromDoc(x,i){const d=x.data();return {id:x.id,main:(d.main===undefined?i<8:!!d.main)?1:0,name:{ru:d.titleRu||d.nameRu||d.name||d.title||x.id,kk:d.titleKz||d.nameKz||''},order:(typeof d.order==='number')?d.order:null}}
@@ -549,7 +553,7 @@ async function loadData(){
   await pickDb();
   try{
     let snap=null,lite=false;
-    try{const cs=await getDocs(collection(fdb,'catalog'));if(cs.docs.some(x=>x.id==='_meta')){snap={docs:cs.docs.filter(x=>x.id!=='_meta')};lite=true}}catch(e){}
+    try{const cs=await getDocs(collection(fdb,'catalog'));const mm=cs.docs.find(x=>x.id==='_meta');if(mm){META=stampOf(mm.data().updatedAt);snap={docs:cs.docs.filter(x=>x.id!=='_meta')};lite=true}}catch(e){}
     if(!snap)snap=await getDocs(collection(fdb,'products'));
     LITE=lite;
     DB.products=snap.docs.map(x=>lite?normLite(x.id,x.data()):norm(x.id,x.data())).sort((a,b)=>(b.created-a.created)||a.name.ru.localeCompare(b.name.ru));
@@ -1081,7 +1085,7 @@ function adminList(){
   <button class="btn line block" data-act="acats" style="margin-bottom:12px">Категории (${DB.cats.length})</button>
   <div class="two" style="margin-bottom:12px"><button class="btn sm line" data-act="asel-demo">Отметить демо-товары</button><button class="btn sm line" data-act="asel-none">Снять все отметки</button></div>
   <button class="btn sm block" id="delsel" data-act="adel-sel" style="margin-bottom:14px">${selLabel()}</button>
-  <div class="note" style="margin-bottom:14px"><b>Быстрая загрузка (лёгкий каталог)</b><br>Состояние: ${LITE?'включён, товаров: '+DB.products.length:'не создан, сайт грузит полные карточки (медленно)'}<br><button class="btn sm gold block" data-act="lite-build" style="margin-top:8px">${LITE?'Обновить лёгкий каталог':'Создать лёгкий каталог'}</button></div>
+  <div class="note" style="margin-bottom:14px"><b>Быстрая загрузка (лёгкий каталог)</b><br>Состояние: ${LITE?'включён, товаров: '+DB.products.length:'не создан, сайт грузит полные карточки (медленно)'}<br><button class="btn sm line block" data-act="sync-now" style="margin-top:8px">Синхронизировать (обновить у всех)</button><button class="btn sm gold block" data-act="lite-build" style="margin-top:8px">${LITE?'Обновить лёгкий каталог':'Создать лёгкий каталог'}</button></div>
   <details class="note" style="margin-bottom:14px"><summary><b>Диагностика полей товаров</b></summary><button class="btn sm line" data-act="diag" style="margin:8px 0">Показать поля 2 товаров</button><pre id="diag" style="white-space:pre-wrap;font-size:15px"></pre></details>
   <div class="note" style="margin-bottom:14px"><b>Восстановить из резервной копии</b><br>Выберите файл .json. Сначала покажу, что в нём найдено, потом спрошу подтверждение.<br><input type="file" id="bkfile" accept=".json,application/json" style="margin:8px 0"><div id="bkinfo"></div><button class="btn sm gold block" id="bkrun" data-act="bk-run" disabled style="margin-top:8px">Восстановить всё (товары и категории)</button><button class="btn sm line block" id="bkdesc" data-act="bk-desc" disabled style="margin-top:8px">Восстановить только описания</button></div>
   <div class="note" style="margin-bottom:14px"><b>Перевод на казахский</b><br>Без перевода: <b>${needTr().length}</b> из ${DB.products.length}<br><button class="btn sm line" data-act="atr-copy" style="margin:8px 0">Подготовить 15 товаров</button><textarea id="trout" readonly rows="3" style="width:100%">${esc(TR_OUT)}</textarea><textarea id="trin" rows="3" placeholder="Вставьте сюда готовый перевод" style="width:100%;margin-top:8px"></textarea><button class="btn sm gold block" data-act="atr-save" style="margin-top:8px">Записать перевод</button></div>
@@ -1240,6 +1244,7 @@ document.addEventListener('click',e=>{
     case 'bk-desc':bkDesc().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'diag':diagRun().catch(err=>{const b=$('#diag');if(b)b.textContent='Ошибка: '+(err&&err.message||err)});break;
     case 'bk-run':bkRun().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
+    case 'sync-now':(async()=>{try{toast('Синхронизирую…');await touchMeta();await loadData();render();toast('Готово. Товаров: '+DB.products.length+'. У покупателей обновится при следующем заходе.')}catch(err){toast('Ошибка: '+(err&&err.message||err))}})();break;
     case 'lite-build':buildLite().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'atr-save':trSave().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'alogout':signOut(fauth).then(()=>{editing=null;catEditing=null;adminView='products';render()});break;
@@ -1327,7 +1332,7 @@ async function handleForm2(f){
     if(btn){btn.disabled=true;btn.textContent='СОХРАНЯЮ…'}
     const isNew=!!c._new;
     try{
-      await saveCategory(c,nr,nk,mn);
+      await saveCategory(c,nr,nk,mn);try{await touchMeta()}catch(e){}
       catEditing=null;render();window.scrollTo(0,0);
       openDone('<div class="doneico"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><h2>'+(isNew?'Категория добавлена':'Категория сохранена')+'</h2><p class="donename">'+esc(nr)+'</p><div class="doneacts"><button class="btn gold block" type="button" data-done="close">Готово</button></div>','');
     }catch(err){
@@ -1351,7 +1356,8 @@ async function handleForm2(f){
     try{
       const sid=await saveProductFB(p);
       let rec=null,warn='';
-      try{rec=await syncLite(sid,p)}catch(e){warn='Товар сохранён, но быстрый каталог не обновился. Откройте админку и нажмите «Обновить лёгкий каталог».'}
+      for(let k=0;k<2&&!rec;k++){try{rec=await syncLite(sid,p)}catch(e){if(k===1)warn='Товар сохранён, но другим покупателям он пока НЕ виден: быстрый каталог не обновился. Откройте админку и нажмите «Обновить лёгкий каталог».'}}
+      if(!warn){try{await touchMeta()}catch(e){}}
       delete FULLC[sid];delete FULLERR[sid];
       localPut(sid,p,rec);
       editing=null;render();window.scrollTo(0,0);
@@ -1395,7 +1401,8 @@ document.addEventListener('input',e=>{
   if(c&&c.v===3&&Array.isArray(c.products)&&c.products.length){LITE=!!c.lite;DB.products=c.products;FBCATS=c.cats||null;DB.cats=buildCats();DB.loaded=true}
   render();started=true;
   await fbInitP;
-  const fresh=c&&c.v===3&&(Date.now()-c.t<TTL);
+  let fresh=c&&c.v===3&&(Date.now()-c.t<TTL);
+  if(fresh&&c.meta){try{await pickDb();const m=await metaStamp();if(m&&m!==c.meta)fresh=false}catch(e){}}
   if(!fresh){
     const before=DB.loaded?dataSig():'';
     await loadData();
