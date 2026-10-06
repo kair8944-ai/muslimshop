@@ -532,7 +532,7 @@ function buildCats(){
   const base=(FBCATS&&FBCATS.length)?FBCATS:BUILTIN_CATS.map(c=>({...c}));
   const ids=new Set(base.map(c=>c.id));
   DB.products.forEach(p=>{if(p.cat&&!ids.has(p.cat)){ids.add(p.cat);base.push({id:p.cat,main:0,name:{ru:p.cat,kk:''}})}});
-  return base;
+  return base.map((c,i)=>({c,i})).sort((x,y)=>((x.c.order!=null?x.c.order:1e6+x.i)-(y.c.order!=null?y.c.order:1e6+y.i))).map(x=>x.c);
 }
 /* кэш товаров в IndexedDB: повторное открытие сайта показывает всё мгновенно */
 const TTL=30*60*1000;
@@ -543,6 +543,7 @@ async function cacheSet(v){try{const d=await idb();d.transaction('kv','readwrite
 const saveCache=()=>{if(DB.products.length)cacheSet({v:3,t:Date.now(),db:DBNAME,lite:LITE,products:DB.products.filter(p=>p.lite||!LITE),cats:FBCATS})};
 const dataSig=()=>JSON.stringify(DB.products.map(p=>[p.id,p.price,p.old,p.status,p.name.ru,p.name.kk,p.desc.ru.length,p.desc.kk.length,p.images.length,p.img.length,p.cat,p.isNew,p.popular,p.featured]))+JSON.stringify(FBCATS||'');
 let KEEP=false;
+function catFromDoc(x,i){const d=x.data();return {id:x.id,main:(d.main===undefined?i<8:!!d.main)?1:0,name:{ru:d.titleRu||d.nameRu||d.name||d.title||x.id,kk:d.titleKz||d.nameKz||''},order:(typeof d.order==='number')?d.order:null}}
 async function loadData(){
   if(!fdb){DB.loaded=true;return}
   await pickDb();
@@ -556,7 +557,7 @@ async function loadData(){
   }catch(e){LOAD_ERR=String(e&&e.message||e)}
   try{
     const cs=await getDocs(collection(fdb,'categories'));
-    const arr=cs.docs.map((x,i)=>{const d=x.data();return {id:x.id,main:(d.main===undefined?i<8:!!d.main)?1:0,name:{ru:d.titleRu||d.nameRu||d.name||d.title||x.id,kk:d.titleKz||d.nameKz||''}}});
+    const arr=cs.docs.map(catFromDoc);
     FBCATS=arr.length?arr:null;
   }catch(e){FBCATS=null}
   DB.cats=buildCats();
@@ -581,6 +582,8 @@ function openDone(html,cls){
   const o=document.createElement('div');o.id='doneov';o.className='doneov';
   o.innerHTML='<div class="donecard '+(cls||'')+'" role="dialog" aria-live="polite">'+html+'</div>';
   o.addEventListener('click',e=>{
+    const cd=e.target.closest('[data-cdel]');
+    if(cd){const sel=document.getElementById('catmove');const tg=sel?sel.value:'';closeDone();doDeleteCat(cd.dataset.cdel,tg).catch(err=>showFail(fbErrText(err),'Категория не удалена'));return}
     const b=e.target.closest('[data-done]');
     if(b){const k=b.dataset.done;closeDone();if(k==='again'){editing=blankProduct();render();window.scrollTo(0,0)}return}
     if(e.target===o||e.target.closest('[data-close]'))closeDone();
@@ -598,9 +601,9 @@ function showDone({isNew,p,sid,warn}){
     +(isNew?'<button class="btn line block" type="button" data-done="again">Добавить ещё товар</button>':'')
     +'<button class="btn line block" type="button" data-done="close">К списку товаров</button></div>','');
 }
-function showFail(text){
+function showFail(text,title){
   openDone('<div class="doneico"><svg viewBox="0 0 24 24"><path d="M12 6v8M12 18v.5"/></svg></div>'
-    +'<h2>Товар не сохранён</h2><p class="donesub" style="color:var(--black)">'+esc(text)+'</p>'
+    +'<h2>'+esc(title||'Товар не сохранён')+'</h2><p class="donesub" style="color:var(--black)">'+esc(text)+'</p>'
     +'<div class="doneacts"><button class="btn gold block" type="button" data-done="close">Понятно</button></div>','fail');
 }
 function localPut(sid,p,rec){
@@ -672,7 +675,7 @@ const LOCK='<a class="lock" href="#/admin" aria-label="Вход для влад�
 function banner(){
   if(!CONFIGURED)return `<div class="note" style="margin-top:20px">Магазин ещё не подключён к базе товаров (Firebase).</div>`;
   if(LOAD_ERR)return `<div class="note" style="margin-top:20px">${t('err_load')}</div>`;
-  if(!DB.loaded)return `<div class="note" style="margin-top:20px">Загрузка товаров… (v10)</div>`;
+  if(!DB.loaded)return `<div class="note" style="margin-top:20px">Загрузка товаров… (v11)</div>`;
   if(DB.loaded&&!DB.products.length)return `<div class="note" style="margin-top:20px">Скоро здесь появятся товары.</div>`;
   return '';
 }
@@ -912,7 +915,7 @@ async function bkRun(){
   render();
   toast(bad?('Записано '+ok+', ошибок '+bad+': '+lastErr):('Готово. Записано: '+ok+(LITE?'. Нажмите «Обновить лёгкий каталог»':'')));
 }
-document.body.insertAdjacentHTML('beforeend','<div id="ver">v10</div>');
+document.body.insertAdjacentHTML('beforeend','<div id="ver">v11</div>');
 document.addEventListener('change',e=>{if(e.target&&e.target.id==='bkfile')bkLoad(e.target.files&&e.target.files[0])});
 async function buildLite(){
   if(!fdb)return;
@@ -962,10 +965,120 @@ function viewAdmin(){
   return `<h1 style="margin-top:16px">Управление магазином</h1>
   <div class="note" style="margin-bottom:14px">Вы вошли как <b>${esc(authUser.email||'')}</b>. Всё, что вы сохраняете здесь, сразу записывается в Firebase и видно покупателям. База: <b>${esc(DBNAME)}</b></div>
   <div class="tabs"><button class="btn sm line" data-act="alogout">Выйти</button></div>
-  ${editing?adminForm(editing):adminList()}`;
+  ${editing?adminForm(editing):(adminView==='cats'?adminCats():adminList())}`;
+}
+/* ---- управление категориями ---- */
+let adminView='products',catEditing=null;
+const catCount=id=>DB.products.filter(p=>p.cat===id).length;
+const catHasDoc=id=>(FBCATS||[]).some(c=>c.id===id);
+const catNamed=c=>!!(c.name.ru&&c.name.ru!==c.id);
+async function ensureCats(){
+  if(FBCATS&&FBCATS.length)return;
+  const cs=await wt(getDocs(collection(fdb,'categories')));
+  if(cs.docs.length){FBCATS=cs.docs.map(catFromDoc);DB.cats=buildCats();return}
+  const base=BUILTIN_CATS.map((c,i)=>({id:c.id,main:c.main?1:0,name:{ru:c.name.ru,kk:c.name.kk||''},order:i*10}));
+  for(const c of base)await wt(setDoc(doc(fdb,'categories',c.id),{titleRu:c.name.ru,titleKz:c.name.kk,main:!!c.main,order:c.order,updatedAt:serverTimestamp()},{merge:true}));
+  FBCATS=base;DB.cats=buildCats();
+}
+function putCatLocal(rec){
+  const arr=(FBCATS||[]).slice();const i=arr.findIndex(x=>x.id===rec.id);
+  if(i>=0)arr[i]=rec;else arr.push(rec);
+  FBCATS=arr;DB.cats=buildCats();saveCache();
+}
+async function saveCategory(c,nr,nk,main){
+  await ensureCats();
+  let id=c.id,order=null;
+  if(c._new){id='cat-'+Math.random().toString(36).slice(2,8);order=Math.max(0,...DB.cats.map(x=>x.order!=null?x.order:0))+10}
+  const old=DB.cats.find(x=>x.id===id);
+  const data={titleRu:nr,titleKz:nk,main:!!main,updatedAt:serverTimestamp()};
+  if(order!=null)data.order=order;
+  await wt(setDoc(doc(fdb,'categories',id),data,{merge:true}));
+  putCatLocal({id,main:main?1:0,name:{ru:nr,kk:nk},order:order!=null?order:(old&&old.order!=null?old.order:null)});
+  return id;
+}
+async function moveCat(id,dir){
+  await ensureCats();
+  const list=DB.cats.slice(),i=list.findIndex(c=>c.id===id),j=i+dir;
+  if(i<0||j<0||j>=list.length)return;
+  const tmp=list[i];list[i]=list[j];list[j]=tmp;
+  for(let k=0;k<list.length;k++){
+    const c=list[k],want=k*10;
+    if(c.order===want&&catHasDoc(c.id))continue;
+    await wt(setDoc(doc(fdb,'categories',c.id),{order:want,main:!!c.main,updatedAt:serverTimestamp()},{merge:true}));
+    putCatLocal({id:c.id,main:c.main?1:0,name:c.name,order:want});
+  }
+}
+function askDeleteCat(id){
+  const c=DB.cats.find(x=>x.id===id);if(!c)return;
+  const n=catCount(id),nm=catNamed(c)?c.name.ru:c.id;
+  if(!n){
+    if(!confirm('Удалить категорию «'+nm+'»? Товаров в ней нет.'))return;
+    doDeleteCat(id,'').catch(err=>showFail(fbErrText(err),'Категория не удалена'));return;
+  }
+  const others=DB.cats.filter(x=>x.id!==id);
+  if(!others.length){toast('Нельзя удалить единственную категорию');return}
+  openDone('<h2>Удалить категорию?</h2><p class="donename">'+esc(nm)+'</p>'
+    +'<p class="donesub">Товаров в ней: '+n+'. Куда их перенести?</p>'
+    +'<select id="catmove" style="width:100%;font-size:18px;padding:12px;margin-bottom:12px;border:2px solid var(--black);border-radius:10px;background:#fff">'+others.map(x=>'<option value="'+esc(x.id)+'">'+esc(catNamed(x)?x.name.ru:x.id)+'</option>').join('')+'</select>'
+    +'<div class="doneacts"><button class="btn gold block" type="button" data-cdel="'+esc(id)+'">ПЕРЕНЕСТИ И УДАЛИТЬ</button><button class="btn line block" type="button" data-done="close">Отмена</button></div>','');
+}
+async function doDeleteCat(id,target){
+  const items=DB.products.filter(p=>p.cat===id);
+  if(items.length&&!target)throw new Error('Не выбрана категория для переноса товаров');
+  await ensureCats();
+  let moved=0;
+  for(const p of items){
+    await wt(setDoc(doc(fdb,'products',p.id),{categoryId:target,updatedAt:serverTimestamp()},{merge:true}));
+    if(LITE)await wt(setDoc(doc(fdb,'catalog',p.id),{categoryId:target,updatedAt:serverTimestamp()},{merge:true}));
+    p.cat=target;delete FULLC[p.id];moved++;
+    if(moved%5===0)toast('Переношу товары: '+moved+' из '+items.length);
+  }
+  if(catHasDoc(id))await wt(deleteDoc(doc(fdb,'categories',id)));
+  FBCATS=(FBCATS||[]).filter(x=>x.id!==id);
+  DB.cats=buildCats();saveCache();render();
+  openDone('<div class="doneico"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><h2>Категория удалена</h2>'
+    +(moved?'<p class="donesub">Товаров перенесено: '+moved+'</p>':'<p class="donesub">Товаров в ней не было</p>')
+    +'<div class="doneacts"><button class="btn gold block" type="button" data-done="close">Готово</button></div>','');
+}
+async function importCats(){
+  const oi=(fdb===fdbs[0])?1:0,other=fdbs[oi];
+  if(!other){toast('Другая база недоступна');return}
+  toast('Читаю категории…');
+  const cs=await wt(getDocs(collection(other,'categories')));
+  if(!cs.docs.length){toast('В базе «'+DB_IDS[oi]+'» категорий нет');return}
+  if(!confirm('Скопировать категории ('+cs.docs.length+') из базы «'+DB_IDS[oi]+'» в «'+DBNAME+'»?\nКатегории с такими же id обновятся, остальное не тронется.'))return;
+  for(const x of cs.docs)await wt(setDoc(doc(fdb,'categories',x.id),{...x.data(),updatedAt:serverTimestamp()},{merge:true}));
+  const c2=await wt(getDocs(collection(fdb,'categories')));
+  FBCATS=c2.docs.map(catFromDoc);DB.cats=buildCats();saveCache();render();
+  openDone('<div class="doneico"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><h2>Категории скопированы</h2><p class="donesub">Скопировано: '+cs.docs.length+'</p><div class="doneacts"><button class="btn gold block" type="button" data-done="close">Готово</button></div>','');
+}
+function adminCats(){
+  if(catEditing)return catForm(catEditing);
+  const list=DB.cats;
+  return `<div class="two" style="margin-bottom:12px"><button class="btn sm line" data-act="acats-back">← К товарам</button><button class="btn sm gold" data-act="acat-new">+ Категория</button></div>
+  <h2 style="margin:6px 0 10px">Категории (${list.length})</h2>
+  <div class="note" style="margin-bottom:12px">Можно переименовать, переставить кнопками ▲ ▼, убрать с главной или удалить. Если в удаляемой категории есть товары, сайт предложит перенести их в другую.</div>
+  ${list.map((c,i)=>{const n=catCount(c.id),nm=catNamed(c);return `<div class="note" style="margin-bottom:10px">
+    <b style="font-size:20px">${esc(nm?c.name.ru:'Без названия')}</b>${c.name.kk?' · '+esc(c.name.kk):''}<br>
+    <span style="color:var(--muted)">${nm?'':'В товарах записано: '}${esc(c.id)} · Товаров: ${n}${c.main?' · на главной':''}</span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn sm line" data-act="acat-up" data-id="${esc(c.id)}" ${i===0?'disabled':''}>▲</button><button class="btn sm line" data-act="acat-down" data-id="${esc(c.id)}" ${i===list.length-1?'disabled':''}>▼</button><button class="btn sm line" data-act="acat-edit" data-id="${esc(c.id)}">Изменить</button><button class="btn sm line" data-act="acat-del" data-id="${esc(c.id)}">Удалить</button></div></div>`}).join('')}
+  <div class="note" style="margin-top:14px"><b>Скопировать категории из другой базы</b><br>Если в другой базе Firestore уже есть названия категорий, их можно перенести сюда.<br><button class="btn sm line block" data-act="acat-import" style="margin-top:8px">Скопировать категории</button></div>`;
+}
+function catForm(c){
+  const nm=catNamed(c);
+  return `<form class="form" data-form="category">
+   <h2>${c._new?'Новая категория':'Изменить категорию'}</h2>
+   ${(!c._new&&!nm)?`<div class="note">У этой категории пока нет названия: в товарах она записана как «${esc(c.id)}». Задайте название, и оно появится на сайте.</div>`:''}
+   <div><label for="c-nr">Название (RU)</label><input id="c-nr" name="nr" value="${esc(nm?c.name.ru:'')}" required></div>
+   <div><label for="c-nk">Название (KZ), по желанию</label><input id="c-nk" name="nk" value="${esc(c.name.kk||'')}"></div>
+   <div class="checks"><label><input type="checkbox" name="main" ${c.main?'checked':''}> Показывать на главной</label></div>
+   <button class="btn gold block" type="submit">СОХРАНИТЬ</button>
+   <button class="btn line block" type="button" data-act="acat-cancel">Отмена</button>
+  </form>`;
 }
 function adminList(){
   return `<button class="btn gold block" data-act="anew" style="margin-bottom:12px">+ ДОБАВИТЬ ТОВАР</button>
+  <button class="btn line block" data-act="acats" style="margin-bottom:12px">Категории (${DB.cats.length})</button>
   <div class="two" style="margin-bottom:12px"><button class="btn sm line" data-act="asel-demo">Отметить демо-товары</button><button class="btn sm line" data-act="asel-none">Снять все отметки</button></div>
   <button class="btn sm block" id="delsel" data-act="adel-sel" style="margin-bottom:14px">${selLabel()}</button>
   <div class="note" style="margin-bottom:14px"><b>Быстрая загрузка (лёгкий каталог)</b><br>Состояние: ${LITE?'включён, товаров: '+DB.products.length:'не создан, сайт грузит полные карточки (медленно)'}<br><button class="btn sm gold block" data-act="lite-build" style="margin-top:8px">${LITE?'Обновить лёгкий каталог':'Создать лёгкий каталог'}</button></div>
@@ -1074,7 +1187,7 @@ function renderChrome(){
     <div><h3>MUSLIM SHOP</h3><div>АТЫРАУ • РЫНОК ДИНА • БУТИК 24${LOCK}</div><div style="margin-top:6px">${esc(t('addr_txt'))}</div><div style="margin-top:6px"><a href="tel:+77781754241">${CONTACT.phone}</a></div><div style="margin-top:6px">${lang==='kk'?'Күн сайын 10:00–19:00':'Ежедневно 10:00–19:00'}</div></div>
     <div><h3>${t('menu_nav')}</h3><a href="#/">${t('home')}</a><a href="#/catalog">${t('catalog')}</a><a href="#/cart">${t('cart')}</a></div>
     <div><h3>${t('social')}</h3><a href="${CONTACT.ig}" target="_blank" rel="noopener">Instagram @musliim_shop06</a><a href="${CONTACT.tt}" target="_blank" rel="noopener">TikTok @muslim_shop06</a><a href="${CONTACT.tg}" target="_blank" rel="noopener">Telegram @muslim_shop06</a><a href="${CONTACT.gis}" target="_blank" rel="noopener">2ГИС — ${lang==='kk'?'картада':'мы на карте'}</a></div>
-    </div><div class="wrap copy">© MUSLIM SHOP, Атырау · v10 </div></footer>`;
+    </div><div class="wrap copy">© MUSLIM SHOP, Атырау · v11 </div></footer>`;
   updateBadge();
 }
 window.addEventListener('hashchange',()=>{ROUTE=null;closeMenu();render()});
@@ -1129,7 +1242,16 @@ document.addEventListener('click',e=>{
     case 'bk-run':bkRun().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'lite-build':buildLite().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'atr-save':trSave().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
-    case 'alogout':signOut(fauth).then(()=>{editing=null;render()});break;
+    case 'alogout':signOut(fauth).then(()=>{editing=null;catEditing=null;adminView='products';render()});break;
+    case 'acats':adminView='cats';catEditing=null;render();window.scrollTo(0,0);break;
+    case 'acats-back':adminView='products';catEditing=null;render();window.scrollTo(0,0);break;
+    case 'acat-new':catEditing={_new:1,id:'',main:0,name:{ru:'',kk:''}};render();window.scrollTo(0,0);break;
+    case 'acat-edit':{const c=DB.cats.find(x=>x.id===id);if(c){catEditing=JSON.parse(JSON.stringify(c));render();window.scrollTo(0,0)}break}
+    case 'acat-cancel':catEditing=null;render();break;
+    case 'acat-up':moveCat(id,-1).then(render).catch(err=>showFail(fbErrText(err),'Не удалось переставить'));break;
+    case 'acat-down':moveCat(id,1).then(render).catch(err=>showFail(fbErrText(err),'Не удалось переставить'));break;
+    case 'acat-del':askDeleteCat(id);break;
+    case 'acat-import':importCats().catch(err=>showFail(fbErrText(err),'Не удалось скопировать'));break;
     case 'anew':editing=blankProduct();render();break;
     case 'aedit':{toast('Открываю…');getFull(id).then(p=>{editing=JSON.parse(JSON.stringify(p));render()}).catch(err=>toast('Ошибка: '+(err&&err.message||err)));break}
     case 'acancel':editing=null;render();break;
@@ -1197,6 +1319,23 @@ async function handleForm2(f){
     return;
   }
   if(!isAdmin())return;
+  if(kind==='category'){
+    const c=catEditing;if(!c)return;
+    const nr=String(fd.get('nr')||'').trim(),nk=String(fd.get('nk')||'').trim(),mn=!!fd.get('main');
+    if(!nr){toast('Укажите название категории');return}
+    const btn=f.querySelector('button[type=submit]'),lbl=btn?btn.textContent:'';
+    if(btn){btn.disabled=true;btn.textContent='СОХРАНЯЮ…'}
+    const isNew=!!c._new;
+    try{
+      await saveCategory(c,nr,nk,mn);
+      catEditing=null;render();window.scrollTo(0,0);
+      openDone('<div class="doneico"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><h2>'+(isNew?'Категория добавлена':'Категория сохранена')+'</h2><p class="donename">'+esc(nr)+'</p><div class="doneacts"><button class="btn gold block" type="button" data-done="close">Готово</button></div>','');
+    }catch(err){
+      if(btn){btn.disabled=false;btn.textContent=lbl||'СОХРАНИТЬ'}
+      showFail(fbErrText(err),'Категория не сохранена');
+    }
+    return;
+  }
   if(kind==='product'){
     const p=editing;if(!p)return;
     p.name={ru:String(fd.get('nr')).trim(),kk:String(fd.get('nk')).trim()};
