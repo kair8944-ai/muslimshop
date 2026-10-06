@@ -489,7 +489,7 @@ const isAdmin=()=>!!authUser;
 const fbInitP=fbInit();
 const authReady=fbInitP.then(()=>new Promise(res=>{
   if(!fauth)return res();
-  try{onAuthStateChanged(fauth,u=>{const was=!!authUser;authUser=u;if(u){try{localStorage.setItem('ms_owner','1')}catch(e){}}res();if(started&&was!==!!u)render()})}catch(e){res()}
+  try{onAuthStateChanged(fauth,u=>{const was=!!authUser;authUser=u;if(u){try{if(localStorage.getItem('ms_owner_off')!=='1')localStorage.setItem('ms_owner','1')}catch(e){}}res();if(started&&was!==!!u)render()})}catch(e){res()}
 }));
 
 /* документ Firestore -> товар для интерфейса (чтение терпимо к разным полям) */
@@ -696,7 +696,7 @@ function addToCart(id,q=1){
   const p=prodById(id);if(!p||p.status!=='in')return;
   const it=cart.find(i=>i.id===id);
   if(it)it.q+=q;else cart.push({id,q});
-  saveCart();toast(t('added'));ymGoal('add_to_cart');
+  saveCart();toast(t('added'));ymGoal('add_to_cart');try{statEv('c',id)}catch(e){}
 }
 const cartLines=()=>cart.map(i=>({p:prodById(i.id),q:i.q})).filter(x=>x.p&&x.p.status!=='hidden');
 
@@ -1015,7 +1015,7 @@ function viewAdmin(){
   return `<h1 style="margin-top:16px">Управление магазином</h1>
   <div class="note" style="margin-bottom:14px">Вы вошли как <b>${esc(authUser.email||'')}</b>. Всё, что вы сохраняете здесь, сразу записывается в Firebase и видно покупателям. База: <b>${esc(DBNAME)}</b></div>
   <div class="tabs"><button class="btn sm line" data-act="alogout">Выйти</button></div>
-  ${editing?adminForm(editing):(adminView==='cats'?adminCats():adminList())}`;
+  ${editing?adminForm(editing):(adminView==='cats'?adminCats():adminView==='stats'?adminStats():adminList())}`;
 }
 /* ---- управление категориями ---- */
 let adminView='products',catEditing=null;
@@ -1129,6 +1129,7 @@ function catForm(c){
 function adminList(){
   return `<button class="btn gold block" data-act="anew" style="margin-bottom:12px">+ ДОБАВИТЬ ТОВАР</button>
   <button class="btn line block" data-act="acats" style="margin-bottom:12px">Категории (${DB.cats.length})</button>
+  <button class="btn line block" data-act="astats" style="margin-bottom:12px">📊 Статистика посещений</button>
   <div class="two" style="margin-bottom:12px"><button class="btn sm line" data-act="asel-demo">Отметить демо-товары</button><button class="btn sm line" data-act="asel-none">Снять все отметки</button></div>
   <button class="btn sm block" id="delsel" data-act="adel-sel" style="margin-bottom:14px">${selLabel()}</button>
   <div class="note" style="margin-bottom:14px"><b>Быстрая загрузка (лёгкий каталог)</b><br>Состояние: ${LITE?'включён, товаров: '+DB.products.length:'не создан, сайт грузит полные карточки (медленно)'}<br><button class="btn sm line block" data-act="dbs-check" style="margin-top:8px">Проверить базы (покажет, где лежат товары)</button><pre id="dbsout" style="white-space:pre-wrap;font-size:14px;margin-top:8px"></pre><button class="btn sm line block" data-act="sync-now" style="margin-top:8px">Синхронизировать (обновить у всех)</button><button class="btn sm gold block" data-act="lite-build" style="margin-top:8px">${LITE?'Обновить лёгкий каталог':'Создать лёгкий каталог'}</button></div>
@@ -1221,7 +1222,7 @@ function renderInner(){
   else if(path==='/admin')html=viewAdmin();
   else html=viewHome();
   app.innerHTML=html;if(after)after();
-  renderChrome();ymHit();
+  renderChrome();ymHit();try{statHit()}catch(e){}
   if(!keep&&!(path==='/admin'&&editing))window.scrollTo(0,0);
 }
 function renderChrome(){
@@ -1297,6 +1298,10 @@ document.addEventListener('click',e=>{
     case 'alogout':signOut(fauth).then(()=>{editing=null;catEditing=null;adminView='products';render()});break;
     case 'acats':adminView='cats';catEditing=null;render();window.scrollTo(0,0);break;
     case 'acats-back':adminView='products';catEditing=null;render();window.scrollTo(0,0);break;
+    case 'astats':adminView='stats';render();window.scrollTo(0,0);stLoad();break;
+    case 'astats-back':adminView='products';render();window.scrollTo(0,0);break;
+    case 'astats-range':ST.range=Number(id)||7;KEEP=true;render();break;
+    case 'astats-refresh':stLoad();break;
     case 'acat-new':catEditing={_new:1,id:'',main:0,name:{ru:'',kk:''}};render();window.scrollTo(0,0);break;
     case 'acat-edit':{const c=DB.cats.find(x=>x.id===id);if(c){catEditing=JSON.parse(JSON.stringify(c));render();window.scrollTo(0,0)}break}
     case 'acat-cancel':catEditing=null;render();break;
@@ -1340,7 +1345,7 @@ async function handleForm2(f){
     if(!name||!tel){toast(t('fill'));return}
     const lines=cartLines(),total=lines.reduce((s,l)=>s+l.p.price*l.q,0);
     const txt='Заказ MUSLIM SHOP\n\n'+lines.map((l,i)=>(i+1)+'. '+l.p.name.ru+' — '+l.q+' шт. × '+money(l.p.price)+' = '+money(l.p.price*l.q)+'\n   '+prodUrl(l.p)).join('\n')+'\n\nИтого: '+money(total)+'\n\nИмя: '+name+'\nТелефон: '+tel+(fd.get('c')?'\nКомментарий: '+fd.get('c'):'');
-    ymGoal('order_whatsapp');window.open('https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(txt),'_blank','noopener');return;
+    ymGoal('order_whatsapp');try{statEv('o')}catch(e){}window.open('https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(txt),'_blank','noopener');return;
   }
   if(kind==='login'){
     const probe=async(em,pin)=>{
@@ -1441,6 +1446,158 @@ document.addEventListener('input',e=>{
   if(el.dataset.f&&(el.type==='number')){CQ[el.dataset.f]=el.value;updateCatalog()}
 });
 
+/* ============ Статистика посещений (Firebase, коллекция visits) ============ */
+const ST={range:7,rows:null,loading:false,err:''};
+const stBot=()=>{try{return !!navigator.webdriver||/bot|crawl|spider|slurp|facebookexternalhit|preview|lighthouse|headless/i.test(navigator.userAgent||'')}catch(e){return false}};
+const statOn=()=>{try{return CONFIGURED&&!stBot()&&!ymOwner()}catch(e){return false}};
+const stDay=(ms)=>new Date((ms===undefined?Date.now():ms)+5*3600e3).toISOString().slice(0,10);
+function stVid(){try{let v=localStorage.getItem('ms_vid');if(!v){v=Math.random().toString(36).slice(2,10)+Date.now().toString(36);localStorage.setItem('ms_vid',v)}return v}catch(e){return 'anon'}}
+function stSrc(){
+  try{const c=sessionStorage.getItem('ms_src');if(c!==null)return c}catch(e){}
+  let v='';
+  try{
+    const q=new URLSearchParams(location.search);
+    const u=(q.get('utm_source')||q.get('src')||q.get('ref')||'').toLowerCase();
+    const ua=navigator.userAgent||'';
+    let h='';try{h=new URL(document.referrer).hostname.toLowerCase()}catch(e){}
+    const map=x=>{
+      if(!x)return '';
+      if(/instagram|(^|\.)ig(\.|$)|^ig$/.test(x))return 'Instagram';
+      if(/tiktok/.test(x)||x==='tt')return 'TikTok';
+      if(/telegram|(^|\.)t\.me$|^tg$/.test(x))return 'Telegram';
+      if(/whatsapp|wa\.me|^wa$/.test(x))return 'WhatsApp';
+      if(/google/.test(x))return 'Google';
+      if(/yandex|(^|\.)ya\.ru$/.test(x))return 'Яндекс';
+      if(/2gis/.test(x))return '2ГИС';
+      if(/facebook|(^|\.)fb\.com$|^fb$/.test(x))return 'Facebook';
+      if(/olx/.test(x))return 'OLX';
+      return '';
+    };
+    v=map(u);
+    if(!v)v=map(h);
+    if(!v){if(/Instagram/i.test(ua))v='Instagram';else if(/FBAN|FBAV/i.test(ua))v='Facebook';else if(/TikTok|musical_ly/i.test(ua))v='TikTok'}
+    const own=!h||h===location.hostname||/muslimshop\.kz$/.test(h)||h==='kair7877.github.io';
+    if(!v)v=own?'Прямой заход / мессенджеры':h.slice(0,40);
+  }catch(e){v='Прямой заход / мессенджеры'}
+  try{sessionStorage.setItem('ms_src',v)}catch(e){}
+  return v;
+}
+let stReady=false,stQ=[],stLast='',stSid=false;
+function stSession(){
+  let isNew=false;
+  try{if(!sessionStorage.getItem('ms_sid')){sessionStorage.setItem('ms_sid','1');isNew=true}}catch(e){if(!stSid){stSid=true;isNew=true}}
+  if(isNew)stPush({t:'v',src:stSrc()});
+}
+function stPush(ev){
+  try{
+    if(!statOn())return;
+    ev.vid=stVid();ev.d=stDay();ev.lg=(typeof lang==='string'?lang:'ru');
+    ev.dev=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent||'')?'m':'d';
+    stQ.push(ev);
+    if(stReady)stFlush();
+  }catch(e){}
+}
+async function stWrite(ev){
+  try{
+    await pickDb();
+    if(!fdb||typeof addDoc!=='function'||typeof serverTimestamp!=='function')return;
+    const data=Object.assign({},ev,{ts:serverTimestamp()});
+    await Promise.race([addDoc(collection(fdb,'visits'),data),new Promise(r=>setTimeout(r,8000))]);
+  }catch(e){}
+}
+async function stFlush(){
+  try{const q=stQ.splice(0);if(q.length)await Promise.all(q.map(stWrite))}catch(e){}
+}
+function statHit(){
+  if(!statOn())return;
+  const path=((location.hash||'#/').replace(/^#/,'').split('?')[0])||'/';
+  if(path.startsWith('/admin'))return;
+  if(path===stLast)return;
+  stLast=path;
+  stSession();
+  stPush({t:'p',pg:path.slice(0,120)});
+}
+function statEv(t,pid){
+  if(!statOn())return;
+  const ev={t:t};if(pid)ev.pid=String(pid).slice(0,100);
+  stSession();stPush(ev);
+}
+async function stLoad(){
+  if(ST.loading)return;
+  ST.loading=true;ST.err='';KEEP=true;render();
+  try{
+    await pickDb();
+    if(!fdb)throw new Error('Firebase не подключён');
+    const sn=await Promise.race([getDocs(query(collection(fdb,'visits'),orderBy('ts','desc'),limit(5000))),new Promise((_,rej)=>setTimeout(()=>rej({code:'timeout'}),20000))]);
+    ST.rows=sn.docs.map(x=>x.data());
+  }catch(e){
+    const c=String(e&&(e.code||e.message)||e);
+    ST.err=/permission|insufficient/i.test(c)?'perm':(/timeout/i.test(c)?'Нет ответа от Firebase. Нажмите «Обновить».':c);
+  }
+  ST.loading=false;KEEP=true;render();
+}
+const stBar=(n,max)=>`<div style="background:var(--gray2);border-radius:3px;height:10px;margin-top:4px"><div style="background:var(--gold);height:10px;border-radius:3px;width:${max?Math.max(2,Math.round(n*100/max)):0}%"></div></div>`;
+function stTop(title,pairs,max){
+  if(!pairs.length)return '';
+  const mx=pairs[0][1];
+  return `<div class="note" style="margin-top:12px"><b>${title}</b>${pairs.slice(0,max||8).map(([k,n])=>`<div style="margin-top:8px"><div style="display:flex;justify-content:space-between;gap:10px"><span>${esc(k)}</span><b>${n}</b></div>${stBar(n,mx)}</div>`).join('')}</div>`;
+}
+const stCount=(arr,f)=>{const m={};for(const x of arr){const k=f(x);if(k===null||k===undefined||k==='')continue;m[k]=(m[k]||0)+1}return Object.entries(m).sort((a,b)=>b[1]-a[1])};
+function stPageLabel(pg){
+  if(pg==='/'||pg==='')return 'Главная';
+  if(pg==='/catalog')return 'Каталог';
+  if(pg==='/cart')return 'Корзина';
+  if(pg.startsWith('/product/')){let id=pg.slice(9);try{id=decodeURIComponent(id)}catch(e){}const p=prodById(id);return p?L(p.name):id}
+  return pg;
+}
+function adminStats(){
+  const owner=(()=>{try{return localStorage.getItem('ms_owner')==='1'}catch(e){return false}})();
+  let h=`<div class="two" style="margin-bottom:12px"><button class="btn sm line" data-act="astats-back">← К товарам</button><button class="btn sm gold" data-act="astats-refresh">${ST.loading?'Загрузка…':'Обновить'}</button></div>
+  <h2 style="margin:6px 0 10px">Статистика посещений</h2>`;
+  h+=`<div class="note" style="margin-bottom:12px"><label style="display:flex;gap:12px;align-items:center;min-height:44px"><input type="checkbox" data-stown="1" ${owner?'checked':''} style="width:26px;height:26px;flex:none"><span><b>Не считать меня на этом устройстве</b><br>Снимите галочку, если хотите проверить, как идёт счёт. Включите обратно, чтобы свои заходы не попадали в статистику.</span></label></div>`;
+  if(ST.err==='perm'){
+    h+=`<div class="note" style="margin-bottom:12px"><b>Нет доступа к данным.</b> В Firebase → Firestore → Rules для базы «${esc(DBNAME)}» нужно добавить правило для коллекции visits (инструкция у вашего помощника). После этого нажмите «Обновить».</div>`;
+  }else if(ST.err){h+=`<div class="note" style="margin-bottom:12px">Ошибка: ${esc(ST.err)}</div>`}
+  const rg=ST.range;
+  const opt=(v,l)=>`<button class="btn sm ${rg===v?'gold':'line'}" data-act="astats-range" data-id="${v}">${l}</button>`;
+  h+=`<div class="tabs">${opt(1,'Сегодня')}${opt(7,'7 дней')}${opt(30,'30 дней')}</div>`;
+  if(!ST.rows){return h+(ST.loading?'<div class="note">Загружаю…</div>':'<div class="note">Нажмите «Обновить», чтобы загрузить данные.</div>')}
+  const today=stDay();
+  const from=stDay(Date.now()-(rg-1)*86400e3);
+  const rows=ST.rows.filter(r=>r&&typeof r.d==='string'&&r.d>=from&&r.d<=today);
+  const vis=rows.filter(r=>r.t==='v'),pv=rows.filter(r=>r.t==='p'),cr=rows.filter(r=>r.t==='c'),od=rows.filter(r=>r.t==='o');
+  const uniq=new Set(rows.map(r=>r.vid)).size;
+  const card=(n,l)=>`<div class="note" style="text-align:center"><div style="font-size:30px;font-weight:700">${n}</div><div style="font-size:14px">${l}</div></div>`;
+  h+=`<div class="two">${card(vis.length,'Визитов')}${card(uniq,'Уникальных посетителей')}</div>
+  <div class="two" style="margin-top:10px">${card(pv.length,'Просмотров страниц')}${card(cr.length,'Добавили в корзину')}</div>
+  <div class="two" style="margin-top:10px">${card(od.length,'Нажали «Заказать» (WhatsApp)')}${card(vis.length?Math.round(od.length*100/vis.length)+'%':'—','Заказов от визитов')}</div>`;
+  if(rg>1){
+    const days=[];for(let i=rg-1;i>=0;i--)days.push(stDay(Date.now()-i*86400e3));
+    const per=days.map(d=>[d,vis.filter(r=>r.d===d).length]);
+    const mx=Math.max(1,...per.map(x=>x[1]));
+    h+=`<div class="note" style="margin-top:12px"><b>Визиты по дням</b>${per.map(([d,n])=>`<div style="margin-top:6px;display:flex;align-items:center;gap:8px"><span style="width:52px;flex:none;font-size:14px">${esc(d.slice(8)+'.'+d.slice(5,7))}</span><div style="flex:1;background:var(--gray2);border-radius:3px;height:12px"><div style="background:var(--gold);height:12px;border-radius:3px;width:${n?Math.max(2,Math.round(n*100/mx)):0}%"></div></div><b style="width:30px;text-align:right;flex:none">${n}</b></div>`).join('')}</div>`;
+  }
+  h+=stTop('Откуда приходят',stCount(vis,r=>r.src||'Прямой заход / мессенджеры'),8);
+  h+=stTop('Самые просматриваемые товары',stCount(pv.filter(r=>String(r.pg||'').startsWith('/product/')),r=>stPageLabel(r.pg)),10);
+  h+=stTop('Чаще всего добавляют в корзину',stCount(cr,r=>{const p=prodById(r.pid);return p?L(p.name):(r.pid||'')}),10);
+  h+=stTop('Страницы',stCount(pv.filter(r=>!String(r.pg||'').startsWith('/product/')),r=>stPageLabel(r.pg||'')),6);
+  h+=stTop('Устройства',stCount(vis,r=>r.dev==='m'?'Телефон':'Компьютер'),3);
+  h+=stTop('Язык сайта',stCount(vis,r=>r.lg==='kk'?'Қазақша':'Русский'),3);
+  if(ST.rows.length>=5000)h+=`<div class="note" style="margin-top:12px">Показаны последние 5000 событий.</div>`;
+  if(!rows.length)h+=`<div class="note" style="margin-top:12px">За этот период данных пока нет.</div>`;
+  return h;
+}
+document.addEventListener('change',e=>{
+  const el=e.target;
+  if(el&&el.dataset&&el.dataset.stown){
+    try{
+      if(el.checked){localStorage.setItem('ms_owner','1');localStorage.removeItem('ms_owner_off')}
+      else{localStorage.removeItem('ms_owner');localStorage.setItem('ms_owner_off','1')}
+      toast(el.checked?'Ваши заходы не считаются':'Ваши заходы теперь считаются');
+    }catch(err){}
+  }
+});
+
 /* ============ Start ============ */
 (async()=>{
   let c=await cacheGet();
@@ -1457,6 +1614,7 @@ document.addEventListener('input',e=>{
     await loadData();
     if(!DB.loaded||dataSig()!==before||LOAD_ERR){KEEP=DB.loaded&&!!before;render()}
   }
+  try{stReady=true;stFlush()}catch(e){}
   watchMeta();
 })();
 </script>
