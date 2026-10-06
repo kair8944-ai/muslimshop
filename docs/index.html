@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MUSLIM SHOP — Купить халяль товары и витамины iHerb в Атырау | Бутик №24</title>
 <meta name="description" content="Оригинальные халяль-витамины, БАДы, мед и товары для здоровья в Атырау. Бутик №24. Быстрая доставка по Казахстану. Ежедневно с 10:00 до 19:00.">
-<meta name="keywords" content="купить халяль витамины в Атырау, iHerb Атырау, БАДы Атырау, MUSLIM SHOP, Бутик №24, халяль товары Атырау, натуральный мед Атырау, мужское и женское здоровье, доставка по Казахстану">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://muslimshop.kz/">
 <meta name="google-site-verification" content="VdmeguAl3Ag03k32Acu6_iegpF5o1WQWGoscemWyHKw">
@@ -353,7 +352,7 @@ const FIREBASE_CONFIG={
 };
 
 /* Почта владельца (пользователь в Firebase Authentication). PIN = пароль этого пользователя. */
-const ADMIN_EMAILS=['Kair7877@gmail.com','admin@muslimshop.kz'];
+let ADMIN_EMAILS=[];
 
 const CONFIGURED=!!(FIREBASE_CONFIG.apiKey&&FIREBASE_CONFIG.appId);
 let FBLOAD_ERR='';
@@ -386,10 +385,29 @@ const CONTACT={
 let toastT;
 function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',2600)}
 
+/* ============ Яндекс.Метрика (устройства владельца не считаются) ============ */
+const YM_ID=113482446;
+/* Один раз откройте muslimshop.kz/?owner=1 на своём телефоне: он перестанет считаться. ?owner=0 вернёт учёт. */
+const ymOwner=()=>{try{const q=new URLSearchParams(location.search).get('owner');if(q==='1')localStorage.setItem('ms_owner','1');if(q==='0')localStorage.removeItem('ms_owner');return localStorage.getItem('ms_owner')==='1'}catch(e){return false}};
+let ymOn=false,ymLast=location.href;
+if(!ymOwner()){
+  (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};m[i].l=1*new Date();k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})(window,document,'script','https://mc.yandex.ru/metrika/tag.js?id='+YM_ID,'ym');
+  window.ym(YM_ID,'init',{webvisor:true,clickmap:true,trackLinks:true,accurateTrackBounce:true,referrer:document.referrer,url:location.href});
+  ymOn=true;
+}
+function ymHit(){
+  if(!ymOn||ymOwner())return;
+  const u=location.href;if(u===ymLast)return;
+  const prev=ymLast;ymLast=u;
+  if(/#\/admin/.test(u))return;
+  try{window.ym(YM_ID,'hit',u,{title:document.title,referer:prev})}catch(e){}
+}
+function ymGoal(n){if(ymOn&&!ymOwner()){try{window.ym(YM_ID,'reachGoal',n)}catch(e){}}}
+
 /* ============ i18n ============ */
 const T={
  ru:{menu:'Меню',search_ph:'Поиск товаров',find:'Найти',cats:'Категории',allcats:'ВСЕ КАТЕГОРИИ',hidecats:'СВЕРНУТЬ',popular:'Популярные товары',news:'Новинки',featured:'Рекомендуемые товары',all_items:'Все товары',
-  about:'О MUSLIM SHOP',about_txt:'MUSLIM SHOP — магазин в Атырау на рынке Дина, бутик 24. Исламские товары, витамины, натуральные средства, парфюмерия и товары для здоровья. Заказывайте на сайте или приходите в бутик.',
+  about:'О MUSLIM SHOP',about_txt:'MUSLIM SHOP — магазин в Атырау на рынке Дина, бутик 24. Оригинальные халяль-витамины и БАДы (в том числе iHerb), натуральный мёд, средства для мужского, женского и детского здоровья, исламские товары и парфюмерия. Закажите на сайте через WhatsApp, приходите в бутик или оформите доставку по Атырау и Казахстану. Работаем ежедневно с 10:00 до 19:00.',
   social:'МЫ В СОЦИАЛЬНЫХ СЕТЯХ',contacts:'КОНТАКТЫ',catalog:'КАТАЛОГ',home:'Главная',cart:'Корзина',phone:'Телефон',addr:'Адрес',
   more:'ПОДРОБНЕЕ',tocart:'В КОРЗИНУ',order:'ЗАКАЗАТЬ',share:'ПОДЕЛИТЬСЯ',copy:'🔗 СКОПИРОВАТЬ ССЫЛКУ',in:'В наличии',out:'Нет в наличии',
   qty:'Количество',desc:'Описание',specs:'Характеристики',sku:'Артикул',new_:'Новинка',
@@ -401,10 +419,10 @@ const T={
   checkout_note:'Заказ откроется в WhatsApp уже заполненным. Нажмите «Отправить», и мы свяжемся с вами для подтверждения и оплаты.',
   fill:'Укажите имя и телефон',copied:'Ссылка скопирована',added:'Добавлено в корзину',notfound:'Товар не найден или скрыт.',back:'← В каталог',
   qty_unit:'шт.',menu_nav:'Навигация',err_load:'Не удалось загрузить товары. Попробуйте обновить страницу.',addr_txt:'пр. Султана Бейбарыса, 45а/5, Атырау, Казахстан',
-  hero_sub:'Исламские товары, здоровье и натуральные средства в Атырау',itemsn:'Товаров:',
+  hero_sub:'Халяль-витамины, БАДы, мёд и товары для здоровья в Атырау. Доставка по Казахстану',itemsn:'Товаров:',
   trust:[['Бутик 24','Рынок Дина, Атырау'],['Заказ','через WhatsApp'],['Цены','в тенге ₸']]},
  kk:{menu:'Мәзір',search_ph:'Тауар іздеу',find:'Іздеу',cats:'Санаттар',allcats:'БАРЛЫҚ САНАТТАР',hidecats:'ЖИНАУ',popular:'Танымал тауарлар',news:'Жаңалықтар',featured:'Ұсынылатын тауарлар',all_items:'Барлық тауарлар',
-  about:'MUSLIM SHOP ТУРАЛЫ',about_txt:'MUSLIM SHOP — Атыраудағы Дина базарындағы 24-бутик. Исламдық тауарлар, дәрумендер, табиғи құралдар, парфюмерия және денсаулыққа арналған тауарлар. Сайттан тапсырыс беріңіз немесе бутикке келіңіз.',
+  about:'MUSLIM SHOP ТУРАЛЫ',about_txt:'MUSLIM SHOP — Атыраудағы Дина базарындағы 24-бутик. Түпнұсқа адал дәрумендер мен БАД (iHerb қоса), табиғи бал, ерлер, әйелдер және балалар денсаулығына арналған құралдар, исламдық тауарлар және парфюмерия. WhatsApp арқылы тапсырыс беріңіз, бутикке келіңіз немесе Атырау мен Қазақстан бойынша жеткізуді рәсімдеңіз. Күн сайын 10:00–19:00 жұмыс істейміз.',
   social:'ӘЛЕУМЕТТІК ЖЕЛІЛЕРДЕМІЗ',contacts:'БАЙЛАНЫС',catalog:'КАТАЛОГ',home:'Басты бет',cart:'Себет',phone:'Телефон',addr:'Мекенжай',
   more:'ТОЛЫҒЫРАҚ',tocart:'СЕБЕТКЕ',order:'ТАПСЫРЫС БЕРУ',share:'БӨЛІСУ',copy:'🔗 СІЛТЕМЕНІ КӨШІРУ',in:'Бар',out:'Жоқ',
   qty:'Саны',desc:'Сипаттама',specs:'Сипаттамалары',sku:'Артикул',new_:'Жаңа',
@@ -416,7 +434,7 @@ const T={
   checkout_note:'Тапсырыс WhatsApp-та толтырылған күйде ашылады. «Жіберу» түймесін басыңыз, біз растау және төлем үшін хабарласамыз.',
   fill:'Аты мен телефонды көрсетіңіз',copied:'Сілтеме көшірілді',added:'Себетке қосылды',notfound:'Тауар табылмады немесе жасырылған.',back:'← Каталогқа',
   qty_unit:'дана',menu_nav:'Бөлімдер',err_load:'Тауарларды жүктеу мүмкін болмады. Бетті жаңартып көріңіз.',addr_txt:'Сұлтан Бейбарыс даңғылы, 45а/5, Атырау, Қазақстан',
-  hero_sub:'Атырауда исламдық тауарлар, денсаулық және табиғи құралдар',itemsn:'Тауар:',
+  hero_sub:'Атырауда адал дәрумендер, БАД, бал және денсаулыққа арналған тауарлар. Қазақстан бойынша жеткізу',itemsn:'Тауар:',
   trust:[['24-бутик','Дина базары, Атырау'],['Тапсырыс','WhatsApp арқылы'],['Бағасы','теңгемен ₸']]}
 };
 let lang=LS.get('ms_lang','ru'); if(lang!=='kk')lang='ru';
@@ -471,7 +489,7 @@ const isAdmin=()=>!!authUser;
 const fbInitP=fbInit();
 const authReady=fbInitP.then(()=>new Promise(res=>{
   if(!fauth)return res();
-  try{onAuthStateChanged(fauth,u=>{const was=!!authUser;authUser=u;res();if(started&&was!==!!u)render()})}catch(e){res()}
+  try{onAuthStateChanged(fauth,u=>{const was=!!authUser;authUser=u;if(u){try{localStorage.setItem('ms_owner','1')}catch(e){}}res();if(started&&was!==!!u)render()})}catch(e){res()}
 }));
 
 /* документ Firestore -> товар для интерфейса (чтение терпимо к разным полям) */
@@ -678,7 +696,7 @@ function addToCart(id,q=1){
   const p=prodById(id);if(!p||p.status!=='in')return;
   const it=cart.find(i=>i.id===id);
   if(it)it.q+=q;else cart.push({id,q});
-  saveCart();toast(t('added'));
+  saveCart();toast(t('added'));ymGoal('add_to_cart');
 }
 const cartLines=()=>cart.map(i=>({p:prodById(i.id),q:i.q})).filter(x=>x.p&&x.p.status!=='hidden');
 
@@ -707,7 +725,7 @@ const LOCK='<a class="lock" href="#/admin" aria-label="Вход для влад�
 function banner(){
   if(!CONFIGURED)return `<div class="note" style="margin-top:20px">Магазин ещё не подключён к базе товаров (Firebase).</div>`;
   if(LOAD_ERR)return `<div class="note" style="margin-top:20px">${t('err_load')}</div>`;
-  if(!DB.loaded)return `<div class="note" style="margin-top:20px">Загрузка товаров… (v11)</div>`;
+  if(!DB.loaded)return `<div class="note" style="margin-top:20px">Загрузка товаров…</div>`;
   if(DB.loaded&&!DB.products.length)return `<div class="note" style="margin-top:20px">Скоро здесь появятся товары.</div>`;
   return '';
 }
@@ -947,7 +965,6 @@ async function bkRun(){
   render();
   toast(bad?('Записано '+ok+', ошибок '+bad+': '+lastErr):('Готово. Записано: '+ok+(LITE?'. Нажмите «Обновить лёгкий каталог»':'')));
 }
-document.body.insertAdjacentHTML('beforeend','<div id="ver">v11</div>');
 document.addEventListener('change',e=>{if(e.target&&e.target.id==='bkfile')bkLoad(e.target.files&&e.target.files[0])});
 async function buildLite(){
   if(!fdb)return;
@@ -990,7 +1007,8 @@ function viewAdmin(){
   if(!CONFIGURED)return `<h1 style="margin-top:16px">Управление магазином</h1><div class="note">Firebase ещё не подключён. Откройте index.html и вставьте apiKey и appId в блок FIREBASE_CONFIG в начале скрипта.</div>`;
   if(!isAdmin())return `<h1 style="margin-top:16px">Управление магазином</h1>
     <form class="form" data-form="login">
-      <div><label for="pn">PIN</label><input id="pn" name="pn" type="password" inputmode="numeric" autocomplete="current-password" required></div>
+      <div><label for="em">Почта владельца</label><input id="em" name="em" type="email" autocomplete="username" required></div>
+      <div><label for="pn">Пароль</label><input id="pn" name="pn" type="password" autocomplete="current-password" required></div>
       <button class="btn gold block" type="submit">Войти</button>
       <div id="loginmsg" class="note" style="display:none"></div>
     </form>`;
@@ -1203,7 +1221,7 @@ function renderInner(){
   else if(path==='/admin')html=viewAdmin();
   else html=viewHome();
   app.innerHTML=html;if(after)after();
-  renderChrome();
+  renderChrome();ymHit();
   if(!keep&&!(path==='/admin'&&editing))window.scrollTo(0,0);
 }
 function renderChrome(){
@@ -1219,7 +1237,7 @@ function renderChrome(){
     <div><h3>MUSLIM SHOP</h3><div>АТЫРАУ • РЫНОК ДИНА • БУТИК 24${LOCK}</div><div style="margin-top:6px">${esc(t('addr_txt'))}</div><div style="margin-top:6px"><a href="tel:+77781754241">${CONTACT.phone}</a></div><div style="margin-top:6px">${lang==='kk'?'Күн сайын 10:00–19:00':'Ежедневно 10:00–19:00'}</div></div>
     <div><h3>${t('menu_nav')}</h3><a href="#/">${t('home')}</a><a href="#/catalog">${t('catalog')}</a><a href="#/cart">${t('cart')}</a></div>
     <div><h3>${t('social')}</h3><a href="${CONTACT.ig}" target="_blank" rel="noopener">Instagram @musliim_shop06</a><a href="${CONTACT.tt}" target="_blank" rel="noopener">TikTok @muslim_shop06</a><a href="${CONTACT.tg}" target="_blank" rel="noopener">Telegram @muslim_shop06</a><a href="${CONTACT.gis}" target="_blank" rel="noopener">2ГИС — ${lang==='kk'?'картада':'мы на карте'}</a></div>
-    </div><div class="wrap copy">© MUSLIM SHOP, Атырау · v11 </div></footer>`;
+    </div><div class="wrap copy">© MUSLIM SHOP, Атырау</div></footer>`;
   updateBadge();
 }
 window.addEventListener('hashchange',()=>{ROUTE=null;closeMenu();render()});
@@ -1322,7 +1340,7 @@ async function handleForm2(f){
     if(!name||!tel){toast(t('fill'));return}
     const lines=cartLines(),total=lines.reduce((s,l)=>s+l.p.price*l.q,0);
     const txt='Заказ MUSLIM SHOP\n\n'+lines.map((l,i)=>(i+1)+'. '+l.p.name.ru+' — '+l.q+' шт. × '+money(l.p.price)+' = '+money(l.p.price*l.q)+'\n   '+prodUrl(l.p)).join('\n')+'\n\nИтого: '+money(total)+'\n\nИмя: '+name+'\nТелефон: '+tel+(fd.get('c')?'\nКомментарий: '+fd.get('c'):'');
-    window.open('https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(txt),'_blank','noopener');return;
+    ymGoal('order_whatsapp');window.open('https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(txt),'_blank','noopener');return;
   }
   if(kind==='login'){
     const probe=async(em,pin)=>{
@@ -1336,7 +1354,7 @@ async function handleForm2(f){
     };
     const msg=m=>{const b=$('#loginmsg');if(b){b.style.display='block';b.textContent=m}toast(m)};
     if(!fauth||typeof signInWithEmailAndPassword!=='function'){msg('Firebase не загружен. Откройте сайт на GitHub Pages в Chrome'+(FBLOAD_ERR?' ('+FBLOAD_ERR+')':''));return}
-    const pin=String(fd.get('pn')||'').trim();let lastCode='';
+    const pin=String(fd.get('pn')||'').trim();let lastCode='';ADMIN_EMAILS=[String(fd.get('em')||'').trim().toLowerCase()];if(!ADMIN_EMAILS[0]){msg('Введите почту');return}
     msg('Проверяю PIN…');
     for(const em of ADMIN_EMAILS){
       try{
