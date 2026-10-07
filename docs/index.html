@@ -526,11 +526,11 @@ function normLite(id,d){
     created:(d.createdAt&&d.createdAt.seconds)||0};
 }
 const liteFrom=(p,thumb)=>({titleRu:p.name.ru,titleKz:p.name.kk||'',price:p.price,oldPrice:p.old||0,categoryId:p.cat,inStock:p.status!=='out',hidden:p.status==='hidden',qty:p.qty||0,sku:p.sku||'',isNew:!!p.isNew,popular:!!p.popular,featured:!!p.featured,dr:!!p.desc.ru,dk:!!p.desc.kk,sp:!!p.specs.ru,spk:!!p.specs.kk,thumb,updatedAt:serverTimestamp()});
-function makeThumb(src){
+function makeThumb(src,mx,q){
   return new Promise(res=>{
     if(!src)return res('');
     const im=new Image();
-    im.onload=()=>{try{const m=480,k=Math.min(1,m/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.width*k));c.height=Math.max(1,Math.round(im.height*k));const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',0.7))}catch(e){res('')}};
+    im.onload=()=>{try{const m=mx||480,k=Math.min(1,m/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.width*k));c.height=Math.max(1,Math.round(im.height*k));const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',q||0.7))}catch(e){res('')}};
     im.onerror=()=>res('');
     im.src=src;
   });
@@ -1310,16 +1310,27 @@ document.addEventListener('click',e=>{
     case 'astats-range':ST.range=Number(id)||7;KEEP=true;render();break;
     case 'astats-refresh':stLoad();break;
     case 'asnap':{
-      try{
-        const prods=DB.products.filter(p=>p.status!=='hidden'&&(p.lite||!LITE));
-        const txt=JSON.stringify({v:3,t:0,meta:META,db:DBNAME,lite:LITE,products:prods,cats:FBCATS});
-        const mb=(txt.length/1048576).toFixed(1);
-        if(!prods.length){alert('Товаров нет, копию делать не из чего.');break}
-        if(!LITE&&!confirm('Файл получится тяжёлым: '+mb+' МБ. Ускорение будет слабее. Всё равно скачать?'))break;
-        const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download='catalog.json';
-        document.body.appendChild(a);a.click();setTimeout(()=>{try{URL.revokeObjectURL(a.href);a.remove()}catch(e){}},4000);
-        toast('catalog.json: '+prods.length+' товаров, '+mb+' МБ');
-      }catch(e){alert('Не получилось сделать копию: '+String(e&&e.message||e))}
+      (async()=>{
+        try{
+          const vis=DB.products.filter(p=>p.status!=='hidden');
+          if(!vis.length){alert('Товаров нет, копию делать не из чего.');return}
+          toast('Готовлю копию… подождите');
+          const out=[];
+          for(let i=0;i<vis.length;i+=6){
+            const part=await Promise.all(vis.slice(i,i+6).map(async p=>{
+              const th=await makeThumb((p.images&&p.images[0])||p.img||'',360,0.6);
+              return Object.assign({},p,{lite:1,img:th,images:th?[th]:[],desc:{ru:'',kk:''},specs:{ru:'',kk:''},hasDesc:!!(p.desc&&p.desc.ru)||!!p.hasDesc,hasDescKz:!!(p.desc&&p.desc.kk)||!!p.hasDescKz,hasSp:!!(p.specs&&p.specs.ru)||!!p.hasSp,hasSpKz:!!(p.specs&&p.specs.kk)||!!p.hasSpKz,_f:'копия'});
+            }));
+            out.push(...part);
+          }
+          const txt=JSON.stringify({v:3,t:0,meta:META,db:DBNAME,lite:true,products:out,cats:FBCATS});
+          const mb=(txt.length/1048576).toFixed(1);
+          if(txt.length>24*1048576){alert('Файл всё равно слишком большой: '+mb+' МБ (GitHub принимает до 25 МБ). Скрин пришлите помощнику.');return}
+          const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download='catalog.json';
+          document.body.appendChild(a);a.click();setTimeout(()=>{try{URL.revokeObjectURL(a.href);a.remove()}catch(e){}},4000);
+          alert('Готово: catalog.json, товаров '+out.length+', размер '+mb+' МБ.');
+        }catch(e){alert('Не получилось сделать копию: '+String(e&&e.message||e))}
+      })();
       break;
     }
     case 'acat-new':catEditing={_new:1,id:'',main:0,name:{ru:'',kk:''}};render();window.scrollTo(0,0);break;
