@@ -342,7 +342,7 @@ h2::after{content:"";position:absolute;left:0;bottom:0;width:60px;height:3px;bac
   addEventListener('error',function(e){show((e.message||'')+(e.lineno?' [строка '+e.lineno+']':''))});
   addEventListener('unhandledrejection',function(e){var r=e.reason;show(String(r&&(r.code||r.message)||r))});
 })();
-let initializeApp,getFirestore,collection,getDocs,getDoc,query,limit,orderBy,onSnapshot,doc,setDoc,addDoc,deleteDoc,serverTimestamp,Timestamp,getAuth,initializeAuth,browserLocalPersistence,inMemoryPersistence,signInWithEmailAndPassword,onAuthStateChanged,signOut;
+let initializeApp,getFirestore,initializeFirestore,collection,getDocs,getDoc,query,limit,orderBy,onSnapshot,doc,setDoc,addDoc,deleteDoc,serverTimestamp,Timestamp,getAuth,initializeAuth,browserLocalPersistence,inMemoryPersistence,signInWithEmailAndPassword,onAuthStateChanged,signOut;
 
 /* ============ Firebase: вставьте сюда настройки вашего веб-приложения ============
    Firebase Console → ⚙ Project settings → Your apps → Web app → firebaseConfig.
@@ -366,7 +366,7 @@ const FBP=CONFIGURED?(async()=>{
     const V='10.12.2',B='https://www.gstatic.com/firebasejs/'+V+'/';
     const [A,F,Au]=await Promise.all([import(B+'firebase-app.js'),import(B+'firebase-firestore.js'),import(B+'firebase-auth.js')]);
     ({initializeApp}=A);
-    ({getFirestore,collection,getDocs,getDoc,query,limit,orderBy,onSnapshot,doc,setDoc,addDoc,deleteDoc,serverTimestamp,Timestamp}=F);
+    ({getFirestore,initializeFirestore,collection,getDocs,getDoc,query,limit,orderBy,onSnapshot,doc,setDoc,addDoc,deleteDoc,serverTimestamp,Timestamp}=F);
     ({getAuth,initializeAuth,browserLocalPersistence,inMemoryPersistence,signInWithEmailAndPassword,onAuthStateChanged,signOut}=Au);
   }catch(e){FBLOAD_ERR='Не удалось загрузить Firebase: '+String(e&&e.message||e)}
 })():Promise.resolve();
@@ -471,7 +471,7 @@ const URLDB=(()=>{try{return new URLSearchParams(location.search).get('db')}catc
 const FORCE=(URLDB==='default'||URLDB==='named')?URLDB:(MAIN_DB==='default'||MAIN_DB==='named'?MAIN_DB:'');
 const FORCE_I=FORCE==='default'?1:FORCE==='named'?0:-1;
 let fdb=null,fdbs=[],dbPicked=false,DBNAME='',fauth=null,authUser=null,LOAD_ERR=FBLOAD_ERR,started=false,FBCATS=null;
-async function fbInit(){await FBP;if(FBLOAD_ERR)LOAD_ERR=FBLOAD_ERR;if(CONFIGURED&&initializeApp){try{const app=initializeApp(FIREBASE_CONFIG);fdbs=[getFirestore(app,DB_IDS[0]),getFirestore(app)];fdb=fdbs[0];DBNAME=DB_IDS[0];try{fauth=initializeAuth(app,{persistence:[browserLocalPersistence,inMemoryPersistence]})}catch(e2){fauth=getAuth(app)}}catch(e){LOAD_ERR=String(e&&e.message||e)}}}
+async function fbInit(){await FBP;if(FBLOAD_ERR)LOAD_ERR=FBLOAD_ERR;if(CONFIGURED&&initializeApp){try{const app=initializeApp(FIREBASE_CONFIG);const mkDb=id=>{try{const S={experimentalAutoDetectLongPolling:true};return id?initializeFirestore(app,S,id):initializeFirestore(app,S)}catch(e0){return id?getFirestore(app,id):getFirestore(app)}};fdbs=[mkDb(DB_IDS[0]),mkDb('')];fdb=fdbs[0];DBNAME=DB_IDS[0];try{fauth=initializeAuth(app,{persistence:[browserLocalPersistence,inMemoryPersistence]})}catch(e2){fauth=getAuth(app)}}catch(e){LOAD_ERR=String(e&&e.message||e)}}}
 async function pickDb(){
   if(dbPicked||!fdbs.length)return;
   if(FORCE_I>=0){fdb=fdbs[FORCE_I];DBNAME=DB_IDS[FORCE_I];dbPicked=true;return}
@@ -812,7 +812,7 @@ function updateCatalog(){
 function viewProduct(slug){
   const p0=prod(slug)||prod(String(slug).split(/[?&#]/)[0].replace(/\/+$/,''));
   if(!p0&&PENDING)return `<section><div class="empty">${lang==='kk'?'Жүктелуде…':'Загрузка…'}</div></section>`;
-  if(!p0&&LOAD_ERR)return `<section><div class="empty">${lang==='kk'?'Тауарлар жүктелмеді. Интернетті тексеріп, бетті жаңартыңыз.':'Не удалось загрузить товары. Проверьте интернет и обновите страницу.'}</div><p style="margin-top:14px"><button class="btn block" onclick="location.reload()">${lang==='kk'?'Жаңарту':'Обновить страницу'}</button></p></section>`;
+  if(!p0&&LOAD_ERR)return `<section><div class="empty">${lang==='kk'?'Тауарлар жүктелмеді. Интернетті тексеріп, бетті жаңартыңыз.':'Не удалось загрузить товары. Проверьте интернет и обновите страницу.'}</div><p style="margin-top:14px"><button class="btn block" onclick="location.reload()">${lang==='kk'?'Жаңарту':'Обновить страницу'}</button></p><p style="margin-top:12px;font-size:12px;color:#8a8a8a;word-break:break-all">${esc(String(LOAD_ERR).slice(0,240))}</p></section>`;
   if(!p0||(p0.status==='hidden'&&!isAdmin()))return `<section><div class="empty">${t('notfound')}</div><p style="margin-top:14px"><a class="btn block" href="#/catalog">${t('back')}</a></p></section>`;
   let p=p0;
   if(p0.lite){
