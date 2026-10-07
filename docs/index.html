@@ -688,7 +688,9 @@ const prod=slug=>DB.products.find(p=>p.slug===slug);
 const prodById=id=>DB.products.find(p=>p.id===id);
 const catName=id=>{const c=DB.cats.find(c=>c.id===id);return c?L(c.name):''};
 const specsRows=s=>String(s||'').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const i=l.indexOf(':');return i>0?[l.slice(0,i).trim(),l.slice(i+1).trim()]:['',l]});
-const prodUrl=p=>location.href.split('#')[0]+'#/product/'+p.slug;
+const prodUrl=p=>location.origin+location.pathname+'#/product/'+encodeURIComponent(p.slug);
+const safeDec=x=>{try{return decodeURIComponent(x)}catch(e){return x}};
+let PENDING=false;
 
 /* ============ Cart ============ */
 let cart=LS.get('ms_cart',[]);
@@ -808,7 +810,8 @@ function updateCatalog(){
 }
 
 function viewProduct(slug){
-  const p0=prod(slug);
+  const p0=prod(slug)||prod(String(slug).split(/[?&#]/)[0].replace(/\/+$/,''));
+  if(!p0&&PENDING)return `<section><div class="empty">${lang==='kk'?'Жүктелуде…':'Загрузка…'}</div></section>`;
   if(!p0&&LOAD_ERR)return `<section><div class="empty">${lang==='kk'?'Тауарлар жүктелмеді. Интернетті тексеріп, бетті жаңартыңыз.':'Не удалось загрузить товары. Проверьте интернет и обновите страницу.'}</div><p style="margin-top:14px"><button class="btn block" onclick="location.reload()">${lang==='kk'?'Жаңарту':'Обновить страницу'}</button></p></section>`;
   if(!p0||(p0.status==='hidden'&&!isAdmin()))return `<section><div class="empty">${t('notfound')}</div><p style="margin-top:14px"><a class="btn block" href="#/catalog">${t('back')}</a></p></section>`;
   let p=p0;
@@ -1224,7 +1227,7 @@ function renderInner(){
   if(!DB.loaded&&(path==='/catalog'||path.startsWith('/product/')||path==='/cart'))html='<div class="note" style="margin-top:20px">Загрузка…</div>';
   else if(path==='/'||path==='')html=viewHome();
   else if(path==='/catalog'){html=viewCatalog(q);after=updateCatalog}
-  else if(path.startsWith('/product/'))html=viewProduct(decodeURIComponent(path.slice(9)));
+  else if(path.startsWith('/product/'))html=viewProduct(safeDec(path.slice(9)));
   else if(path==='/cart')html=viewCart();
   else if(path==='/admin')html=viewAdmin();
   else html=viewHome();
@@ -1639,7 +1642,7 @@ document.addEventListener('change',e=>{
     }catch(e){}
   }
   if(c&&FORCE_I>=0&&c.db!==DB_IDS[FORCE_I])c=null;
-  if(c&&c.v===3&&Array.isArray(c.products)&&c.products.length){LITE=!!c.lite;DB.products=c.products;FBCATS=c.cats||null;DB.cats=buildCats();DB.loaded=true}
+  if(c&&c.v===3&&Array.isArray(c.products)&&c.products.length){LITE=!!c.lite;DB.products=c.products;FBCATS=c.cats||null;DB.cats=buildCats();DB.loaded=true;PENDING=true;setTimeout(()=>{if(PENDING){PENDING=false;KEEP=true;LOAD_ERR=LOAD_ERR||'timeout';render()}},25000)}
   render();started=true;
   await fbInitP;
   if(c&&!dbPicked&&FORCE_I<0){const ix=DB_IDS.indexOf(c.db);if(ix>=0&&fdbs[ix]){fdb=fdbs[ix];DBNAME=DB_IDS[ix];dbPicked=true}}
@@ -1648,9 +1651,11 @@ document.addEventListener('change',e=>{
   if(fresh&&c.meta){try{await pickDb();const m=await metaStamp();if(m&&m!==c.meta)fresh=false}catch(e){}}
   if(!fresh){
     const before=DB.loaded?dataSig():'';
+    const wasPending=PENDING;
     await loadData();
-    if(!DB.loaded||dataSig()!==before||LOAD_ERR){KEEP=DB.loaded&&!!before;render()}
-  }
+    PENDING=false;
+    if(!DB.loaded||dataSig()!==before||LOAD_ERR||wasPending){KEEP=DB.loaded&&!!before;render()}
+  }else if(PENDING){PENDING=false;KEEP=true;render()}
   try{stReady=true;stFlush()}catch(e){}
   watchMeta();
 })();
