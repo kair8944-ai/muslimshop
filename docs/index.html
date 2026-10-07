@@ -39,6 +39,8 @@
 {"@context":"https://schema.org","@type":"WebSite","name":"MUSLIM SHOP","alternateName":["Muslim Shop Атырау","muslimshop.kz"],"url":"https://muslimshop.kz/","inLanguage":["ru","kk"]}
 </script>
 <meta name="theme-color" content="#1F2022">
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -807,6 +809,7 @@ function updateCatalog(){
 
 function viewProduct(slug){
   const p0=prod(slug);
+  if(!p0&&LOAD_ERR)return `<section><div class="empty">${lang==='kk'?'Тауарлар жүктелмеді. Интернетті тексеріп, бетті жаңартыңыз.':'Не удалось загрузить товары. Проверьте интернет и обновите страницу.'}</div><p style="margin-top:14px"><button class="btn block" onclick="location.reload()">${lang==='kk'?'Жаңарту':'Обновить страницу'}</button></p></section>`;
   if(!p0||(p0.status==='hidden'&&!isAdmin()))return `<section><div class="empty">${t('notfound')}</div><p style="margin-top:14px"><a class="btn block" href="#/catalog">${t('back')}</a></p></section>`;
   let p=p0;
   if(p0.lite){
@@ -1133,6 +1136,7 @@ function adminList(){
   return `<button class="btn gold block" data-act="anew" style="margin-bottom:12px">+ ДОБАВИТЬ ТОВАР</button>
   <button class="btn line block" data-act="acats" style="margin-bottom:12px">Категории (${DB.cats.length})</button>
   <button class="btn line block" data-act="astats" style="margin-bottom:12px">📊 Статистика посещений</button>
+  <button class="btn line block" data-act="asnap" style="margin-bottom:12px">⚡ Скачать быструю копию каталога</button>
   <div class="two" style="margin-bottom:12px"><button class="btn sm line" data-act="asel-demo">Отметить демо-товары</button><button class="btn sm line" data-act="asel-none">Снять все отметки</button></div>
   <button class="btn sm block" id="delsel" data-act="adel-sel" style="margin-bottom:14px">${selLabel()}</button>
   <div class="note" style="margin-bottom:14px"><b>Быстрая загрузка (лёгкий каталог)</b><br>Состояние: ${LITE?'включён, товаров: '+DB.products.length:'не создан, сайт грузит полные карточки (медленно)'}<br><button class="btn sm line block" data-act="dbs-check" style="margin-top:8px">Проверить базы (покажет, где лежат товары)</button><pre id="dbsout" style="white-space:pre-wrap;font-size:14px;margin-top:8px"></pre><button class="btn sm line block" data-act="sync-now" style="margin-top:8px">Синхронизировать (обновить у всех)</button><button class="btn sm gold block" data-act="lite-build" style="margin-top:8px">${LITE?'Обновить лёгкий каталог':'Создать лёгкий каталог'}</button></div>
@@ -1305,6 +1309,19 @@ document.addEventListener('click',e=>{
     case 'astats-back':adminView='products';render();window.scrollTo(0,0);break;
     case 'astats-range':ST.range=Number(id)||7;KEEP=true;render();break;
     case 'astats-refresh':stLoad();break;
+    case 'asnap':{
+      try{
+        const prods=DB.products.filter(p=>p.status!=='hidden'&&(p.lite||!LITE));
+        const txt=JSON.stringify({v:3,t:0,meta:META,db:DBNAME,lite:LITE,products:prods,cats:FBCATS});
+        const mb=(txt.length/1048576).toFixed(1);
+        if(!prods.length){alert('Товаров нет, копию делать не из чего.');break}
+        if(!LITE&&!confirm('Файл получится тяжёлым: '+mb+' МБ. Ускорение будет слабее. Всё равно скачать?'))break;
+        const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download='catalog.json';
+        document.body.appendChild(a);a.click();setTimeout(()=>{try{URL.revokeObjectURL(a.href);a.remove()}catch(e){}},4000);
+        toast('catalog.json: '+prods.length+' товаров, '+mb+' МБ');
+      }catch(e){alert('Не получилось сделать копию: '+String(e&&e.message||e))}
+      break;
+    }
     case 'acat-new':catEditing={_new:1,id:'',main:0,name:{ru:'',kk:''}};render();window.scrollTo(0,0);break;
     case 'acat-edit':{const c=DB.cats.find(x=>x.id===id);if(c){catEditing=JSON.parse(JSON.stringify(c));render();window.scrollTo(0,0)}break}
     case 'acat-cancel':catEditing=null;render();break;
@@ -1604,6 +1621,12 @@ document.addEventListener('change',e=>{
 /* ============ Start ============ */
 (async()=>{
   let c=await cacheGet();
+  if(!(c&&c.v===3&&Array.isArray(c.products)&&c.products.length)){
+    try{
+      const r=await Promise.race([fetch('catalog.json',{cache:'no-cache'}).then(x=>x.ok?x.json():null),new Promise(z=>setTimeout(()=>z(null),3500))]);
+      if(r&&r.v===3&&Array.isArray(r.products)&&r.products.length){r.t=0;c=r}
+    }catch(e){}
+  }
   if(c&&FORCE_I>=0&&c.db!==DB_IDS[FORCE_I])c=null;
   if(c&&c.v===3&&Array.isArray(c.products)&&c.products.length){LITE=!!c.lite;DB.products=c.products;FBCATS=c.cats||null;DB.cats=buildCats();DB.loaded=true}
   render();started=true;
