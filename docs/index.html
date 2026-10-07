@@ -542,9 +542,7 @@ async function getFull(id){
   const p=DB.products.find(x=>x.id===id);if(p&&!p.lite)return p;
   const sn=await getDoc(doc(fdb,'products',id));
   if(!sn.exists())return p;
-  const nf=norm(id,sn.data());
-  if(p&&p.photo&&!isAdmin()){nf.img=p.photo;nf.images=[p.photo]}
-  return FULLC[id]=nf;
+  return FULLC[id]=norm(id,sn.data());
 }
 async function syncLite(id,p){
   if(!LITE||!fdb)return null;
@@ -1142,7 +1140,6 @@ function adminList(){
   <button class="btn line block" data-act="acats" style="margin-bottom:12px">Категории (${DB.cats.length})</button>
   <button class="btn line block" data-act="astats" style="margin-bottom:12px">📊 Статистика посещений</button>
   <button class="btn line block" data-act="asnap" style="margin-bottom:12px">⚡ Скачать быструю копию каталога</button>
-  <button class="btn gold block" data-act="aphotos" style="margin-bottom:12px">📷 Экспорт фото + каталог (ZIP для GitHub)</button>
   <div class="two" style="margin-bottom:12px"><button class="btn sm line" data-act="asel-demo">Отметить демо-товары</button><button class="btn sm line" data-act="asel-none">Снять все отметки</button></div>
   <button class="btn sm block" id="delsel" data-act="adel-sel" style="margin-bottom:14px">${selLabel()}</button>
   <div class="note" style="margin-bottom:14px"><b>Быстрая загрузка (лёгкий каталог)</b><br>Состояние: ${LITE?'включён, товаров: '+DB.products.length:'не создан, сайт грузит полные карточки (медленно)'}<br><button class="btn sm line block" data-act="dbs-check" style="margin-top:8px">Проверить базы (покажет, где лежат товары)</button><pre id="dbsout" style="white-space:pre-wrap;font-size:14px;margin-top:8px"></pre><button class="btn sm line block" data-act="sync-now" style="margin-top:8px">Синхронизировать (обновить у всех)</button><button class="btn sm gold block" data-act="lite-build" style="margin-top:8px">${LITE?'Обновить лёгкий каталог':'Создать лёгкий каталог'}</button></div>
@@ -1315,7 +1312,6 @@ document.addEventListener('click',e=>{
     case 'astats-back':adminView='products';render();window.scrollTo(0,0);break;
     case 'astats-range':ST.range=Number(id)||7;KEEP=true;render();break;
     case 'astats-refresh':stLoad();break;
-    case 'aphotos':exportPhotos();break;
     case 'asnap':{
       (async()=>{
         try{
@@ -1637,81 +1633,6 @@ document.addEventListener('change',e=>{
     }catch(err){}
   }
 });
-
-
-/* ============ Экспорт фото в файлы + catalog.json (ZIP) ============ */
-function zipStore(files){
-  const enc=new TextEncoder(),parts=[],cd=[];let off=0;
-  const T=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;T[n]=c>>>0}
-  const crc=d=>{let c=0xFFFFFFFF;for(let i=0;i<d.length;i++)c=T[(c^d[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0};
-  for(const f of files){
-    const nm=enc.encode(f.name),c=crc(f.data),sz=f.data.length;
-    const h=new DataView(new ArrayBuffer(30));
-    h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(12,0x21,true);
-    h.setUint32(14,c,true);h.setUint32(18,sz,true);h.setUint32(22,sz,true);h.setUint16(26,nm.length,true);
-    parts.push(new Uint8Array(h.buffer),nm,f.data);
-    const e=new DataView(new ArrayBuffer(46));
-    e.setUint32(0,0x02014b50,true);e.setUint16(4,20,true);e.setUint16(6,20,true);e.setUint16(8,0x0800,true);e.setUint16(14,0x21,true);
-    e.setUint32(16,c,true);e.setUint32(20,sz,true);e.setUint32(24,sz,true);e.setUint16(28,nm.length,true);e.setUint32(42,off,true);
-    cd.push(new Uint8Array(e.buffer),nm);
-    off+=30+nm.length+sz;
-  }
-  const cs=cd.reduce((a,x)=>a+x.length,0);
-  const en=new DataView(new ArrayBuffer(22));
-  en.setUint32(0,0x06054b50,true);en.setUint16(8,files.length,true);en.setUint16(10,files.length,true);en.setUint32(12,cs,true);en.setUint32(16,off,true);
-  return new Blob([...parts,...cd,new Uint8Array(en.buffer)],{type:'application/zip'});
-}
-function photoBytes(src,mx,q){
-  return new Promise(res=>{
-    if(!src)return res(null);
-    const im=new Image();
-    im.onload=()=>{try{
-      const k=Math.min(1,mx/Math.max(im.width,im.height)),c=document.createElement('canvas');
-      c.width=Math.max(1,Math.round(im.width*k));c.height=Math.max(1,Math.round(im.height*k));
-      const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);
-      c.toBlob(async b=>{if(!b)return res(null);res({ext:b.type==='image/webp'?'webp':'jpg',data:new Uint8Array(await b.arrayBuffer())})},'image/webp',q);
-    }catch(e){res(null)}};
-    im.onerror=()=>res(null);
-    im.src=src;
-  });
-}
-let PHOTO_BUSY=false;
-async function exportPhotos(){
-  if(PHOTO_BUSY)return;
-  const vis=DB.products.filter(p=>p.status!=='hidden');
-  if(!vis.length){alert('Товаров нет, экспортировать нечего.');return}
-  PHOTO_BUSY=true;
-  try{
-    const files=[],out=[],used=new Set();let noPhoto=0,done=0;
-    for(let i=0;i<vis.length;i+=4){
-      const part=await Promise.all(vis.slice(i,i+4).map(async p=>{
-        let f=p;try{f=(await getFull(p.id))||p}catch(e){}
-        const src=(f.images&&f.images[0])||(p.images&&p.images[0])||f.img||p.img||'';
-        const ph=/^data:/.test(src)||/^https?:/.test(src)?await photoBytes(src,800,0.85):null;
-        return {p,f,ph};
-      }));
-      for(const {p,f,ph} of part){
-        let path='';
-        if(ph){
-          let base=String(p.id).replace(/[^A-Za-z0-9_-]/g,'_')||'p',n=base,k=2;
-          while(used.has(n)){n=base+'-'+k++}
-          used.add(n);path='img/'+n+'.'+ph.ext;
-          files.push({name:path,data:ph.data});
-        }else noPhoto++;
-        const dd=f.desc||{ru:'',kk:''},ss=f.specs||{ru:'',kk:''};
-        out.push(Object.assign({},p,{lite:1,img:path,images:path?[path]:[],photo:path,desc:{ru:dd.ru||'',kk:dd.kk||''},specs:{ru:ss.ru||'',kk:ss.kk||''},hasDesc:!!dd.ru||!!p.hasDesc,hasDescKz:!!dd.kk||!!p.hasDescKz,hasSp:!!ss.ru||!!p.hasSp,hasSpKz:!!ss.kk||!!p.hasSpKz,_f:'файлы'}));
-        done++;
-      }
-      toast('Готовлю фото: '+done+' из '+vis.length);
-    }
-    files.push({name:'catalog.json',data:new TextEncoder().encode(JSON.stringify({v:3,t:0,meta:META,db:DBNAME,lite:true,products:out,cats:FBCATS}))});
-    const blob=zipStore(files),mb=(blob.size/1048576).toFixed(1);
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='muslimshop-photos.zip';
-    document.body.appendChild(a);a.click();setTimeout(()=>{try{URL.revokeObjectURL(a.href);a.remove()}catch(e){}},8000);
-    alert('Готово: muslimshop-photos.zip, '+mb+' МБ.\nФото: '+(files.length-1)+', товаров: '+out.length+(noPhoto?'\nБез фото (или не удалось прочитать): '+noPhoto:'')+'\n\nРаспакуйте ZIP и загрузите папку img и файл catalog.json в GitHub.');
-  }catch(e){alert('Не получилось: '+String(e&&e.message||e))}
-  PHOTO_BUSY=false;
-}
 
 /* ============ Start ============ */
 (async()=>{
