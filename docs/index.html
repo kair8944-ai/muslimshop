@@ -1321,8 +1321,10 @@ document.addEventListener('click',e=>{
           const out=[];
           for(let i=0;i<vis.length;i+=6){
             const part=await Promise.all(vis.slice(i,i+6).map(async p=>{
-              const th=await makeThumb((p.images&&p.images[0])||p.img||'',360,0.6);
-              return Object.assign({},p,{lite:1,img:th,images:th?[th]:[],desc:{ru:'',kk:''},specs:{ru:'',kk:''},hasDesc:!!(p.desc&&p.desc.ru)||!!p.hasDesc,hasDescKz:!!(p.desc&&p.desc.kk)||!!p.hasDescKz,hasSp:!!(p.specs&&p.specs.ru)||!!p.hasSp,hasSpKz:!!(p.specs&&p.specs.kk)||!!p.hasSpKz,_f:'копия'});
+              let f=p;try{f=(await getFull(p.id))||p}catch(e){}
+              const th=await makeThumb((p.images&&p.images[0])||p.img||(f.images&&f.images[0])||'',360,0.6);
+              const dd=f.desc||{ru:'',kk:''},ss=f.specs||{ru:'',kk:''};
+              return Object.assign({},p,{lite:1,img:th,images:th?[th]:[],desc:{ru:dd.ru||'',kk:dd.kk||''},specs:{ru:ss.ru||'',kk:ss.kk||''},hasDesc:!!dd.ru||!!p.hasDesc,hasDescKz:!!dd.kk||!!p.hasDescKz,hasSp:!!ss.ru||!!p.hasSp,hasSpKz:!!ss.kk||!!p.hasSpKz,_f:'копия'});
             }));
             out.push(...part);
           }
@@ -1562,7 +1564,7 @@ async function stLoad(){
   try{
     await pickDb();
     if(!fdb)throw new Error('Firebase не подключён');
-    const sn=await Promise.race([getDocs(query(collection(fdb,'visits'),orderBy('ts','desc'),limit(5000))),new Promise((_,rej)=>setTimeout(()=>rej({code:'timeout'}),20000))]);
+    const sn=await Promise.race([getDocs(query(collection(fdb,'visits'),orderBy('ts','desc'),limit(2000))),new Promise((_,rej)=>setTimeout(()=>rej({code:'timeout'}),20000))]);
     ST.rows=sn.docs.map(x=>x.data());
   }catch(e){
     const c=String(e&&(e.code||e.message)||e);
@@ -1617,7 +1619,7 @@ function adminStats(){
   h+=stTop('Страницы',stCount(pv.filter(r=>!String(r.pg||'').startsWith('/product/')),r=>stPageLabel(r.pg||'')),6);
   h+=stTop('Устройства',stCount(vis,r=>r.dev==='m'?'Телефон':'Компьютер'),3);
   h+=stTop('Язык сайта',stCount(vis,r=>r.lg==='kk'?'Қазақша':'Русский'),3);
-  if(ST.rows.length>=5000)h+=`<div class="note" style="margin-top:12px">Показаны последние 5000 событий.</div>`;
+  if(ST.rows.length>=2000)h+=`<div class="note" style="margin-top:12px">Показаны последние 2000 событий (так экономится бесплатный лимит чтений).</div>`;
   if(!rows.length)h+=`<div class="note" style="margin-top:12px">За этот период данных пока нет.</div>`;
   return h;
 }
@@ -1634,21 +1636,23 @@ document.addEventListener('change',e=>{
 
 /* ============ Start ============ */
 (async()=>{
-  let c=await cacheGet();
-  if(!(c&&c.v===3&&Array.isArray(c.products)&&c.products.length)){
+  const OWN=(()=>{try{return !!ymOwner()||/^#\/admin/.test(location.hash)}catch(e){return false}})();
+  let c=null,snap=false;
+  if(!OWN){
     try{
       const r=await Promise.race([fetch('catalog.json',{cache:'no-cache'}).then(x=>x.ok?x.json():null),new Promise(z=>setTimeout(()=>z(null),3500))]);
-      if(r&&r.v===3&&Array.isArray(r.products)&&r.products.length){r.t=0;c=r}
+      if(r&&r.v===3&&Array.isArray(r.products)&&r.products.length){r.t=0;c=r;snap=true}
     }catch(e){}
   }
-  if(c&&FORCE_I>=0&&c.db!==DB_IDS[FORCE_I])c=null;
-  if(c&&c.v===3&&Array.isArray(c.products)&&c.products.length){LITE=!!c.lite;DB.products=c.products;FBCATS=c.cats||null;DB.cats=buildCats();DB.loaded=true;PENDING=true;setTimeout(()=>{if(PENDING){PENDING=false;KEEP=true;LOAD_ERR=LOAD_ERR||'timeout';render()}},25000)}
+  if(!c)c=await cacheGet();
+  if(c&&FORCE_I>=0&&c.db!==DB_IDS[FORCE_I]){c=null;snap=false}
+  if(c&&c.v===3&&Array.isArray(c.products)&&c.products.length){LITE=!!c.lite;DB.products=c.products;FBCATS=c.cats||null;DB.cats=buildCats();DB.loaded=true;if(!snap){PENDING=true;setTimeout(()=>{if(PENDING){PENDING=false;KEEP=true;LOAD_ERR=LOAD_ERR||'timeout';render()}},25000)}}
   render();started=true;
   await fbInitP;
   if(c&&!dbPicked&&FORCE_I<0){const ix=DB_IDS.indexOf(c.db);if(ix>=0&&fdbs[ix]){fdb=fdbs[ix];DBNAME=DB_IDS[ix];dbPicked=true}}
-  let fresh=c&&c.v===3&&(Date.now()-c.t<TTL);
-  if(fresh&&!c.meta)fresh=false;
-  if(fresh&&c.meta){try{await pickDb();const m=await metaStamp();if(m&&m!==c.meta)fresh=false}catch(e){}}
+  let fresh=snap||(c&&c.v===3&&(Date.now()-c.t<TTL));
+  if(fresh&&!c.meta&&!snap)fresh=false;
+  if(fresh&&c.meta&&!snap){try{await pickDb();const m=await metaStamp();if(m&&m!==c.meta)fresh=false}catch(e){}}
   if(!fresh){
     const before=DB.loaded?dataSig():'';
     const wasPending=PENDING;
@@ -1657,7 +1661,7 @@ document.addEventListener('change',e=>{
     if(!DB.loaded||dataSig()!==before||LOAD_ERR||wasPending){KEEP=DB.loaded&&!!before;render()}
   }else if(PENDING){PENDING=false;KEEP=true;render()}
   try{stReady=true;stFlush()}catch(e){}
-  watchMeta();
+  if(!snap)watchMeta();
 })();
 </script>
 </body>
