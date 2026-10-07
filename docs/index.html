@@ -819,6 +819,7 @@ function viewProduct(slug){
     if(FULLC[p0.id])p=FULLC[p0.id];
     else if(!FULLING[p0.id]&&!FULLERR[p0.id]&&fdb){FULLING[p0.id]=1;getFull(p0.id).then(()=>{delete FULLING[p0.id];KEEP=true;render()}).catch(e=>{delete FULLING[p0.id];FULLERR[p0.id]=String(e&&e.message||e);KEEP=true;render()})}
   }
+  if(p.st&&p.images&&p.images[0])p=Object.assign({},p,{img:p.images[0]});
   document.title=L(p.name)+' — MUSLIM SHOP';
   CUR=p;
   const rows=specsRows(p.specs&&(p.specs[lang]||p.specs.ru));
@@ -1140,6 +1141,7 @@ function adminList(){
   <button class="btn line block" data-act="acats" style="margin-bottom:12px">Категории (${DB.cats.length})</button>
   <button class="btn line block" data-act="astats" style="margin-bottom:12px">📊 Статистика посещений</button>
   <button class="btn line block" data-act="asnap" style="margin-bottom:12px">⚡ Скачать быструю копию каталога</button>
+  <button class="btn gold block" data-act="azip" style="margin-bottom:12px">🌐 Скачать весь сайт (ZIP) для Cloudflare</button>
   <div class="two" style="margin-bottom:12px"><button class="btn sm line" data-act="asel-demo">Отметить демо-товары</button><button class="btn sm line" data-act="asel-none">Снять все отметки</button></div>
   <button class="btn sm block" id="delsel" data-act="adel-sel" style="margin-bottom:14px">${selLabel()}</button>
   <div class="note" style="margin-bottom:14px"><b>Быстрая загрузка (лёгкий каталог)</b><br>Состояние: ${LITE?'включён, товаров: '+DB.products.length:'не создан, сайт грузит полные карточки (медленно)'}<br><button class="btn sm line block" data-act="dbs-check" style="margin-top:8px">Проверить базы (покажет, где лежат товары)</button><pre id="dbsout" style="white-space:pre-wrap;font-size:14px;margin-top:8px"></pre><button class="btn sm line block" data-act="sync-now" style="margin-top:8px">Синхронизировать (обновить у всех)</button><button class="btn sm gold block" data-act="lite-build" style="margin-top:8px">${LITE?'Обновить лёгкий каталог':'Создать лёгкий каталог'}</button></div>
@@ -1312,6 +1314,7 @@ document.addEventListener('click',e=>{
     case 'astats-back':adminView='products';render();window.scrollTo(0,0);break;
     case 'astats-range':ST.range=Number(id)||7;KEEP=true;render();break;
     case 'astats-refresh':stLoad();break;
+    case 'azip':buildSiteZip().catch(e=>{ZIPBUSY=false;alert('Не получилось: '+String(e&&e.message||e))});break;
     case 'asnap':{
       (async()=>{
         try{
@@ -1633,6 +1636,88 @@ document.addEventListener('change',e=>{
     }catch(err){}
   }
 });
+
+/* ============ Экспорт всего сайта в ZIP (каталог + чёткие фото как файлы) ============ */
+let ZIPBUSY=false;
+const crcT=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+const crc32=u=>{let c=0xFFFFFFFF;for(let i=0;i<u.length;i++)c=crcT[(c^u[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0};
+function zipBlob(files){
+  const enc=new TextEncoder(),parts=[],cd=[];let off=0,cdSize=0;
+  const d=new Date(),dt=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1),dd=((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();
+  for(const f of files){
+    const nm=enc.encode(f.name),crc=crc32(f.data),sz=f.data.length;
+    const lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);lh.setUint16(6,0x0800,true);lh.setUint16(8,0,true);lh.setUint16(10,dt,true);lh.setUint16(12,dd,true);lh.setUint32(14,crc,true);lh.setUint32(18,sz,true);lh.setUint32(22,sz,true);lh.setUint16(26,nm.length,true);lh.setUint16(28,0,true);
+    parts.push(lh.buffer,nm,f.data);
+    const ch=new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true);ch.setUint16(4,20,true);ch.setUint16(6,20,true);ch.setUint16(8,0x0800,true);ch.setUint16(10,0,true);ch.setUint16(12,dt,true);ch.setUint16(14,dd,true);ch.setUint32(16,crc,true);ch.setUint32(20,sz,true);ch.setUint32(24,sz,true);ch.setUint16(28,nm.length,true);ch.setUint16(30,0,true);ch.setUint16(32,0,true);ch.setUint16(34,0,true);ch.setUint16(36,0,true);ch.setUint32(38,0,true);ch.setUint32(42,off,true);
+    cd.push(ch.buffer,nm);cdSize+=46+nm.length;
+    off+=30+nm.length+sz;
+  }
+  const end=new DataView(new ArrayBuffer(22));
+  end.setUint32(0,0x06054b50,true);end.setUint16(4,0,true);end.setUint16(6,0,true);end.setUint16(8,files.length,true);end.setUint16(10,files.length,true);end.setUint32(12,cdSize,true);end.setUint32(16,off,true);end.setUint16(20,0,true);
+  return new Blob([...parts,...cd,end.buffer],{type:'application/zip'});
+}
+function imgBlob(src,mx,q){
+  return new Promise(res=>{
+    if(!src)return res(null);
+    const im=new Image();
+    im.onload=()=>{try{
+      const k=Math.min(1,mx/Math.max(im.width,im.height)),c=document.createElement('canvas');
+      c.width=Math.max(1,Math.round(im.width*k));c.height=Math.max(1,Math.round(im.height*k));
+      const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);
+      c.toBlob(b=>res(b),'image/jpeg',q);
+    }catch(e){res(null)}};
+    im.onerror=()=>res(null);
+    im.src=src;
+  });
+}
+const hs=str=>{str=String(str||'');let h=5381;const step=str.length>6000?Math.floor(str.length/6000):1;for(let i=0;i<str.length;i+=step)h=((h<<5)+h+str.charCodeAt(i))|0;return (h>>>0).toString(36)+str.length.toString(36)};
+async function buildSiteZip(){
+  if(ZIPBUSY){alert('Копия уже готовится, подождите.');return}
+  const vis=DB.products.filter(p=>p.status!=='hidden');
+  if(!vis.length){alert('Товаров нет, копию делать не из чего.');return}
+  ZIPBUSY=true;
+  const files=[],out=[],enc=new TextEncoder();let nImg=0,nExt=0;
+  const addText=(name,txt)=>files.push({name,data:enc.encode(txt)});
+  toast('Готовлю сайт… это займёт несколько минут, не закрывайте страницу');
+  for(let i=0;i<vis.length;i+=4){
+    const part=await Promise.all(vis.slice(i,i+4).map(async p=>{
+      const f=(await getFull(p.id))||p;
+      const srcs=((f.images&&f.images.length)?f.images:(p.images||[])).filter(Boolean).slice(0,4);
+      const base=String(p.id).replace(/[^A-Za-z0-9_-]/g,'_');
+      const imgs=[];let thumb='';
+      for(let k=0;k<srcs.length;k++){
+        const h=hs(srcs[k]);
+        const b=await imgBlob(srcs[k],1200,0.82);
+        if(b){const nm='img/'+base+'-'+(k+1)+'-'+h+'.jpg';files.push({name:nm,data:new Uint8Array(await b.arrayBuffer())});imgs.push(nm);nImg++}
+        else{imgs.push(srcs[k]);nExt++}
+        if(k===0){
+          const tb=await imgBlob(srcs[0],360,0.72);
+          if(tb){const tn='img/t/'+base+'-'+h+'.jpg';files.push({name:tn,data:new Uint8Array(await tb.arrayBuffer())});thumb=tn}
+          else thumb=imgs[0];
+        }
+      }
+      const dd=f.desc||{ru:'',kk:''},ss=f.specs||{ru:'',kk:''};
+      return {id:p.id,slug:p.slug,st:1,cat:p.cat,name:p.name,price:p.price,old:p.old,status:p.status,qty:p.qty,sku:p.sku,img:thumb,images:imgs,isNew:p.isNew,popular:p.popular,featured:p.featured,created:p.created,desc:{ru:dd.ru||'',kk:dd.kk||''},specs:{ru:ss.ru||'',kk:ss.kk||''}};
+    }));
+    out.push(...part);
+    toast('Готово товаров: '+Math.min(i+4,vis.length)+' из '+vis.length);
+  }
+  addText('catalog.json',JSON.stringify({v:3,t:0,meta:null,db:DBNAME,lite:false,st:1,products:out,cats:FBCATS}));
+  let htmlOk=false;
+  try{const r=await fetch(location.origin+location.pathname,{cache:'no-store'});if(r.ok){const t=await r.text();if(/<title>/i.test(t)&&t.length>50000){addText('index.html',t);htmlOk=true}}}catch(e){}
+  if(!htmlOk){ZIPBUSY=false;alert('Не удалось подхватить index.html с сайта. Откройте сайт по обычному адресу muslimshop.kz и повторите.');return}
+  for(const n of ['robots.txt','sitemap.xml']){try{const r=await fetch(n,{cache:'no-store'});if(r.ok){const t=await r.text();if(!/<!doctype html|<html/i.test(t))addText(n,t)}}catch(e){}}
+  for(const n of ['favicon.png','og-banner.png']){try{const r=await fetch(n,{cache:'no-store'});if(r.ok&&/image/.test(r.headers.get('content-type')||''))files.push({name:n,data:new Uint8Array(await r.arrayBuffer())})}catch(e){}}
+  addText('_headers','/\n  Cache-Control: no-cache\n/index.html\n  Cache-Control: no-cache\n/catalog.json\n  Cache-Control: no-cache\n/img/*\n  Cache-Control: public, max-age=31536000, immutable\n');
+  if(files.length>990){ZIPBUSY=false;alert('Файлов получилось '+files.length+'. Загрузка через сайт Cloudflare принимает не больше 1000. Напишите помощнику, уменьшим.');return}
+  const blob=zipBlob(files),mb=(blob.size/1048576).toFixed(1);
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='muslimshop-site.zip';
+  document.body.appendChild(a);a.click();setTimeout(()=>{try{URL.revokeObjectURL(a.href);a.remove()}catch(e){}},8000);
+  ZIPBUSY=false;
+  alert('Готово: muslimshop-site.zip\nТоваров: '+out.length+', фото-файлов: '+nImg+(nExt?' (ещё '+nExt+' ссылок на внешние фото оставлено как есть)':'')+'\nФайлов в архиве: '+files.length+', размер: '+mb+' МБ.');
+}
 
 /* ============ Start ============ */
 (async()=>{
