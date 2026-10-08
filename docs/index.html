@@ -476,18 +476,18 @@ async function pickDb(){
   if(dbPicked||!fdbs.length)return;
   if(FORCE_I>=0){fdb=fdbs[FORCE_I];DBNAME=DB_IDS[FORCE_I];dbPicked=true;return}
   let saved=-1;try{saved=parseInt(localStorage.getItem('ms_db')||'-1',10)}catch(e){}
-  const order=saved===1?[1,0]:[0,1];
-  let fb=null;
-  for(const i of order){
-    for(const col of ['catalog','products']){
-      try{
-        const sn=await getDocs(query(collection(fdbs[i],col),limit(1)));
-        if(sn.docs.length){fdb=fdbs[i];DBNAME=DB_IDS[i];dbPicked=true;try{localStorage.setItem('ms_db',String(i))}catch(e){}return}
-      }catch(e){}
-    }
-    if(fb===null)fb=i;
+  // Не переключаемся на первую непустую базу: выбираем базу с наиболее полным набором товаров.
+  let best=-1,bestCount=-1;
+  for(let i=0;i<fdbs.length;i++){
+    try{
+      const sn=await getDocs(collection(fdbs[i],'products'));
+      const n=sn.docs.length;
+      if(n>bestCount || (n===bestCount && i===saved)){best=i;bestCount=n}
+    }catch(e){}
   }
-  const k=fb===null?0:fb;fdb=fdbs[k];DBNAME=DB_IDS[k];dbPicked=true;
+  if(best<0)best=(saved===0||saved===1)?saved:0;
+  fdb=fdbs[best];DBNAME=DB_IDS[best];dbPicked=true;
+  try{localStorage.setItem('ms_db',String(best))}catch(e){}
 }
 let DB={cats:BUILTIN_CATS,products:[],loaded:false};
 const isAdmin=()=>!!authUser;
@@ -603,8 +603,28 @@ async function loadData(){
   await pickDb();
   try{
     let snap=null,lite=false;
-    try{const cs=await getDocs(collection(fdb,'catalog'));const mm=cs.docs.find(x=>x.id==='_meta');if(mm){META=stampOf(mm.data().updatedAt);snap={docs:cs.docs.filter(x=>x.id!=='_meta')};lite=true}}catch(e){}
-    if(!snap)snap=await getDocs(collection(fdb,'products'));
+    // Используем лёгкий catalog только если он действительно содержит столько же
+    // товаров, сколько основная коллекция products. Неполный catalog больше не скрывает товары.
+    try{
+      const [cs,ps]=await Promise.all([
+        getDocs(collection(fdb,'catalog')),
+        getDocs(collection(fdb,'products'))
+      ]);
+      const mm=cs.docs.find(x=>x.id==='_meta');
+      const catDocs=cs.docs.filter(x=>x.id!=='_meta');
+      const expected=mm&&typeof mm.data().count==='number'?mm.data().count:ps.docs.length;
+      if(mm && catDocs.length>0 && catDocs.length===ps.docs.length && catDocs.length===expected){
+        META=stampOf(mm.data().updatedAt);
+        snap={docs:catDocs};
+        lite=true;
+      }else{
+        // catalog неполный/устаревший — показываем полный products
+        snap=ps;
+        META=null;
+      }
+    }catch(e){
+      snap=await getDocs(collection(fdb,'products'));
+    }
     LITE=lite;
     DB.products=snap.docs.map(x=>lite?normLite(x.id,x.data()):norm(x.id,x.data())).sort((a,b)=>(b.created-a.created)||a.name.ru.localeCompare(b.name.ru));
     LOAD_ERR='';
