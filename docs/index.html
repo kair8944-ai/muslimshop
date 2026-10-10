@@ -1660,7 +1660,7 @@ document.addEventListener('change',e=>{
   let c=null,snap=false;
   if(!OWN){
     try{
-      const r=await Promise.race([fetch('catalog.json',{cache:'no-cache'}).then(x=>x.ok?x.json():null),new Promise(z=>setTimeout(()=>z(null),3500))]);
+      const r=await Promise.race([fetch('catalog.json',{cache:'no-cache'}).then(x=>x.ok?x.json():null),new Promise(z=>setTimeout(()=>z(null),20000))]);
       if(r&&r.v===3&&Array.isArray(r.products)&&r.products.length){r.t=0;c=r;snap=true}
     }catch(e){}
   }
