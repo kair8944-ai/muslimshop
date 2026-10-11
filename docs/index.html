@@ -1318,24 +1318,43 @@ function catForm(c){
    <button class="btn line block" type="button" data-act="acat-cancel">Отмена</button>
   </form>`;
 }
-function adminList(){
-  return `<button class="btn gold block" data-act="anew" style="margin-bottom:12px">+ ДОБАВИТЬ ТОВАР</button>
-  <button class="btn line block" data-act="acats" style="margin-bottom:12px">Категории (${DB.cats.length})</button>
-  <button class="btn line block" data-act="astats" style="margin-bottom:12px">📊 Товары и посещения</button>
-  <div class="two" style="margin-bottom:12px"><button class="btn sm line" data-act="asel-demo">Отметить демо-товары</button><button class="btn sm line" data-act="asel-none">Снять все отметки</button></div>
-  <button class="btn sm block" id="delsel" data-act="adel-sel" style="margin-bottom:14px">${selLabel()}</button>
-  <button class="btn sm line block" data-act="gh-dl" style="margin-bottom:14px">Скачать catalog.json (запасная копия)</button>
-  <details class="note" style="margin-bottom:14px"><summary><b>Диагностика полей товаров</b></summary><button class="btn sm line" data-act="diag" style="margin:8px 0">Показать поля 2 товаров</button><pre id="diag" style="white-space:pre-wrap;font-size:15px"></pre></details>
-  <div class="note" style="margin-bottom:14px"><b>Восстановить из резервной копии</b><br>Выберите файл .json. Сначала покажу, что в нём найдено, потом спрошу подтверждение.<br><input type="file" id="bkfile" accept=".json,application/json" style="margin:8px 0"><div id="bkinfo"></div><button class="btn sm gold block" id="bkrun" data-act="bk-run" disabled style="margin-top:8px">Восстановить всё (товары и категории)</button><button class="btn sm line block" id="bkdesc" data-act="bk-desc" disabled style="margin-top:8px">Восстановить только описания</button></div>
-  <div class="note" style="margin-bottom:14px"><b>Перевод на казахский</b><br>Без перевода: <b>${needTr().length}</b> из ${DB.products.length}<br><button class="btn sm line" data-act="atr-copy" style="margin:8px 0">Подготовить 15 товаров</button><textarea id="trout" readonly rows="3" style="width:100%">${esc(TR_OUT)}</textarea><textarea id="trin" rows="3" placeholder="Вставьте сюда готовый перевод" style="width:100%;margin-top:8px"></textarea><button class="btn sm gold block" data-act="atr-save" style="margin-top:8px">Записать перевод</button></div>
-  ${LOAD_ERR?`<div class="note" style="margin-bottom:12px">Не удалось прочитать товары: ${esc(LOAD_ERR)}</div>`:''}
-  ${DB.products.map(p=>`<div class="adm-row">${imgBox(p,'ph')}
+let adminQ='',adminCat='';
+const admFiltered=()=>{const q=adminQ.trim().toLowerCase();return DB.products.filter(p=>(!adminCat||p.cat===adminCat)&&(!q||(p.name.ru||'').toLowerCase().includes(q)||(p.name.kk||'').toLowerCase().includes(q)||String(p.sku||'').toLowerCase().includes(q)))};
+function admRows(){const arr=admFiltered();return arr.map(p=>`<div class="adm-row">${imgBox(p,'ph')}
     <div><label class="checks" style="display:flex;min-height:36px"><input type="checkbox" data-sel="${esc(p.id)}" ${SEL.has(p.id)?'checked':''} style="width:24px;height:24px"> <b>${esc(L(p.name))}</b></label>${p.status==='hidden'?'<span class="hidden-badge">скрыт</span>':''}${isDemo(p)?'<span class="hidden-badge">демо</span>':''}<br>${money(p.price)} · ${p.status==='out'?'нет в наличии':p.status==='hidden'?'скрыт':'в наличии'} · ${esc(catName(p.cat))}</div>
     <div class="adm-btns">
       <button class="btn sm line" data-act="aedit" data-id="${esc(p.id)}">Редактировать</button>
       <button class="btn sm line" data-act="ahide" data-id="${esc(p.id)}">${p.status==='hidden'?'Показать':'Скрыть'}</button>
       <button class="btn sm line" data-act="adel" data-id="${esc(p.id)}">Удалить</button>
-      <a class="btn sm line" href="#/product/${esc(p.id)}">Открыть</a></div></div>`).join('')||'<div class="empty">Товаров пока нет. Нажмите «Добавить товар».</div>'}`;
+      <a class="btn sm line" href="#/product/${esc(p.id)}">Открыть</a></div></div>`).join('')||'<div class="empty">'+(DB.products.length?'Ничего не найдено. Измените категорию или поиск.':'Товаров пока нет. Нажмите «Добавить товар».')+'</div>'}
+const admCountTxt=()=>'Показано: '+admFiltered().length+' из '+DB.products.length;
+function admChips(){
+  const cnt={};DB.products.forEach(p=>{cnt[p.cat]=(cnt[p.cat]||0)+1});
+  const chip=(id,name,n)=>`<button type="button" class="btn sm ${adminCat===id?'gold':'line'}" data-act="acatf" data-id="${esc(id)}" style="flex:none;white-space:nowrap">${esc(name)} ${n}</button>`;
+  return chip('','Все',DB.products.length)+DB.cats.filter(c=>cnt[c.id]).map(c=>chip(c.id,L(c.name)||c.id,cnt[c.id])).join('');
+}
+function admSelect(){
+  const cnt={};DB.products.forEach(p=>{cnt[p.cat]=(cnt[p.cat]||0)+1});
+  return '<option value="">Все категории ('+DB.products.length+')</option>'+DB.cats.filter(c=>cnt[c.id]).map(c=>'<option value="'+esc(c.id)+'"'+(adminCat===c.id?' selected':'')+'>'+esc(L(c.name)||c.id)+' ('+cnt[c.id]+')</option>').join('');
+}
+function admRefresh(){const l=$('#admlist');if(!l)return;l.innerHTML=admRows();const c=$('#admchips');if(c)c.innerHTML=admChips();const n=$('#admcount');if(n)n.textContent=admCountTxt();const sel=$('#admcat');if(sel)sel.value=adminCat}
+document.addEventListener('input',e=>{if(e.target&&e.target.id==='admq'){adminQ=e.target.value;admRefresh()}});
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='admcat'){adminCat=e.target.value;admRefresh()}});
+function adminList(){
+  return `<button class="btn gold block" data-act="anew" style="margin-bottom:12px">+ ДОБАВИТЬ ТОВАР</button>
+  <button class="btn line block" data-act="acats" style="margin-bottom:12px">Категории (${DB.cats.length})</button>
+  <button class="btn line block" data-act="astats" style="margin-bottom:12px">📊 Товары и посещения</button>
+  <details style="margin-bottom:14px"><summary class="btn sm line block" style="list-style:none;text-align:center;cursor:pointer">⚙ Инструменты: копия, восстановление, перевод</summary><div style="margin-top:10px">
+  <button class="btn sm line block" data-act="gh-dl" style="margin-bottom:14px">Скачать catalog.json (запасная копия)</button>
+  <details class="note" style="margin-bottom:14px"><summary><b>Диагностика полей товаров</b></summary><button class="btn sm line" data-act="diag" style="margin:8px 0">Показать поля 2 товаров</button><pre id="diag" style="white-space:pre-wrap;font-size:15px"></pre></details>
+  <div class="note" style="margin-bottom:14px"><b>Восстановить из резервной копии</b><br>Выберите файл .json. Сначала покажу, что в нём найдено, потом спрошу подтверждение.<br><input type="file" id="bkfile" accept=".json,application/json" style="margin:8px 0"><div id="bkinfo"></div><button class="btn sm gold block" id="bkrun" data-act="bk-run" disabled style="margin-top:8px">Восстановить всё (товары и категории)</button><button class="btn sm line block" id="bkdesc" data-act="bk-desc" disabled style="margin-top:8px">Восстановить только описания</button></div>
+  <div class="note" style="margin-bottom:14px"><b>Перевод на казахский</b><br>Без перевода: <b>${needTr().length}</b> из ${DB.products.length}<br><button class="btn sm line" data-act="atr-copy" style="margin:8px 0">Подготовить 15 товаров</button><textarea id="trout" readonly rows="3" style="width:100%">${esc(TR_OUT)}</textarea><textarea id="trin" rows="3" placeholder="Вставьте сюда готовый перевод" style="width:100%;margin-top:8px"></textarea><button class="btn sm gold block" data-act="atr-save" style="margin-top:8px">Записать перевод</button></div>
+  </div></details>
+  ${LOAD_ERR?`<div class="note" style="margin-bottom:12px">Не удалось прочитать товары: ${esc(LOAD_ERR)}</div>`:''}
+  <div style="margin:6px 0 12px"><input id="admq" type="search" placeholder="Поиск по названию или артикулу…" value="${esc(adminQ)}" autocomplete="off" style="width:100%;margin-bottom:8px"><select id="admcat" style="width:100%;margin-bottom:8px">${admSelect()}</select><div id="admchips" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px">${admChips()}</div><div id="admcount" class="note" style="margin-top:6px">${admCountTxt()}</div></div>
+  <div class="two" style="margin-bottom:12px"><button class="btn sm line" data-act="asel-demo">Отметить демо-товары</button><button class="btn sm line" data-act="asel-none">Снять все отметки</button></div>
+  <button class="btn sm block" id="delsel" data-act="adel-sel" style="margin-bottom:14px">${selLabel()}</button>
+  <div id="admlist">${admRows()}</div>`;
 }
 const imgsHtml=p=>(p.images||[]).map((s,i)=>`<div class="ie"><img src="${esc(s)}" alt=""><button type="button" class="btn sm line" data-act="rmimg" data-id="${i}">Убрать</button></div>`).join('');
 function refreshImgs(){const b=$('#imgs');if(b)b.innerHTML=imgsHtml(editing)}
@@ -1491,6 +1510,7 @@ document.addEventListener('click',e=>{
     case 'sync-now':(async()=>{try{toast('Синхронизирую…');await touchMeta();await loadData();render();toast('Готово. Товаров: '+DB.products.length+'. У покупателей обновится при следующем заходе.')}catch(err){toast('Ошибка: '+(err&&err.message||err))}})();break;
     case 'lite-build':buildLite().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'atr-save':trSave().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
+    case 'acatf':adminCat=id||'';admRefresh();break;
     case 'gh-publish':ghPublish();break;
     case 'gh-dl':ghDownload();break;
     case 'alogout':signOut(fauth).then(()=>{editing=null;catEditing=null;adminView='products';render()});break;
