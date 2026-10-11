@@ -471,11 +471,21 @@ function ghBar(){
 function ghCatalogObj(imgPath){
   const prods=Object.keys(GH.cols.products).map(id=>{
     const d=ghClone(GH.cols.products[id]);d.id=id;
-    if(imgPath)d.images=(d.images||[]).map(s=>imgPath(id,s));
+    if(imgPath)d.images=(d.images||[]).map(s=>imgPath(id,s)).filter(Boolean);
     return d;
   });
   const cats=Object.keys(GH.cols.categories).map(id=>Object.assign({id},ghClone(GH.cols.categories[id])));
   return {v:4,updated:new Date().toISOString(),categories:cats,products:prods};
+}
+const imgOk=src=>new Promise(res=>{if(!src||typeof src!=='string'){res(false);return}const im=new Image();let done=false;const f=v=>{if(!done){done=true;res(v)}};im.onload=()=>f(im.naturalWidth>0);im.onerror=()=>f(false);setTimeout(()=>f(false),12000);im.src=src});
+async function ghDataFile(s){
+  const m=/^data:([^;,]+)([^,]*),([\s\S]*)$/.exec(s);if(!m)return null;
+  const mime=m[1].toLowerCase(),isB64=/;base64/i.test(m[2]);
+  let b64;
+  if(isB64)b64=m[3].replace(/\s+/g,'');
+  else{try{b64=btoa(unescape(encodeURIComponent(decodeURIComponent(m[3]))))}catch(e){return null}}
+  const ext=mime.includes('png')?'png':mime.includes('webp')?'webp':mime.includes('gif')?'gif':mime.includes('svg')?'svg':'jpg';
+  return {ext,b64};
 }
 /* --- SEO: настоящие страницы товаров и категорий + sitemap.xml + robots.txt --- */
 function ghSeoFiles(dir,map){
@@ -487,7 +497,7 @@ function ghSeoFiles(dir,map){
   const cut=(x,n)=>{x=one(x);if(x.length<=n)return x;const c=x.slice(0,n),i=c.lastIndexOf(' ');return c.slice(0,i>n*0.6?i:n).trim()+'…'};
   const jld=o=>'<script type="application/ld+json">'+JSON.stringify(o).replace(/</g,'\\u003c')+'<\/script>';
   const money=v=>Number(v||0).toLocaleString('ru-RU')+' ₸';
-  const imgAbs=s=>{s=map[s]||s;if(!s||String(s).startsWith('data:'))return '';return /^https?:/.test(s)?s:SITE+String(s).replace(/^\//,'')};
+  const imgAbs=s=>{s=(s in map)?map[s]:s;if(!s||String(s).startsWith('data:'))return '';return /^https?:/.test(s)?s:SITE+String(s).replace(/^\//,'')};
   const cats=GH.cols.categories;
   const cname=id=>{const c=cats[id]||{};return clean(c.titleRu||c.nameRu||(c.name&&c.name.ru)||'')};
   const vis=Object.keys(GH.cols.products).filter(id=>!GH.cols.products[id].hidden);
@@ -548,19 +558,21 @@ async function ghPublish(){
     if(GH.err||!Object.keys(GH.cols.products).length)throw new Error('Каталог не загружен, публиковать нельзя.');
     const b=await ghBase();
     const sha1=async s=>{const h=await crypto.subtle.digest('SHA-1',new TextEncoder().encode(s));return [...new Uint8Array(h)].slice(0,6).map(x=>x.toString(16).padStart(2,'0')).join('')};
-    const todo=[],seen={},map={};
+    const todo=[],seen={},map={},bad=[];
     for(const id of Object.keys(GH.cols.products)){
       for(const s of (GH.cols.products[id].images||[])){
-        if(typeof s==='string'&&s.startsWith('data:image')&&!(s in map)){
+        if(typeof s==='string'&&s.startsWith('data:')&&!(s in map)){
+          GH.msg='Проверяю фото…';ghBar();
+          const f=(await imgOk(s))?await ghDataFile(s):null;
+          if(!f){map[s]='';bad.push(id);continue}
           const key=await sha1(s);
-          const ext=/image\/png/.test(s)?'png':/image\/webp/.test(s)?'webp':'jpg';
-          const rel='img/'+String(id).replace(/[^\w-]/g,'')+'-'+key+'.'+ext;
+          const rel='img/'+String(id).replace(/[^\w-]/g,'')+'-'+key+'.'+f.ext;
           map[s]=rel;
-          if(!GH.up[rel]&&!seen[rel]){seen[rel]=1;todo.push({rel,path:b.dir+rel,b64:s.split(',')[1]})}
-        }
+          if(!GH.up[rel]&&!seen[rel]){seen[rel]=1;todo.push({rel,path:b.dir+rel,b64:f.b64})}
+        }else if(typeof s==='string'&&s.startsWith('data:')&&map[s]===''){bad.push(id)}
       }
     }
-    const text=JSON.stringify(ghCatalogObj((id,s)=>map[s]||s));
+    const text=JSON.stringify(ghCatalogObj((id,s)=>(s in map)?map[s]:s));
     const tree=[];
     let i=0;
     const run=async()=>{
@@ -597,6 +609,7 @@ async function ghPublish(){
     GH.dirty=0;GH.publishing=false;
     GH.msg='Опубликовано'+(seoN?' (страниц для поиска: '+seoN+')':'')+'. Сайт обновится через 1–2 минуты.';ghBar();
     setTimeout(()=>{GH.msg='';ghBar()},20000);
+    if(bad.length){const names=[...new Set(bad)].slice(0,12).map(id=>{const d=GH.cols.products[id]||{};return '• '+String(d.titleRu||id).replace(/^[^\wА-Яа-яЁё]+/,'').slice(0,50)}).join('\n');alert('Внимание: у '+new Set(bad).size+' товаров фото повреждено и не опубликовано:\n'+names+'\n\nЗагрузите для них новое фото или нажмите «Проверить и починить фото» в Инструментах.')}
   }catch(e){
     GH.publishing=false;GH.msg='';ghBar();
     toast('Не опубликовано: '+(e&&e.message||e));
@@ -1233,24 +1246,49 @@ async function bkLoad(file){
     const b2=$('#bkdesc');if(b2)b2.disabled=!withDesc;const b3=$('#bkphoto');if(b3)b3.disabled=!withImg;
   }catch(e){box.textContent='Не удалось прочитать файл: '+(e&&e.message||e)}
 }
+async function bkValidImgs(list){
+  const out=[];
+  for(const im of (list||[]).filter(Boolean)){if(await imgOk(im))out.push(im)}
+  return out;
+}
 async function bkPhotos(){
   if(!BK||!BK.prods.length){toast('Сначала выберите файл');return}
-  const todo=BK.prods.filter(x=>x.id&&prodById(x.id)&&Array.isArray(x.data.images)&&x.data.images.filter(Boolean).length&&!((GH.cols.products[x.id]||{}).updatedAt));
-  const skip=BK.prods.length-todo.length;
-  if(!todo.length){toast('Нет товаров, у которых можно вернуть фото');return}
-  if(!confirm('Вернуть фото из копии для '+todo.length+' товаров?\nЦены, названия и описания не меняются. Товары, которые вы уже правили в админке, пропускаются (их фото не трогаем). Пропущено: '+skip+'.'))return;
+  const cand=BK.prods.filter(x=>x.id&&prodById(x.id)&&Array.isArray(x.data.images)&&x.data.images.filter(Boolean).length&&!((GH.cols.products[x.id]||{}).updatedAt));
+  if(!cand.length){toast('Нет товаров, у которых можно вернуть фото');return}
+  if(!confirm('Вернуть фото из копии для '+cand.length+' товаров?\nЦены, названия и описания не меняются. Товары, которые вы уже правили в админке, пропускаются. Неоткрывающиеся фото из копии пропускаются.'))return;
   let ok=0,bad=0,last='';
-  for(const x of todo){
+  for(const x of cand){
     try{
-      const imgs=x.data.images.filter(Boolean);
+      const imgs=await bkValidImgs(x.data.images);
+      if(!imgs.length){bad++;continue}
       await setDoc(doc(fdb,'products',x.id),{images:imgs},{merge:true});
       const p=prodById(x.id);if(p){p.images=imgs;p.img=imgs[0]}
       delete FULLC[x.id];ok++;
     }catch(e){bad++;last=String(e&&e.message||e)}
-    if((ok+bad)%10===0)toast('Фото: '+(ok+bad)+' из '+todo.length);
+    if((ok+bad)%10===0)toast('Фото: '+(ok+bad)+' из '+cand.length);
   }
   render();
-  toast(bad?('Фото: '+ok+', ошибок '+bad+': '+last):('Фото восстановлены: '+ok+'. Нажмите «Опубликовать» внизу.'));
+  toast('Фото восстановлены: '+ok+(bad?(', пропущено: '+bad):'')+'. Нажмите «Опубликовать» внизу.'+(last?(' '+last):''));
+}
+async function photoCheck(){
+  const all=DB.products.slice();
+  toast('Проверяю фото: 0 из '+all.length);
+  const broken=[];let i=0,n=0;
+  const run=async()=>{while(i<all.length){const p=all[i++];const ok=await imgOk((p.images||[])[0]);if(!ok)broken.push(p);n++;if(n%20===0)toast('Проверяю фото: '+n+' из '+all.length)}};
+  await Promise.all([run(),run(),run(),run(),run(),run()]);
+  if(!broken.length){alert('Все фото открываются ('+all.length+' товаров).\nЕсли на сайте фото не видно, подождите 1–2 минуты после публикации и обновите страницу.');return}
+  const names=broken.slice(0,15).map(p=>'• '+String(p.name.ru||p.id).replace(/^[^\wА-Яа-яЁё]+/,'').slice(0,50)).join('\n');
+  if(!BK||!BK.prods.length){alert('Не открывается фото у '+broken.length+' товаров:\n'+names+(broken.length>15?'\n…':'')+'\n\nВыберите файл копии выше (резервная копия или catalog.json) и нажмите эту кнопку ещё раз, фото вернутся из файла.');return}
+  let ok=0,miss=0;
+  for(const p of broken){
+    const x=BK.prods.find(y=>y.id===p.id)||BK.prods.find(y=>String(y.data.titleRu||y.data.title||'')===String(p.name.ru||''));
+    const imgs=x&&Array.isArray(x.data.images)?await bkValidImgs(x.data.images):[];
+    if(!imgs.length){miss++;continue}
+    await setDoc(doc(fdb,'products',p.id),{images:imgs},{merge:true});
+    p.images=imgs;p.img=imgs[0];delete FULLC[p.id];ok++;
+  }
+  render();
+  alert('Сломанных фото: '+broken.length+'. Починено из файла: '+ok+(miss?(', не нашлось в файле: '+miss):'')+'.\n'+(ok?'Нажмите «Опубликовать» внизу, чтобы покупатели увидели.':''));
 }
 async function bkDesc(){
   if(!BK||!BK.prods.length){toast('Сначала выберите файл');return}
@@ -1505,7 +1543,7 @@ function adminList(){
   <details style="margin-bottom:14px"><summary class="btn sm line block" style="list-style:none;text-align:center;cursor:pointer">⚙ Инструменты: копия, восстановление, перевод</summary><div style="margin-top:10px">
   <button class="btn sm line block" data-act="gh-dl" style="margin-bottom:14px">Скачать catalog.json (запасная копия)</button>
   <details class="note" style="margin-bottom:14px"><summary><b>Диагностика полей товаров</b></summary><button class="btn sm line" data-act="diag" style="margin:8px 0">Показать поля 2 товаров</button><pre id="diag" style="white-space:pre-wrap;font-size:15px"></pre></details>
-  <div class="note" style="margin-bottom:14px"><b>Восстановить из резервной копии</b><br>Выберите файл .json. Сначала покажу, что в нём найдено, потом спрошу подтверждение.<br><input type="file" id="bkfile" accept=".json,application/json" style="margin:8px 0"><div id="bkinfo"></div><button class="btn sm gold block" id="bkrun" data-act="bk-run" disabled style="margin-top:8px">Восстановить всё (товары и категории)</button><button class="btn sm line block" id="bkdesc" data-act="bk-desc" disabled style="margin-top:8px">Восстановить только описания</button><button class="btn sm gold block" id="bkphoto" data-act="bk-photo" disabled style="margin-top:8px">Восстановить только фото (вернуть качество)</button></div>
+  <div class="note" style="margin-bottom:14px"><b>Восстановить из резервной копии</b><br>Выберите файл .json. Сначала покажу, что в нём найдено, потом спрошу подтверждение.<br><input type="file" id="bkfile" accept=".json,application/json" style="margin:8px 0"><div id="bkinfo"></div><button class="btn sm gold block" id="bkrun" data-act="bk-run" disabled style="margin-top:8px">Восстановить всё (товары и категории)</button><button class="btn sm line block" id="bkdesc" data-act="bk-desc" disabled style="margin-top:8px">Восстановить только описания</button><button class="btn sm gold block" id="bkphoto" data-act="bk-photo" disabled style="margin-top:8px">Восстановить только фото (вернуть качество)</button><button class="btn sm line block" data-act="photo-check" style="margin-top:8px">🔎 Проверить и починить фото</button></div>
   <div class="note" style="margin-bottom:14px"><b>Перевод на казахский</b><br>Без перевода: <b>${needTr().length}</b> из ${DB.products.length}<br><button class="btn sm line" data-act="atr-copy" style="margin:8px 0">Подготовить 15 товаров</button><textarea id="trout" readonly rows="3" style="width:100%">${esc(TR_OUT)}</textarea><textarea id="trin" rows="3" placeholder="Вставьте сюда готовый перевод" style="width:100%;margin-top:8px"></textarea><button class="btn sm gold block" data-act="atr-save" style="margin-top:8px">Записать перевод</button></div>
   </div></details>
   ${LOAD_ERR?`<div class="note" style="margin-bottom:12px">Не удалось прочитать товары: ${esc(LOAD_ERR)}</div>`:''}
@@ -1714,6 +1752,7 @@ document.addEventListener('click',e=>{
     case 'del':cart=cart.filter(x=>x.id!==id);saveCart();render();break;
     /* admin */
     case 'atr-copy':{toast('Готовлю…');(async()=>{const list=needTr().slice(0,15);const fulls=await Promise.all(list.map(p=>getFull(p.id)));const b=fulls.filter(Boolean).map(p=>({id:p.id,t:p.name.ru,d:p.desc.ru,s:p.specs.ru}));TR_OUT=b.length?JSON.stringify(b):'';render();if(!b.length){toast('Всё переведено')}else if(navigator.clipboard){navigator.clipboard.writeText(TR_OUT).then(()=>toast('Скопировано. Отправьте это Claude'),()=>toast('Скопируйте текст из поля вручную'))}else toast('Скопируйте текст из поля вручную')})().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break}
+    case 'photo-check':photoCheck().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'bk-photo':bkPhotos().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'bk-desc':bkDesc().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'diag':diagRun().catch(err=>{const b=$('#diag');if(b)b.textContent='Ошибка: '+(err&&err.message||err)});break;
