@@ -821,7 +821,7 @@ function openDone(html,cls){
     const cd=e.target.closest('[data-cdel]');
     if(cd){const sel=document.getElementById('catmove');const tg=sel?sel.value:'';closeDone();doDeleteCat(cd.dataset.cdel,tg).catch(err=>showFail(fbErrText(err),'Категория не удалена'));return}
     const b=e.target.closest('[data-done]');
-    if(b){const k=b.dataset.done;closeDone();if(k==='again'){editing=blankProduct();render();window.scrollTo(0,0)}return}
+    if(b){const k=b.dataset.done;closeDone();if(k==='again'){editing=blankProduct();EDIT_DIRTY=false;render();window.scrollTo(0,0)}return}
     if(e.target===o||e.target.closest('[data-close]'))closeDone();
   });
   document.body.appendChild(o);
@@ -1287,7 +1287,7 @@ function viewAdmin(){
       <div><label for="dir">Папка сайта (docs, либо пусто для корня)</label><input id="dir" name="dir" value="${esc(ghDef().d)}" autocapitalize="none"></div>
       <button class="btn gold block" type="submit">Войти</button>
       <div id="loginmsg" class="note" style="display:none"></div>
-    </form></form>`;
+    </form>`;
   return `<h1 style="margin-top:16px">Управление магазином</h1>
   <div class="note" style="margin-bottom:14px">Репозиторий: <b>${esc(authUser.email||'')}</b>. Товаров в каталоге: <b>${DB.products.length}</b>. Всё, что вы меняете, сохраняется черновиком. Чтобы покупатели увидели, нажмите «Опубликовать» внизу экрана.</div>
   <div class="tabs"><button class="btn sm line" data-act="alogout">Выйти</button></div>
@@ -1392,7 +1392,8 @@ function adminCats(){
 }
 function catForm(c){
   const nm=catNamed(c);
-  return `<form class="form" data-form="category">
+  return `<div style="margin:4px 0 12px"><button type="button" class="btn sm line" data-act="acat-cancel">← К категориям</button></div>
+  <form class="form" data-form="category">
    <h2>${c._new?'Новая категория':'Изменить категорию'}</h2>
    ${(!c._new&&!nm)?`<div class="note">У этой категории пока нет названия: в товарах она записана как «${esc(c.id)}». Задайте название, и оно появится на сайте.</div>`:''}
    <div><label for="c-nr">Название (RU)</label><input id="c-nr" name="nr" value="${esc(nm?c.name.ru:'')}" required></div>
@@ -1444,7 +1445,8 @@ const imgsHtml=p=>(p.images||[]).map((s,i)=>`<div class="ie"><img src="${esc(s)}
 function refreshImgs(){const b=$('#imgs');if(b)b.innerHTML=imgsHtml(editing)}
 function adminForm(p){
   const o=(v,l,sel)=>`<option value="${esc(v)}" ${sel?'selected':''}>${l}</option>`;
-  return `<form class="form" data-form="product">
+  return `<div style="margin:4px 0 12px"><button type="button" class="btn sm line" data-act="acancel">← К списку товаров</button></div>
+  <form class="form" data-form="product">
    <h2>${p._new?'Новый товар':'Редактирование'}</h2>
    <div><label>Фотографии (до 4)</label><div id="imgs">${imgsHtml(p)}</div>
      <input type="file" id="pfile" accept="image/*" multiple></div>
@@ -1522,6 +1524,37 @@ try{history.scrollRestoration='manual'}catch(e){}
 window.addEventListener('scroll',()=>{clearTimeout(__sv);__sv=setTimeout(()=>{try{const y=Math.round(window.scrollY),st=history.state||{};if(st.y!==y)history.replaceState(Object.assign({},st,{y}),'')}catch(e){}},120)},{passive:true});
 const catUrl=()=>{const p=[];if(CQ.cat)p.push('cat='+encodeURIComponent(CQ.cat));if(CQ.q)p.push('q='+encodeURIComponent(CQ.q));if(CQ.sort&&CQ.sort!=='pop')p.push('sort='+CQ.sort);if(CQ.min!==''&&CQ.min!=null)p.push('min='+encodeURIComponent(CQ.min));if(CQ.max!==''&&CQ.max!=null)p.push('max='+encodeURIComponent(CQ.max));if(CQ.stock)p.push('stock=1');if(CQ.neu)p.push('neu=1');if(CQ.pop)p.push('pop=1');return '#/catalog'+(p.length?'?'+p.join('&'):'')};
 const saveCatUrl=()=>{try{history.replaceState(history.state,'',catUrl())}catch(e){}};
+let ADM_PUSHED=0,ADM_IGN=0,ADM_FORCE=false,EDIT_DIRTY=false,LAST_Y=0;
+const admDepth=()=>{try{const {path}=parse();if(path!=='/admin'||!authUser)return 0}catch(e){return 0}return (adminView!=='products'?1:0)+((editing||catEditing)?1:0)};
+function admSync(){
+  const d=admDepth();
+  if(ADM_PUSHED<d){
+    try{history.replaceState(Object.assign({},history.state||{},{y:Math.round(LAST_Y)}),'')}catch(e){}
+    while(ADM_PUSHED<d){ADM_PUSHED++;try{history.pushState({adm:ADM_PUSHED},'',location.href)}catch(e){}}
+  }else if(ADM_PUSHED>d){
+    const k=ADM_PUSHED-d;ADM_PUSHED=d;ADM_IGN+=k;
+    try{history.go(-k)}catch(e){ADM_IGN-=k}
+  }
+}
+function admCloseTop(){
+  if(editing)editing=null;else if(catEditing)catEditing=null;else if(adminView!=='products')adminView='products';
+  EDIT_DIRTY=false;
+  const st=history.state;RESTORE_Y=(st&&typeof st.y==='number'&&st.y>0)?st.y:null;
+  render();
+}
+const ADM_ASK='Выйти без сохранения? Изменения в этой карточке пропадут.';
+function admExit(){
+  if((editing||catEditing)&&EDIT_DIRTY&&!confirm(ADM_ASK))return;
+  if(ADM_PUSHED>0){ADM_FORCE=true;history.back()}else admCloseTop();
+}
+window.addEventListener('popstate',()=>{
+  if(ADM_IGN>0){ADM_IGN--;return}
+  if(admDepth()>0&&ADM_PUSHED>0){
+    if(!ADM_FORCE&&(editing||catEditing)&&EDIT_DIRTY&&!confirm(ADM_ASK)){try{history.pushState({adm:ADM_PUSHED},'',location.href)}catch(e){}return}
+    ADM_FORCE=false;ADM_PUSHED--;admCloseTop();
+  }
+});
+document.addEventListener('click',()=>{LAST_Y=window.scrollY},true);
 function renderInner(){
   const {path,q}=parse();const app=$('#app');
   document.title='MUSLIM SHOP — Атырау';
@@ -1542,6 +1575,7 @@ function renderInner(){
     const go=()=>{const e=document.getElementById('descsec')||document.querySelector('table.specs');if(!e)return null;const y=Math.max(0,Math.round(e.getBoundingClientRect().top+window.scrollY-84));window.scrollTo(0,y);return y};
     requestAnimationFrame(()=>{const y=go();if(y!=null)setTimeout(()=>{if(Math.abs(window.scrollY-y)<6)go()},450)});
   }
+  if(path==='/admin')admSync();
 }
 function renderChrome(){
   document.documentElement.lang=lang==='kk'?'kk':'ru';
@@ -1620,9 +1654,9 @@ document.addEventListener('click',e=>{
     case 'gh-dl':ghDownload();break;
     case 'alogout':signOut(fauth).then(()=>{editing=null;catEditing=null;adminView='products';render()});break;
     case 'acats':adminView='cats';catEditing=null;render();window.scrollTo(0,0);break;
-    case 'acats-back':adminView='products';catEditing=null;render();window.scrollTo(0,0);break;
+    case 'acats-back':admExit();break;
     case 'astats':adminView='stats';render();window.scrollTo(0,0);stLoad();break;
-    case 'astats-back':adminView='products';render();window.scrollTo(0,0);break;
+    case 'astats-back':admExit();break;
     case 'astats-range':ST.range=Number(id)||7;KEEP=true;render();break;
     case 'astats-refresh':stLoad();break;
     case 'asnap':{
@@ -1651,22 +1685,22 @@ document.addEventListener('click',e=>{
       })();
       break;
     }
-    case 'acat-new':catEditing={_new:1,id:'',main:0,name:{ru:'',kk:''}};render();window.scrollTo(0,0);break;
-    case 'acat-edit':{const c=DB.cats.find(x=>x.id===id);if(c){catEditing=JSON.parse(JSON.stringify(c));render();window.scrollTo(0,0)}break}
-    case 'acat-cancel':catEditing=null;render();break;
+    case 'acat-new':catEditing={_new:1,id:'',main:0,name:{ru:'',kk:''}};EDIT_DIRTY=false;render();window.scrollTo(0,0);break;
+    case 'acat-edit':{const c=DB.cats.find(x=>x.id===id);if(c){catEditing=JSON.parse(JSON.stringify(c));EDIT_DIRTY=false;render();window.scrollTo(0,0)}break}
+    case 'acat-cancel':admExit();break;
     case 'acat-up':moveCat(id,-1).then(render).catch(err=>showFail(fbErrText(err),'Не удалось переставить'));break;
     case 'acat-down':moveCat(id,1).then(render).catch(err=>showFail(fbErrText(err),'Не удалось переставить'));break;
     case 'acat-del':askDeleteCat(id);break;
     case 'acat-import':importCats().catch(err=>showFail(fbErrText(err),'Не удалось скопировать'));break;
-    case 'anew':editing=blankProduct();render();break;
-    case 'aedit':{toast('Открываю…');getFull(id).then(p=>{editing=JSON.parse(JSON.stringify(p));render()}).catch(err=>toast('Ошибка: '+(err&&err.message||err)));break}
-    case 'acancel':editing=null;render();break;
+    case 'anew':editing=blankProduct();EDIT_DIRTY=false;render();break;
+    case 'aedit':{toast('Открываю…');getFull(id).then(p=>{editing=JSON.parse(JSON.stringify(p));EDIT_DIRTY=false;render()}).catch(err=>toast('Ошибка: '+(err&&err.message||err)));break}
+    case 'acancel':admExit();break;
     case 'ahide':setHidden(id).catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'asel-demo':DB.products.filter(isDemo).forEach(p=>SEL.add(p.id));render();toast('Отмечено демо-товаров: '+DB.products.filter(isDemo).length);break;
     case 'asel-none':SEL.clear();render();break;
     case 'adel-sel':removeSelected().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'adel':removeProduct(id).catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
-    case 'rmimg':editing.images.splice(Number(id),1);editing.img=editing.images[0]||'';refreshImgs();break;
+    case 'rmimg':EDIT_DIRTY=true;editing.images.splice(Number(id),1);editing.img=editing.images[0]||'';refreshImgs();break;
     case 'gal':{const k=Number(id),im=$('.pp .ph img');if(im&&CUR&&CUR.images[k]){im.src=CUR.images[k];document.querySelectorAll('.thumbs button').forEach((x,n)=>x.classList.toggle('on',n===k))}break}
   }
 });
@@ -1765,12 +1799,13 @@ document.addEventListener('change',e=>{
         const d=await new Promise(r=>compress(f,r));
         if(d){editing.images.push(d);editing.img=editing.images[0]}
       }
-      refreshImgs();
+      EDIT_DIRTY=true;refreshImgs();
     })();
   }
 });
 document.addEventListener('input',e=>{
   const el=e.target;
+  if(el.closest&&el.closest('form[data-form="product"],form[data-form="category"]'))EDIT_DIRTY=true;
   if(el.id==='q'&&$('#plist')){CQ.q=el.value.trim();clearTimeout(window.__sq);window.__sq=setTimeout(()=>{if(!$('#plist'))return;updateCatalog();saveCatUrl()},140);return}
   if(el.dataset.f&&(el.type==='number')){CQ[el.dataset.f]=el.value;updateCatalog();saveCatUrl()}
 });
