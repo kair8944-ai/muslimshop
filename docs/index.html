@@ -40,7 +40,6 @@
 </script>
 <meta name="theme-color" content="#1F2022">
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -478,6 +477,69 @@ function ghCatalogObj(imgPath){
   const cats=Object.keys(GH.cols.categories).map(id=>Object.assign({id},ghClone(GH.cols.categories[id])));
   return {v:4,updated:new Date().toISOString(),categories:cats,products:prods};
 }
+/* --- SEO: настоящие страницы товаров и категорий + sitemap.xml + robots.txt --- */
+function ghSeoFiles(dir,map){
+  const SITE=((document.querySelector('link[rel=canonical]')||{}).href||(location.origin+'/')).replace(/\/?$/,'/');
+  const esc=x=>String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const emo=/[\u{1F000}-\u{1FFFF}\u{2190}-\u{21FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\uFE0F\u200D]/gu;
+  const clean=x=>String(x||'').replace(emo,'').replace(/[ \t]+/g,' ').trim();
+  const one=x=>clean(x).replace(/\s+/g,' ').trim();
+  const cut=(x,n)=>{x=one(x);if(x.length<=n)return x;const c=x.slice(0,n),i=c.lastIndexOf(' ');return c.slice(0,i>n*0.6?i:n).trim()+'…'};
+  const jld=o=>'<script type="application/ld+json">'+JSON.stringify(o).replace(/</g,'\\u003c')+'<\/script>';
+  const money=v=>Number(v||0).toLocaleString('ru-RU')+' ₸';
+  const imgAbs=s=>{s=map[s]||s;if(!s||String(s).startsWith('data:'))return '';return /^https?:/.test(s)?s:SITE+String(s).replace(/^\//,'')};
+  const cats=GH.cols.categories;
+  const cname=id=>{const c=cats[id]||{};return clean(c.titleRu||c.nameRu||(c.name&&c.name.ru)||'')};
+  const vis=Object.keys(GH.cols.products).filter(id=>!GH.cols.products[id].hidden);
+  const css='*{box-sizing:border-box}body{margin:0;font:17px/1.55 "PT Sans",Arial,sans-serif;background:#f4f2ee;color:#1d1e22}a{color:inherit}header{background:#1f2022;border-bottom:3px solid #b08d57;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}header a{color:#fff;text-decoration:none;font-weight:700;letter-spacing:.04em}main{max-width:760px;margin:0 auto;padding:16px 16px 40px}.bc{font-size:14px;color:#666;margin:6px 0 14px}.pic{background:#fff;border-radius:16px;padding:10px;text-align:center}.pic img{max-width:100%;max-height:560px;height:auto}h1{font-size:26px;line-height:1.25;margin:18px 0 8px}.price{font-size:30px;font-weight:700;margin:6px 0}.stock{color:#1f6b3b;font-weight:700;margin-bottom:14px}.out{color:#a33}.btn{display:block;text-align:center;text-decoration:none;font-weight:700;padding:15px 18px;border-radius:14px;margin:10px 0;border:2px solid #1d1e22;background:#fff}.gold{background:#b08d57;border-color:#b08d57}.dark{background:#1d1e22;color:#fff}h2{font-size:21px;margin:26px 0 8px}.box{background:#fff;border-radius:16px;padding:16px 18px;white-space:pre-line}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.card{background:#fff;border-radius:14px;padding:10px;text-decoration:none;display:block}.card img{width:100%;aspect-ratio:3/4;object-fit:contain;background:#faf9f7;border-radius:10px}.card b{display:block;margin:8px 0 2px;font-size:15px;line-height:1.25}.shop{margin-top:28px;font-size:15px;color:#555}';
+  const head=(title,desc,url,image,type)=>'<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(title)+'</title><meta name="description" content="'+esc(desc)+'"><link rel="canonical" href="'+esc(url)+'"><meta name="robots" content="index, follow"><meta property="og:type" content="'+type+'"><meta property="og:site_name" content="MUSLIM SHOP"><meta property="og:locale" content="ru_KZ"><meta property="og:title" content="'+esc(title)+'"><meta property="og:description" content="'+esc(desc)+'"><meta property="og:url" content="'+esc(url)+'">'+(image?'<meta property="og:image" content="'+esc(image)+'">':'')+'<meta name="twitter:card" content="summary_large_image"><link rel="icon" type="image/png" href="'+SITE+'favicon.png"><meta name="theme-color" content="#1F2022"><style>'+css+'</style>';
+  const top='</head><body><header><a href="'+SITE+'">MUSLIM SHOP</a><a href="'+SITE+'#/catalog">Каталог</a></header><main>';
+  const foot='<div class="shop"><b>MUSLIM SHOP</b> — Бутик №24, Рынок Дина, Атырау. Ежедневно с 10:00 до 19:00. Тел. '+esc(CONTACT.phone)+'</div></main></body></html>';
+  const files=[],today=new Date().toISOString().slice(0,10),urls=[{loc:SITE,mod:today}];
+  const catIds={};
+  for(const id of vis){
+    const d=GH.cols.products[id];
+    const title=clean(d.titleRu)||'Товар';
+    const url=SITE+'p/'+id+'.html';
+    const imgs=(d.images||[]).map(imgAbs).filter(Boolean);
+    const cn=cname(d.categoryId);
+    if(d.categoryId&&cn)catIds[d.categoryId]=1;
+    const desc=cut(d.description,155)||('Купить '+title+' в Атырау. Оригинал, доставка по Казахстану. MUSLIM SHOP, Бутик №24.');
+    const price=Number(d.price)||0;
+    const prod={'@context':'https://schema.org','@type':'Product',name:title,image:imgs.slice(0,4),description:cut(d.description,500)||desc,sku:String(d.sku||id)};
+    if(cn)prod.category=cn;
+    if(price>0)prod.offers={'@type':'Offer',url:url,priceCurrency:'KZT',price:String(price),availability:d.inStock===false?'https://schema.org/OutOfStock':'https://schema.org/InStock',itemCondition:'https://schema.org/NewCondition',seller:{'@type':'Organization',name:'MUSLIM SHOP'}};
+    const crumbs=[{'@type':'ListItem',position:1,name:'Главная',item:SITE}];
+    if(cn)crumbs.push({'@type':'ListItem',position:2,name:cn,item:SITE+'c/'+d.categoryId+'.html'});
+    crumbs.push({'@type':'ListItem',position:crumbs.length+1,name:title,item:url});
+    const wa='https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent('Здравствуйте! Хочу заказать: '+title+(price>0?' — '+money(price):'')+'\n'+url);
+    const html=head(title+' — купить в Атырау | MUSLIM SHOP',desc,url,imgs[0]||'','product')+jld(prod)+jld({'@context':'https://schema.org','@type':'BreadcrumbList',itemListElement:crumbs})+top+
+      '<div class="bc"><a href="'+SITE+'">Главная</a>'+(cn?' › <a href="'+SITE+'c/'+esc(d.categoryId)+'.html">'+esc(cn)+'</a>':'')+'</div>'+
+      '<article><div class="pic">'+(imgs[0]?'<img src="'+esc(imgs[0])+'" alt="'+esc(title)+'">':'')+'</div><h1>'+esc(title)+'</h1>'+
+      (price>0?'<div class="price">'+esc(money(price))+'</div>':'')+
+      '<div class="stock'+(d.inStock===false?' out':'')+'">'+(d.inStock===false?'Нет в наличии':'В наличии')+'</div>'+
+      '<a class="btn gold" href="'+SITE+'#/product/'+encodeURIComponent(id)+'">Открыть в магазине и добавить в корзину</a><a class="btn dark" href="'+esc(wa)+'">Заказать в WhatsApp</a>'+
+      (d.description?'<h2>Описание</h2><div class="box">'+esc(String(d.description).trim())+'</div>':'')+
+      (d.specs?'<h2>Характеристики</h2><div class="box">'+esc(String(d.specs).trim())+'</div>':'')+'</article>'+foot;
+    files.push({path:dir+'p/'+id+'.html',content:html});
+    const lm=d.updatedAt&&d.updatedAt.seconds?new Date(d.updatedAt.seconds*1000).toISOString().slice(0,10):(d.createdAt&&d.createdAt.seconds?new Date(d.createdAt.seconds*1000).toISOString().slice(0,10):today);
+    urls.push({loc:url,mod:lm});
+  }
+  for(const cid of Object.keys(catIds)){
+    const cn=cname(cid),url=SITE+'c/'+cid+'.html';
+    const list=vis.filter(id=>GH.cols.products[id].categoryId===cid);
+    const first=imgAbs(((GH.cols.products[list[0]]||{}).images||[])[0]);
+    const desc='Купить '+cn.toLowerCase()+' в Атырау: '+list.length+' товаров с ценами в тенге. Оригинальная продукция, доставка по Казахстану. MUSLIM SHOP, Бутик №24.';
+    const cards=list.map(id=>{const d=GH.cols.products[id],im=imgAbs((d.images||[])[0]);return '<a class="card" href="'+SITE+'p/'+id+'.html">'+(im?'<img loading="lazy" src="'+esc(im)+'" alt="'+esc(clean(d.titleRu))+'">':'')+'<b>'+esc(clean(d.titleRu))+'</b>'+(Number(d.price)>0?'<span>'+esc(money(d.price))+'</span>':'')+'</a>'}).join('');
+    const html=head(cn+' — купить в Атырау | MUSLIM SHOP',desc,url,first,'website')+jld({'@context':'https://schema.org','@type':'BreadcrumbList',itemListElement:[{'@type':'ListItem',position:1,name:'Главная',item:SITE},{'@type':'ListItem',position:2,name:cn,item:url}]})+top+
+      '<div class="bc"><a href="'+SITE+'">Главная</a> › '+esc(cn)+'</div><h1>'+esc(cn)+' в Атырау</h1><div class="grid">'+cards+'</div>'+foot;
+    files.push({path:dir+'c/'+cid+'.html',content:html});
+    urls.push({loc:url,mod:today});
+  }
+  files.push({path:dir+'sitemap.xml',content:'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'+urls.map(u=>'<url><loc>'+esc(u.loc)+'</loc><lastmod>'+u.mod+'</lastmod></url>').join('\n')+'\n</urlset>\n'});
+  files.push({path:dir+'robots.txt',content:'User-agent: *\nAllow: /\n\nSitemap: '+SITE+'sitemap.xml\n'});
+  return files;
+}
 async function ghPublish(){
   if(GH.publishing)return;
   GH.publishing=true;GH.msg='Готовлю публикацию…';ghBar();
@@ -513,6 +575,16 @@ async function ghPublish(){
     };
     await Promise.all([run(),run(),run(),run()]);
     GH.msg='Записываю каталог…';ghBar();
+    let seoN=0;
+    try{
+      const seo=ghSeoFiles(b.dir,map);seoN=seo.length;
+      const keep={};seo.forEach(f=>{keep[f.path]=1;tree.push({path:f.path,mode:'100644',type:'blob',content:f.content})});
+      try{
+        const par0=await ghApi('/git/ref/heads/'+b.br);const cm0=await ghApi('/git/commits/'+par0.object.sha);
+        const all=await ghApi('/git/trees/'+cm0.tree.sha+'?recursive=1');
+        (all.tree||[]).forEach(t=>{if(t.type==='blob'&&/\.html$/.test(t.path)&&(t.path.startsWith(b.dir+'p/')||t.path.startsWith(b.dir+'c/'))&&!keep[t.path])tree.push({path:t.path,mode:'100644',type:'blob',sha:null})});
+      }catch(e){}
+    }catch(e){console.error('seo',e)}
     const cb=await ghApi('/git/blobs',{method:'POST',body:JSON.stringify({content:text,encoding:'utf-8'})});
     tree.push({path:b.dir+'catalog.json',mode:'100644',type:'blob',sha:cb.sha});
     const ref=await ghApi('/git/ref/heads/'+b.br);
@@ -523,7 +595,7 @@ async function ghPublish(){
     await ghApi('/git/refs/heads/'+b.br,{method:'PATCH',body:JSON.stringify({sha:nc.sha})});
     todo.forEach(t=>{GH.up[t.rel]=1});
     GH.dirty=0;GH.publishing=false;
-    GH.msg='Опубликовано. Сайт обновится через 1–2 минуты.';ghBar();
+    GH.msg='Опубликовано'+(seoN?' (страниц для поиска: '+seoN+')':'')+'. Сайт обновится через 1–2 минуты.';ghBar();
     setTimeout(()=>{GH.msg='';ghBar()},20000);
   }catch(e){
     GH.publishing=false;GH.msg='';ghBar();
@@ -1429,6 +1501,7 @@ function adminList(){
   return `<button class="btn gold block" data-act="anew" style="margin-bottom:12px">+ ДОБАВИТЬ ТОВАР</button>
   <button class="btn line block" data-act="acats" style="margin-bottom:12px">Категории (${DB.cats.length})</button>
   <button class="btn line block" data-act="astats" style="margin-bottom:12px">📊 Товары и посещения</button>
+  <button class="btn line block" data-act="gh-publish" style="margin-bottom:12px">🔍 Опубликовать и обновить страницы для поиска</button>
   <details style="margin-bottom:14px"><summary class="btn sm line block" style="list-style:none;text-align:center;cursor:pointer">⚙ Инструменты: копия, восстановление, перевод</summary><div style="margin-top:10px">
   <button class="btn sm line block" data-act="gh-dl" style="margin-bottom:14px">Скачать catalog.json (запасная копия)</button>
   <details class="note" style="margin-bottom:14px"><summary><b>Диагностика полей товаров</b></summary><button class="btn sm line" data-act="diag" style="margin:8px 0">Показать поля 2 товаров</button><pre id="diag" style="white-space:pre-wrap;font-size:15px"></pre></details>
