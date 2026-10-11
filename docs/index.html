@@ -1504,6 +1504,24 @@ function parse(){
   return {path,q};
 }
 function render(){try{renderInner()}catch(e){console.error(e);window.dispatchEvent(new ErrorEvent('error',{message:'экран не отрисовался: '+(e&&e.message||e)}))}}
+let RESTORE_Y=null,__ru=0,__sv=0;
+function restoreY(y){
+  const id=++__ru;let n=0,ok=0,stop=false;
+  const de=document.documentElement;de.style.overflowAnchor='none';
+  const done=()=>{if(id===__ru)de.style.overflowAnchor=''};
+  const cancel=()=>{stop=true;done()};
+  ['touchstart','wheel','keydown','mousedown'].forEach(ev=>window.addEventListener(ev,cancel,{once:true,passive:true}));
+  const go=()=>{
+    if(stop||id!==__ru)return;
+    if(Math.abs(window.scrollY-y)>2){ok=0;window.scrollTo({top:y,left:0,behavior:'instant'})}else ok++;
+    if(++n<24&&ok<5)setTimeout(go,100);else done();
+  };
+  go();
+}
+try{history.scrollRestoration='manual'}catch(e){}
+window.addEventListener('scroll',()=>{clearTimeout(__sv);__sv=setTimeout(()=>{try{const y=Math.round(window.scrollY),st=history.state||{};if(st.y!==y)history.replaceState(Object.assign({},st,{y}),'')}catch(e){}},120)},{passive:true});
+const catUrl=()=>{const p=[];if(CQ.cat)p.push('cat='+encodeURIComponent(CQ.cat));if(CQ.q)p.push('q='+encodeURIComponent(CQ.q));if(CQ.sort&&CQ.sort!=='pop')p.push('sort='+CQ.sort);if(CQ.min!==''&&CQ.min!=null)p.push('min='+encodeURIComponent(CQ.min));if(CQ.max!==''&&CQ.max!=null)p.push('max='+encodeURIComponent(CQ.max));if(CQ.stock)p.push('stock=1');if(CQ.neu)p.push('neu=1');if(CQ.pop)p.push('pop=1');return '#/catalog'+(p.length?'?'+p.join('&'):'')};
+const saveCatUrl=()=>{try{history.replaceState(history.state,'',catUrl())}catch(e){}};
 function renderInner(){
   const {path,q}=parse();const app=$('#app');
   document.title='MUSLIM SHOP — Атырау';
@@ -1518,8 +1536,9 @@ function renderInner(){
   else html=viewHome();
   app.innerHTML=html;if(after)after();
   renderChrome();ymHit();try{statHit()}catch(e){}
-  if(!keep&&!(path==='/admin'&&editing))window.scrollTo(0,0);
-  if(!keep&&q.go==='desc'&&path.startsWith('/product/')){
+  const ry=RESTORE_Y;RESTORE_Y=null;
+  if(!keep&&!(path==='/admin'&&editing)){if(ry!=null)restoreY(ry);else window.scrollTo(0,0)}
+  if(!keep&&ry==null&&q.go==='desc'&&path.startsWith('/product/')){
     const go=()=>{const e=document.getElementById('descsec')||document.querySelector('table.specs');if(!e)return null;const y=Math.max(0,Math.round(e.getBoundingClientRect().top+window.scrollY-84));window.scrollTo(0,y);return y};
     requestAnimationFrame(()=>{const y=go();if(y!=null)setTimeout(()=>{if(Math.abs(window.scrollY-y)<6)go()},450)});
   }
@@ -1540,14 +1559,15 @@ function renderChrome(){
     </div><div class="wrap copy">© MUSLIM SHOP, Атырау</div></footer>`;
   updateBadge();
 }
-window.addEventListener('hashchange',()=>{ROUTE=null;closeMenu();render()});
+window.addEventListener('hashchange',()=>{ROUTE=null;closeMenu();const st=history.state;RESTORE_Y=(st&&typeof st.y==='number'&&st.y>0)?st.y:null;render()});
 /* внутренние ссылки обрабатываем сами: в окнах предпросмотра (iframe) обычный переход по #-ссылке ломает страницу */
 document.addEventListener('click',e=>{
   const a=e.target.closest('a[href^="#/"]');
   if(!a||a.dataset.act==='goto'||e.defaultPrevented)return;
   e.preventDefault();closeMenu();
   const h=a.getAttribute('href');ROUTE=h.slice(1);
-  try{history.pushState(null,'',h)}catch(x){try{location.hash=h}catch(y){}}
+  try{history.replaceState(Object.assign({},history.state||{},{y:Math.round(window.scrollY)}),'')}catch(x){}
+  try{history.pushState({n:1},'',h)}catch(x){try{location.hash=h}catch(y){}}
   render();
 });
 
@@ -1734,8 +1754,7 @@ document.addEventListener('change',e=>{
   const el=e.target;
   if(el.dataset.f){
     const k=el.dataset.f;CQ[k]=el.type==='checkbox'?el.checked:el.value;
-    const q=[];if(CQ.cat)q.push('cat='+encodeURIComponent(CQ.cat));if(CQ.q)q.push('q='+encodeURIComponent(CQ.q));
-    updateCatalog();return;
+    updateCatalog();saveCatUrl();return;
   }
   if(el.dataset.sel!==undefined){el.checked?SEL.add(el.dataset.sel):SEL.delete(el.dataset.sel);const b=$('#delsel');if(b)b.textContent=selLabel();return}
   if(el.id==='pfile'&&el.files.length&&editing){
@@ -1752,8 +1771,8 @@ document.addEventListener('change',e=>{
 });
 document.addEventListener('input',e=>{
   const el=e.target;
-  if(el.id==='q'&&$('#plist')){CQ.q=el.value.trim();clearTimeout(window.__sq);window.__sq=setTimeout(()=>{if(!$('#plist'))return;updateCatalog();try{const p=[];if(CQ.cat)p.push('cat='+encodeURIComponent(CQ.cat));if(CQ.q)p.push('q='+encodeURIComponent(CQ.q));history.replaceState(null,'','#/catalog'+(p.length?'?'+p.join('&'):''))}catch(e){}},140);return}
-  if(el.dataset.f&&(el.type==='number')){CQ[el.dataset.f]=el.value;updateCatalog()}
+  if(el.id==='q'&&$('#plist')){CQ.q=el.value.trim();clearTimeout(window.__sq);window.__sq=setTimeout(()=>{if(!$('#plist'))return;updateCatalog();saveCatUrl()},140);return}
+  if(el.dataset.f&&(el.type==='number')){CQ[el.dataset.f]=el.value;updateCatalog();saveCatUrl()}
 });
 
 /* ============ Статистика посещений (Firebase, коллекция visits) ============ */
@@ -1863,6 +1882,7 @@ function adminStats(){
   render();started=true;
   await fbInitP;await authReady;
   await loadData();
+  try{const st=history.state;if(st&&typeof st.y==='number'&&st.y>0)RESTORE_Y=st.y}catch(e){}
   render();
   try{ghBar()}catch(e){}
   try{stReady=true}catch(e){}
