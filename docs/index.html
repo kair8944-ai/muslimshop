@@ -428,7 +428,7 @@ addDoc=async(c,data)=>{await ghGuard();const id=ghId();(GH.cols[c.n]||(GH.cols[c
 deleteDoc=async ref=>{await ghGuard();if(GH.cols[ref.n])delete GH.cols[ref.n][ref.id];ghTouch(ref.n)};
 onSnapshot=()=>()=>{};
 serverTimestamp=()=>({__ts:1});
-Timestamp={now:ghStamp,fromMillis:ms=>({seconds:Math.floor(ms/1000),nanoseconds:0})};
+Timestamp={now:ghStamp,fromMillis:ms=>({seconds:Math.floor(ms/1000),nanoseconds:0}),fromDate:d=>({seconds:Math.floor(d.getTime()/1000),nanoseconds:0})};
 /* --- вход владельца: токен GitHub вместо пароля Firebase --- */
 getAuth=initializeAuth=()=>({});
 browserLocalPersistence={};inMemoryPersistence={};
@@ -1093,8 +1093,27 @@ async function bkLoad(file){
     const f0=BK.prods[0]?Object.keys(BK.prods[0].data).join(', '):'';
     box.innerHTML='Найдено: товаров <b>'+BK.prods.length+'</b> (с названием: '+named.length+', с фото: '+withImg+', <b>с описанием: '+withDesc+'</b>), категорий <b>'+BK.cats.length+'</b>.<br>Поля в копии: '+esc(f0)+'.'+(noId?'<br>Без id: '+noId+' (будут созданы как новые).':'')+(named[0]?'<br>Пример: '+esc(String(named[0].data.titleRu||named[0].data.title)):'');
     if(btn)btn.disabled=!(BK.prods.length||BK.cats.length);
-    const b2=$('#bkdesc');if(b2)b2.disabled=!withDesc;
+    const b2=$('#bkdesc');if(b2)b2.disabled=!withDesc;const b3=$('#bkphoto');if(b3)b3.disabled=!withImg;
   }catch(e){box.textContent='Не удалось прочитать файл: '+(e&&e.message||e)}
+}
+async function bkPhotos(){
+  if(!BK||!BK.prods.length){toast('Сначала выберите файл');return}
+  const todo=BK.prods.filter(x=>x.id&&prodById(x.id)&&Array.isArray(x.data.images)&&x.data.images.filter(Boolean).length&&!((GH.cols.products[x.id]||{}).updatedAt));
+  const skip=BK.prods.length-todo.length;
+  if(!todo.length){toast('Нет товаров, у которых можно вернуть фото');return}
+  if(!confirm('Вернуть фото из копии для '+todo.length+' товаров?\nЦены, названия и описания не меняются. Товары, которые вы уже правили в админке, пропускаются (их фото не трогаем). Пропущено: '+skip+'.'))return;
+  let ok=0,bad=0,last='';
+  for(const x of todo){
+    try{
+      const imgs=x.data.images.filter(Boolean);
+      await setDoc(doc(fdb,'products',x.id),{images:imgs},{merge:true});
+      const p=prodById(x.id);if(p){p.images=imgs;p.img=imgs[0]}
+      delete FULLC[x.id];ok++;
+    }catch(e){bad++;last=String(e&&e.message||e)}
+    if((ok+bad)%10===0)toast('Фото: '+(ok+bad)+' из '+todo.length);
+  }
+  render();
+  toast(bad?('Фото: '+ok+', ошибок '+bad+': '+last):('Фото восстановлены: '+ok+'. Нажмите «Опубликовать» внизу.'));
 }
 async function bkDesc(){
   if(!BK||!BK.prods.length){toast('Сначала выберите файл');return}
@@ -1347,7 +1366,7 @@ function adminList(){
   <details style="margin-bottom:14px"><summary class="btn sm line block" style="list-style:none;text-align:center;cursor:pointer">⚙ Инструменты: копия, восстановление, перевод</summary><div style="margin-top:10px">
   <button class="btn sm line block" data-act="gh-dl" style="margin-bottom:14px">Скачать catalog.json (запасная копия)</button>
   <details class="note" style="margin-bottom:14px"><summary><b>Диагностика полей товаров</b></summary><button class="btn sm line" data-act="diag" style="margin:8px 0">Показать поля 2 товаров</button><pre id="diag" style="white-space:pre-wrap;font-size:15px"></pre></details>
-  <div class="note" style="margin-bottom:14px"><b>Восстановить из резервной копии</b><br>Выберите файл .json. Сначала покажу, что в нём найдено, потом спрошу подтверждение.<br><input type="file" id="bkfile" accept=".json,application/json" style="margin:8px 0"><div id="bkinfo"></div><button class="btn sm gold block" id="bkrun" data-act="bk-run" disabled style="margin-top:8px">Восстановить всё (товары и категории)</button><button class="btn sm line block" id="bkdesc" data-act="bk-desc" disabled style="margin-top:8px">Восстановить только описания</button></div>
+  <div class="note" style="margin-bottom:14px"><b>Восстановить из резервной копии</b><br>Выберите файл .json. Сначала покажу, что в нём найдено, потом спрошу подтверждение.<br><input type="file" id="bkfile" accept=".json,application/json" style="margin:8px 0"><div id="bkinfo"></div><button class="btn sm gold block" id="bkrun" data-act="bk-run" disabled style="margin-top:8px">Восстановить всё (товары и категории)</button><button class="btn sm line block" id="bkdesc" data-act="bk-desc" disabled style="margin-top:8px">Восстановить только описания</button><button class="btn sm gold block" id="bkphoto" data-act="bk-photo" disabled style="margin-top:8px">Восстановить только фото (вернуть качество)</button></div>
   <div class="note" style="margin-bottom:14px"><b>Перевод на казахский</b><br>Без перевода: <b>${needTr().length}</b> из ${DB.products.length}<br><button class="btn sm line" data-act="atr-copy" style="margin:8px 0">Подготовить 15 товаров</button><textarea id="trout" readonly rows="3" style="width:100%">${esc(TR_OUT)}</textarea><textarea id="trin" rows="3" placeholder="Вставьте сюда готовый перевод" style="width:100%;margin-top:8px"></textarea><button class="btn sm gold block" data-act="atr-save" style="margin-top:8px">Записать перевод</button></div>
   </div></details>
   ${LOAD_ERR?`<div class="note" style="margin-bottom:12px">Не удалось прочитать товары: ${esc(LOAD_ERR)}</div>`:''}
@@ -1503,6 +1522,7 @@ document.addEventListener('click',e=>{
     case 'del':cart=cart.filter(x=>x.id!==id);saveCart();render();break;
     /* admin */
     case 'atr-copy':{toast('Готовлю…');(async()=>{const list=needTr().slice(0,15);const fulls=await Promise.all(list.map(p=>getFull(p.id)));const b=fulls.filter(Boolean).map(p=>({id:p.id,t:p.name.ru,d:p.desc.ru,s:p.specs.ru}));TR_OUT=b.length?JSON.stringify(b):'';render();if(!b.length){toast('Всё переведено')}else if(navigator.clipboard){navigator.clipboard.writeText(TR_OUT).then(()=>toast('Скопировано. Отправьте это Claude'),()=>toast('Скопируйте текст из поля вручную'))}else toast('Скопируйте текст из поля вручную')})().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break}
+    case 'bk-photo':bkPhotos().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'bk-desc':bkDesc().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'diag':diagRun().catch(err=>{const b=$('#diag');if(b)b.textContent='Ошибка: '+(err&&err.message||err)});break;
     case 'bk-run':bkRun().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
