@@ -320,6 +320,11 @@ h2::after{content:"";position:absolute;left:0;bottom:0;width:60px;height:3px;bac
 .search input::-webkit-search-cancel-button{opacity:.6}
 .btn.wa{background:#25D366;border-color:#25D366;color:#0b2e17;font-weight:700}
 .btn.wa:disabled{opacity:.5}
+.an-live{display:inline-flex;align-items:center;gap:6px;background:#E6F4EC;color:#14753d;font-weight:700;font-size:12px;letter-spacing:.06em;padding:3px 10px;border-radius:999px}
+.an-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;animation:anp 1.6s infinite}
+@keyframes anp{0%{box-shadow:0 0 0 0 rgba(34,197,94,.6)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+.an-card{background:var(--white);border:1px solid var(--gray2);border-radius:16px;padding:12px 14px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.an-n{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums;font-weight:700}
 </style>
 </head>
 <body>
@@ -1401,7 +1406,9 @@ function viewAdmin(){
       <button class="btn gold block" type="submit">Войти</button>
       <div id="loginmsg" class="note" style="display:none"></div>
     </form>`;
+  anKick();
   return `<h1 style="margin-top:16px">Управление магазином</h1>
+  <div id="anbar" class="note" style="margin-bottom:12px">${anBarInner()}</div>
   <div class="note" style="margin-bottom:14px">Репозиторий: <b>${esc(authUser.email||'')}</b>. Товаров в каталоге: <b>${DB.products.length}</b>. Всё, что вы меняете, сохраняется черновиком. Чтобы покупатели увидели, нажмите «Опубликовать» внизу экрана.</div>
   <div class="tabs"><button class="btn sm line" data-act="alogout">Выйти</button></div>
   ${editing?adminForm(editing):(adminView==='cats'?adminCats():adminView==='stats'?adminStats():adminList())}`;
@@ -1773,6 +1780,7 @@ document.addEventListener('click',e=>{
     case 'acats-back':admExit();break;
     case 'astats':adminView='stats';render();window.scrollTo(0,0);stLoad();break;
     case 'astats-back':admExit();break;
+    case 'an-refresh':anLoad();break;
     case 'astats-range':ST.range=Number(id)||7;KEEP=true;render();break;
     case 'astats-refresh':stLoad();break;
     case 'asnap':{
@@ -1989,6 +1997,7 @@ async function stFlush(){
   try{const q=stQ.splice(0);if(q.length)await Promise.all(q.map(stWrite))}catch(e){}
 }
 function statHit(){
+  try{anPage()}catch(e){}
   if(!statOn())return;
   const path=((location.hash||'#/').replace(/^#/,'').split('?')[0])||'/';
   if(path.startsWith('/admin'))return;
@@ -1998,11 +2007,144 @@ function statHit(){
   stPush({t:'p',pg:path.slice(0,120)});
 }
 function statEv(t,pid){
+  try{anEvent(t)}catch(e){}
   if(!statOn())return;
   const ev={t:t};if(pid)ev.pid=String(pid).slice(0,100);
   stSession();stPush(ev);
 }
-async function stLoad(){}
+async function stLoad(){try{await anLoad()}catch(e){}}
+
+/* ============ Своя живая аналитика (Firestore REST, коллекция analytics_daily/{YYYY-MM-DD}) ============ */
+/* Впишите данные своего проекта Firebase (Project settings → General → Your apps → Web app). Пока поля пустые, сайт работает как раньше, а счёт посещений выключен. */
+const AN_CFG={projectId:'',apiKey:'',database:'(default)'};
+const AN={rows:{},loaded:false,err:'',at:0,busy:false,lastPath:'',sess:false};
+const anOn=()=>!!(AN_CFG.projectId&&AN_CFG.apiKey);
+const anBase=()=>'https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(AN_CFG.projectId)+'/databases/'+encodeURIComponent(AN_CFG.database||'(default)')+'/documents';
+const anDocName=d=>'projects/'+AN_CFG.projectId+'/databases/'+(AN_CFG.database||'(default)')+'/documents/analytics_daily/'+d;
+const anHour=()=>String(new Date(Date.now()+5*3600e3).getUTCHours()).padStart(2,'0');
+const anZero=()=>({uniqueVisitors:0,totalVisits:0,pageViews:0,cartAdds:0,ordersCount:0,hourly:{}});
+const anRow=d=>AN.rows[d]||anZero();
+/* владелец и боты не считаются: флаг ignore_admin_analytics ставится при входе в управление */
+function anIgnored(){
+  try{
+    if(new URLSearchParams(location.search).get('owner')==='0')localStorage.removeItem('ignore_admin_analytics');
+    if(authUser)localStorage.setItem('ignore_admin_analytics','true');
+    return localStorage.getItem('ignore_admin_analytics')==='true'||ymOwner()||stBot();
+  }catch(e){return stBot()}
+}
+function anVid(){
+  try{let v=localStorage.getItem('app_visitor_id');if(!v){v=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():'v'+Date.now().toString(36)+Math.random().toString(36).slice(2,10);localStorage.setItem('app_visitor_id',v)}return v}catch(e){return ''}
+}
+/* атомарное увеличение счётчиков (increment) одним запросом */
+function anSend(inc){
+  try{
+    if(!anOn()||anIgnored())return;
+    const day=stDay(),tr=[];
+    for(const k in inc){if(!inc[k])continue;tr.push({fieldPath:k.indexOf('hourly.')===0?'hourly.`'+k.slice(7)+'`':k,increment:{integerValue:String(inc[k])}})}
+    if(!tr.length)return;
+    const body={writes:[{update:{name:anDocName(day),fields:{date:{stringValue:day}}},updateMask:{fieldPaths:['date']},updateTransforms:tr}]};
+    fetch(anBase()+':commit?key='+encodeURIComponent(AN_CFG.apiKey),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),keepalive:true}).catch(()=>{});
+  }catch(e){}
+}
+function anPage(){
+  if(!anOn())return;
+  const path=((location.hash||'#/').replace(/^#/,'').split('?')[0])||'/';
+  if(path.startsWith('/admin')||path===AN.lastPath)return;
+  AN.lastPath=path;
+  if(anIgnored())return;
+  const inc={pageViews:1};
+  let isNew=false;
+  try{isNew=!sessionStorage.getItem('an_sid');sessionStorage.setItem('an_sid','1')}catch(e){isNew=!AN.sess}
+  AN.sess=true;
+  if(isNew){
+    inc.totalVisits=1;inc['hourly.'+anHour()]=1;
+    try{const today=stDay();if(anVid()&&localStorage.getItem('app_last_visit_date')!==today){inc.uniqueVisitors=1;localStorage.setItem('app_last_visit_date',today)}}catch(e){}
+  }
+  anSend(inc);
+}
+function anEvent(t){if(t==='c')anSend({cartAdds:1});else if(t==='o')anSend({ordersCount:1})}
+/* чтение последних 14 дней */
+async function anLoad(){
+  if(!anOn()||AN.busy)return;
+  AN.busy=true;
+  try{
+    const names=[];for(let i=0;i<14;i++)names.push(anDocName(stDay(Date.now()-i*864e5)));
+    const r=await fetch(anBase()+':batchGet?key='+encodeURIComponent(AN_CFG.apiKey),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({documents:names})});
+    const j=await r.json().catch(()=>null);
+    if(!r.ok){const e0=j&&(j.error||(Array.isArray(j)&&j[0]&&j[0].error));throw new Error((e0&&e0.message)||('код '+r.status))}
+    const rows={};
+    (Array.isArray(j)?j:[]).forEach(x=>{
+      if(!x.found)return;
+      const f=x.found.fields||{},id=x.found.name.split('/').pop();
+      const n=k=>Number(f[k]&&(f[k].integerValue!=null?f[k].integerValue:f[k].doubleValue))||0;
+      const h={},hf=(f.hourly&&f.hourly.mapValue&&f.hourly.mapValue.fields)||{};
+      for(const k in hf)h[k]=Number(hf[k].integerValue)||0;
+      rows[id]={date:id,uniqueVisitors:n('uniqueVisitors'),totalVisits:n('totalVisits'),pageViews:n('pageViews'),cartAdds:n('cartAdds'),ordersCount:n('ordersCount'),hourly:h};
+    });
+    AN.rows=rows;AN.err='';AN.loaded=true;AN.at=Date.now();
+  }catch(e){AN.err=String(e&&e.message||e)}
+  AN.busy=false;
+  anPaint();
+}
+function anKick(){try{if(anOn()&&(!AN.loaded||Date.now()-AN.at>15000))setTimeout(()=>anLoad(),0)}catch(e){}}
+/* «живое» обновление: пока админка открыта, данные обновляются каждые 15 секунд */
+setInterval(()=>{try{if(!anOn()||!authUser||document.hidden||!/#\/admin/.test(location.hash))return;anLoad()}catch(e){}},15000);
+function anPaint(){
+  try{
+    const b=document.getElementById('anbar');if(b)b.innerHTML=anBarInner();
+    const d=document.getElementById('andash');if(d)d.innerHTML=anDashInner();
+  }catch(e){}
+}
+const anBig=(n,sz)=>'<span class="an-n" style="font-size:'+(sz||28)+'px;line-height:1.1">'+n+'</span>';
+/* информер в шапке админки */
+function anBarInner(){
+  if(!anOn())return '<b>Живая аналитика не подключена.</b> Впишите projectId и apiKey в блок AN_CFG в index.html.';
+  const t=anRow(stDay());
+  const c=(n,l)=>'<div style="flex:1;text-align:center">'+anBig(n,22)+'<div style="font-size:13px;color:var(--muted)">'+l+'</div></div>';
+  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span class="an-live"><i class="an-dot"></i>LIVE</span><span style="font-size:14px;color:var(--muted)">сегодня</span><button type="button" class="btn sm line" data-act="astats" style="margin-left:auto">Подробнее</button></div>'
+   +'<div style="display:flex;gap:6px">'+c(t.uniqueVisitors,'клиентов')+c(t.totalVisits,'заходов')+c(t.cartAdds,'в корзину')+'</div>'
+   +(AN.err?'<div style="font-size:13px;color:#7A2E2E;margin-top:6px">Нет связи с базой аналитики</div>':'');
+}
+/* полный дашборд */
+function anDashInner(){
+  if(!anOn())return '<div class="note">Своя аналитика ещё не подключена. Откройте index.html, найдите блок <b>AN_CFG</b> и впишите projectId и apiKey вашего проекта Firebase. Пока это не сделано, посещения не записываются.</div>';
+  const days=ST.range===14?14:7,list=[];
+  for(let i=days-1;i>=0;i--){const d=stDay(Date.now()-i*864e5);list.push(Object.assign({d},anRow(d)))}
+  const t=list[list.length-1],y=list[list.length-2];
+  let badge='';
+  if(y.uniqueVisitors>0){const p=Math.round((t.uniqueVisitors-y.uniqueVisitors)*100/y.uniqueVisitors);badge='<span style="font-size:12px;font-weight:700;color:'+(p>=0?'#14753d':'#a33')+'">'+(p>=0?'▲ +'+p:'▼ '+p)+'% ко вчера</span>'}
+  else if(t.uniqueVisitors>0)badge='<span style="font-size:12px;font-weight:700;color:#14753d">вчера не было данных</span>';
+  const conv=t.uniqueVisitors?(t.cartAdds*100/t.uniqueVisitors).toFixed(1).replace('.',',')+'%':'—';
+  const kpi=(title,val,sub)=>'<div class="an-card"><div style="font-size:13px;color:var(--muted);margin-bottom:4px">'+title+'</div>'+anBig(val,28)+(sub?'<div style="margin-top:4px">'+sub+'</div>':'')+'</div>';
+  const mx=Math.max(1,...list.map(r=>r.uniqueVisitors));
+  const peak=list.reduce((a,r)=>r.uniqueVisitors>a.uniqueVisitors?r:a,list[0]);
+  const bars=list.map(r=>{
+    const h=Math.round(r.uniqueVisitors*100/mx),isPeak=r===peak&&r.uniqueVisitors>0;
+    const lab=days===14?r.d.slice(8):r.d.slice(8)+'.'+r.d.slice(5,7);
+    return '<div style="flex:1;min-width:0;text-align:center"><div class="an-n" style="font-size:11px">'+r.uniqueVisitors+'</div><div style="height:90px;display:flex;align-items:flex-end"><div style="width:100%;height:'+(r.uniqueVisitors?Math.max(h,4):1)+'%;background:'+(isPeak?'var(--gold)':'var(--gray2)')+';border-radius:6px 6px 0 0"></div></div><div style="font-size:10px;color:var(--muted)">'+lab+'</div></div>';
+  }).join('');
+  const hs=Array(24).fill(0);
+  list.forEach(r=>{for(const k in r.hourly){const h=parseInt(k,10);if(h>=0&&h<24)hs[h]+=r.hourly[k]}});
+  const per=[['Ночь','00–06',0,6],['Утро','06–12',6,12],['День','12–18',12,18],['Вечер','18–24',18,24]].map(a=>({n:a[0],l:a[1],v:hs.slice(a[2],a[3]).reduce((s,x)=>s+x,0)}));
+  const pm=Math.max(...per.map(p=>p.v)),hm=Math.max(...hs),ph=hm>0?hs.indexOf(hm):-1;
+  const hbars=hs.map((v,h)=>'<div title="'+h+':00 — '+v+'" style="flex:1;height:'+(hm?Math.max(Math.round(v*100/hm),v?6:2):2)+'%;background:'+(h===ph?'var(--gold)':'var(--gray2)')+';border-radius:2px 2px 0 0"></div>').join('');
+  const rb=n=>'<button type="button" class="btn sm '+(days===n?'gold':'line')+'" data-act="astats-range" data-id="'+n+'">'+n+' дней</button>';
+  const upd=AN.at?new Date(AN.at).toLocaleTimeString('ru-RU'):'—';
+  return (AN.err?'<div class="note" style="margin-bottom:10px;background:#F7E3E3;border-left-color:#7A2E2E">Не удалось получить данные: '+esc(AN.err)+'. Проверьте projectId, apiKey и правила Firestore.</div>':'')
+  +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap"><span class="an-live"><i class="an-dot"></i>LIVE</span><span style="font-size:13px;color:var(--muted)">обновлено '+upd+'</span><button type="button" class="btn sm line" data-act="an-refresh" style="margin-left:auto">Обновить</button></div>'
+  +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+  +kpi('Уникальные клиенты',t.uniqueVisitors,badge)
+  +kpi('Всего просмотров',t.pageViews,'<span style="font-size:12px;color:var(--muted)">заходов: '+t.totalVisits+'</span>')
+  +kpi('Добавлений в корзину',t.cartAdds,'<span style="font-size:12px;color:var(--muted)">заказов в WhatsApp: '+t.ordersCount+'</span>')
+  +kpi('Конверсия интереса',conv,'<span style="font-size:12px;color:var(--muted)">корзины к клиентам</span>')
+  +'</div>'
+  +'<div class="an-card" style="margin-top:12px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><b>Клиентов по дням</b><span style="margin-left:auto;display:flex;gap:6px">'+rb(7)+rb(14)+'</span></div><div style="display:flex;gap:'+(days===14?3:6)+'px;align-items:flex-end">'+bars+'</div>'+(peak.uniqueVisitors>0?'<div style="font-size:13px;color:var(--muted);margin-top:8px">Самый сильный день: <b>'+peak.d.slice(8)+'.'+peak.d.slice(5,7)+'</b> ('+peak.uniqueVisitors+')</div>':'')+'</div>'
+  +'<div class="an-card" style="margin-top:12px"><b>В какое время заходят</b><div style="font-size:13px;color:var(--muted);margin:2px 0 8px">за выбранный период, время Атырау'+(ph>=0?'. Пик: <b>'+String(ph).padStart(2,'0')+':00</b>':'')+'</div>'
+  +per.map(p=>'<div style="margin-top:8px"><div style="display:flex;justify-content:space-between;gap:10px"><span>'+p.n+' <span style="color:var(--muted);font-size:13px">'+p.l+'</span></span>'+anBig(p.v,16)+'</div>'+stBar(p.v,pm)+'</div>').join('')
+  +'<div style="display:flex;gap:2px;align-items:flex-end;height:50px;margin-top:12px">'+hbars+'</div><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted)"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div></div>'
+  +'<div class="note" style="margin-top:12px;font-size:14px"><b>Как читать.</b> «Уникальный клиент» — один человек за день, сколько бы раз он ни заходил. «Просмотры» — сколько страниц и товаров открыли. «Конверсия интереса» — какая доля клиентов положила товар в корзину. Ваши заходы и заходы с устройства, где вы входили в управление, не считаются.</div>';
+}
+
 const stBar=(n,max)=>`<div style="background:var(--gray2);border-radius:3px;height:10px;margin-top:4px"><div style="background:var(--gold);height:10px;border-radius:3px;width:${max?Math.max(2,Math.round(n*100/max)):0}%"></div></div>`;
 function stTop(title,pairs,max){
   if(!pairs.length)return '';
@@ -2021,10 +2163,12 @@ function adminStats(){
   const vis=DB.products.filter(p=>p.status!=='hidden');
   const rows=DB.cats.map(c=>({n:L(c.name)||c.id,all:DB.products.filter(p=>p.cat===c.id).length,v:vis.filter(p=>p.cat===c.id).length})).filter(r=>r.all);
   return `<div class="two" style="margin-bottom:12px"><button class="btn sm line" data-act="astats-back">← К товарам</button></div>
-  <h2 style="margin:6px 0 10px">Товары на сайте</h2>
+  <h2 style="margin:6px 0 10px">Посещаемость и аналитика</h2>
+  <div id="andash">${anDashInner()}</div>
+  <h2 style="margin:18px 0 10px">Товары на сайте</h2>
   <div class="note" style="margin-bottom:12px">Всего: <b>${DB.products.length}</b> · видно покупателям: <b>${vis.length}</b> · скрыто: <b>${DB.products.length-vis.length}</b> · нет в наличии: <b>${DB.products.filter(p=>p.status==='out').length}</b></div>
   ${rows.map(r=>`<div class="note" style="margin-bottom:8px;display:flex;justify-content:space-between;gap:10px"><span>${esc(r.n)}</span><b>${r.v} из ${r.all}</b></div>`).join('')}
-  <h2 style="margin:18px 0 10px">Посещения</h2>
+  <h2 style="margin:18px 0 10px">Яндекс Метрика</h2>
   <div class="note">Посещения считает Яндекс Метрика (счётчик ${YM_ID}). Откройте <a href="https://metrika.yandex.ru/dashboard?id=${YM_ID}" target="_blank" rel="noopener"><b>metrika.yandex.ru</b></a>. Заходы с этого телефона, где вы вошли в управление, не считаются.</div>`;
 }
 
