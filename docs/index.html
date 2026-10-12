@@ -318,6 +318,8 @@ h2::after{content:"";position:absolute;left:0;bottom:0;width:60px;height:3px;bac
 .search input,.search input[type=search],#admq{color:#15161a !important;-webkit-text-fill-color:#15161a !important;caret-color:#b08d57;background:#fff !important}
 .search input::placeholder,#admq::placeholder{color:#74757a !important;-webkit-text-fill-color:#74757a !important;opacity:1}
 .search input::-webkit-search-cancel-button{opacity:.6}
+.btn.wa{background:#25D366;border-color:#25D366;color:#0b2e17;font-weight:700}
+.btn.wa:disabled{opacity:.5}
 </style>
 </head>
 <body>
@@ -661,7 +663,7 @@ const T={
  ru:{menu:'Меню',search_ph:'Поиск товаров',find:'Найти',cats:'Категории',allcats:'ВСЕ КАТЕГОРИИ',hidecats:'СВЕРНУТЬ',popular:'Популярные товары',news:'Новинки',featured:'Рекомендуемые товары',all_items:'Все товары',
   about:'О MUSLIM SHOP',about_txt:'MUSLIM SHOP — магазин в Атырау на рынке Дина, бутик 24. Оригинальные халяль-витамины и БАДы (в том числе iHerb), натуральный мёд, средства для мужского, женского и детского здоровья, исламские товары и парфюмерия. Закажите на сайте через WhatsApp, приходите в бутик или оформите доставку по Атырау и Казахстану. Работаем ежедневно с 10:00 до 19:00.',
   social:'МЫ В СОЦИАЛЬНЫХ СЕТЯХ',contacts:'КОНТАКТЫ',catalog:'КАТАЛОГ',home:'Главная',cart:'Корзина',phone:'Телефон',addr:'Адрес',
-  more:'ПОДРОБНЕЕ',tocart:'В КОРЗИНУ',order:'ЗАКАЗАТЬ',share:'ПОДЕЛИТЬСЯ',copy:'🔗 СКОПИРОВАТЬ ССЫЛКУ',in:'В наличии',out:'Нет в наличии',
+  more:'ПОДРОБНЕЕ',tocart:'В КОРЗИНУ',order:'ЗАКАЗАТЬ',wa1:'⚡ ЗАКАЗАТЬ В 1 КЛИК (WhatsApp)',share:'ПОДЕЛИТЬСЯ',copy:'🔗 СКОПИРОВАТЬ ССЫЛКУ',in:'В наличии',out:'Нет в наличии',
   qty:'Количество',desc:'Описание',specs:'Характеристики',sku:'Артикул',new_:'Новинка',
   filters:'ФИЛЬТРЫ',sort:'Сортировка',s_pop:'По популярности',s_asc:'Сначала дешёвые',s_desc:'Сначала дорогие',s_new:'Новинки',
   price_from:'Цена от, ₸',price_to:'Цена до, ₸',only_in:'Только в наличии',only_new:'Новинки',only_pop:'Популярные',all:'Все',
@@ -676,7 +678,7 @@ const T={
  kk:{menu:'Мәзір',search_ph:'Тауар іздеу',find:'Іздеу',cats:'Санаттар',allcats:'БАРЛЫҚ САНАТТАР',hidecats:'ЖИНАУ',popular:'Танымал тауарлар',news:'Жаңалықтар',featured:'Ұсынылатын тауарлар',all_items:'Барлық тауарлар',
   about:'MUSLIM SHOP ТУРАЛЫ',about_txt:'MUSLIM SHOP — Атыраудағы Дина базарындағы 24-бутик. Түпнұсқа адал дәрумендер мен БАД (iHerb қоса), табиғи бал, ерлер, әйелдер және балалар денсаулығына арналған құралдар, исламдық тауарлар және парфюмерия. WhatsApp арқылы тапсырыс беріңіз, бутикке келіңіз немесе Атырау мен Қазақстан бойынша жеткізуді рәсімдеңіз. Күн сайын 10:00–19:00 жұмыс істейміз.',
   social:'ӘЛЕУМЕТТІК ЖЕЛІЛЕРДЕМІЗ',contacts:'БАЙЛАНЫС',catalog:'КАТАЛОГ',home:'Басты бет',cart:'Себет',phone:'Телефон',addr:'Мекенжай',
-  more:'ТОЛЫҒЫРАҚ',tocart:'СЕБЕТКЕ',order:'ТАПСЫРЫС БЕРУ',share:'БӨЛІСУ',copy:'🔗 СІЛТЕМЕНІ КӨШІРУ',in:'Бар',out:'Жоқ',
+  more:'ТОЛЫҒЫРАҚ',tocart:'СЕБЕТКЕ',order:'ТАПСЫРЫС БЕРУ',wa1:'⚡ 1 БАСУМЕН ТАПСЫРЫС (WhatsApp)',share:'БӨЛІСУ',copy:'🔗 СІЛТЕМЕНІ КӨШІРУ',in:'Бар',out:'Жоқ',
   qty:'Саны',desc:'Сипаттама',specs:'Сипаттамалары',sku:'Артикул',new_:'Жаңа',
   filters:'СҮЗГІЛЕР',sort:'Сұрыптау',s_pop:'Танымалдығы бойынша',s_asc:'Алдымен арзандары',s_desc:'Алдымен қымбаттары',s_new:'Жаңалар',
   price_from:'Бағасы, бастап ₸',price_to:'Бағасы, дейін ₸',only_in:'Тек бары',only_new:'Жаңалар',only_pop:'Танымалдар',all:'Барлығы',
@@ -1165,6 +1167,7 @@ function viewProduct(slug){
       <div class="actions">
         <button class="btn" data-act="padd" data-id="${esc(p.id)}" ${p.status!=='in'?'disabled':''}>${t('tocart')}</button>
         <button class="btn gold" data-act="pbuy" data-id="${esc(p.id)}" ${p.status!=='in'?'disabled':''}>${t('order')}</button>
+        <button class="btn wa" data-act="wa1" data-id="${esc(p.id)}" ${p.status!=='in'?'disabled':''}>${t('wa1')}</button>
         <button class="btn line" data-act="share" data-id="${esc(p.id)}">${t('share')}</button>
         <button class="btn line" data-act="copy" data-id="${esc(p.id)}">${t('copy')}</button>
       </div>
@@ -1745,6 +1748,7 @@ document.addEventListener('click',e=>{
     case 'q-':pq=Math.max(1,pq-1);$('#qv').textContent=pq;break;
     case 'padd':addToCart(id,pq);break;
     case 'pbuy':addToCart(id,pq);location.hash='#/cart';break;
+    case 'wa1':{const p=prodById(id);if(!p)break;const q=pq||1;const txt='Здравствуйте! Хочу заказать:\n'+p.name.ru+' — '+q+' шт. × '+money(p.price)+' = '+money(p.price*q)+'\n'+prodUrl(p);try{ymGoal('order_whatsapp_1click')}catch(e){}try{statEv('o')}catch(e){}window.open('https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(txt),'_blank','noopener');break}
     case 'share':shareProduct(prodById(id));break;
     case 'copy':copyText(prodUrl(prodById(id)));break;
     case 'inc':{const i=cart.find(x=>x.id===id);if(i){i.q=Math.min(99,i.q+1);saveCart();render()}break}
