@@ -2016,7 +2016,7 @@ async function stLoad(){try{await anLoad()}catch(e){}}
 
 /* ============ Своя живая аналитика (Firestore REST, коллекция analytics_daily/{YYYY-MM-DD}) ============ */
 /* Впишите данные своего проекта Firebase (Project settings → General → Your apps → Web app). Пока поля пустые, сайт работает как раньше, а счёт посещений выключен. */
-const AN_CFG={projectId:'',apiKey:'',database:'(default)'};
+const AN_CFG={projectId:'muslim-shop-55c12',apiKey:'AIzaSyCCNwtzhDTBPB8GU_Ls7ogvN5xyUDOez3M',database:'ai-studio-muslimshop-6c5697f5-1412-4eb6-8d95-aa2cc7a70c7b'};
 const AN={rows:{},loaded:false,err:'',at:0,busy:false,lastPath:'',sess:false};
 const anOn=()=>!!(AN_CFG.projectId&&AN_CFG.apiKey);
 const anBase=()=>'https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(AN_CFG.projectId)+'/databases/'+encodeURIComponent(AN_CFG.database||'(default)')+'/documents';
