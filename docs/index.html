@@ -2045,8 +2045,10 @@ function tgTag(cid){
   const c=(DB.cats||[]).find(x=>x.id===cid);
   const n=(c&&c.name&&(c.name.ru||c.name.kk))||'';
   const t=String(n).replace(/[^\p{L}\p{N}]+/gu,'_').replace(/^_+|_+$/g,'');
-  return t?'#'+t:'';
+  const ch=tgCfg().ch;
+  return t?'#'+t+(/^@\w+$/.test(ch)?ch:''):'';
 }
+const tgCatUrl=cid=>location.origin+location.pathname+'#/catalog?cat='+encodeURIComponent(cid);
 function tgCaption(p){
   let d=String(p.desc&&p.desc.ru||'').replace(/\s+/g,' ').trim();
   if(d.length>350)d=d.slice(0,350).replace(/\s+\S*$/,'')+'…';
@@ -2054,7 +2056,8 @@ function tgCaption(p){
   if(p.price>0)s+='\n\n💰 '+(p.old>p.price?'<s>'+tgH(money(p.old))+'</s> ':'')+'<b>'+tgH(money(p.price))+'</b>';
   if(p.status==='out')s+='\n⛔ Нет в наличии';
   if(d)s+='\n\n'+tgH(d);
-  const tag=tgTag(p.cat);if(tag)s+='\n\n'+tag;
+  const cn=(DB.cats.find(x=>x.id===p.cat)||{}).name;
+  if(cn&&(cn.ru||cn.kk))s+='\n\n📂 <a href="'+tgH(tgCatUrl(p.cat))+'">'+tgH(cn.ru||cn.kk)+'</a>';
   s+='\n\n📞 '+tgH(CONTACT.phone);
   return s;
 }
@@ -2108,11 +2111,13 @@ async function tgBulk(){
 async function tgMenu(){
   if(tgBusy)return;
   const has={};DB.products.forEach(p=>{if(p.status!=='hidden')has[p.cat]=1});
-  const tags=DB.cats.filter(c=>has[c.id]).map(c=>tgTag(c.id)).filter(Boolean);
-  if(!tags.length){toast('Нет категорий с товарами');return}
+  const cats=DB.cats.filter(c=>has[c.id]&&c.name&&(c.name.ru||c.name.kk));
+  if(!cats.length){toast('Нет категорий с товарами');return}
   tgBusy=true;toast('Обновляю меню в канале…');
-  const c=tgCfg(),text='📚 <b>Каталог по категориям</b>\nНажмите на категорию, чтобы увидеть все товары:\n\n'+tags.join('\n');
-  const kb={inline_keyboard:[[{text:'🛒 Открыть магазин',url:location.origin+location.pathname}]]};
+  const c=tgCfg(),text='📚 <b>Каталог по категориям</b>\nНажмите на нужную категорию, и откроется страница магазина с товарами.';
+  const rows=[];for(let i=0;i<cats.length;i+=2)rows.push(cats.slice(i,i+2).map(x=>({text:x.name.ru||x.name.kk,url:tgCatUrl(x.id)})));
+  rows.push([{text:'🛒 Открыть магазин',url:location.origin+location.pathname}]);
+  const kb={inline_keyboard:rows};
   try{
     const m=LS.get('ms_tg_menu',null);let done=false;
     if(m&&m.ch===c.ch&&m.id){try{await tgApi('editMessageText',{chat_id:c.ch,message_id:m.id,text,parse_mode:'HTML',reply_markup:kb});done=true}catch(e){if(/not modified/i.test(String(e&&e.message)))done=true}}
