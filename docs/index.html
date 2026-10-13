@@ -1531,6 +1531,7 @@ function admRows(){const arr=admFiltered();return arr.map(p=>`<div class="adm-ro
       <button class="btn sm line" data-act="aedit" data-id="${esc(p.id)}">Редактировать</button>
       <button class="btn sm line" data-act="ahide" data-id="${esc(p.id)}">${p.status==='hidden'?'Показать':'Скрыть'}</button>
       <button class="btn sm line" data-act="adel" data-id="${esc(p.id)}">Удалить</button>
+      <button class="btn sm line" data-act="tg-send" data-id="${esc(p.id)}">${tgSent()[p.id]?'✓ В канале':'✈ В Telegram'}</button>
       <a class="btn sm line" href="#/product/${esc(p.id)}">Открыть</a></div></div>`).join('')||'<div class="empty">'+(DB.products.length?'Ничего не найдено. Измените категорию или поиск.':'Товаров пока нет. Нажмите «Добавить товар».')+'</div>'}
 const admCountTxt=()=>'Показано: '+admFiltered().length+' из '+DB.products.length;
 function admChips(){
@@ -1550,6 +1551,7 @@ function adminList(){
   <button class="btn line block" data-act="acats" style="margin-bottom:12px">Категории (${DB.cats.length})</button>
   <button class="btn line block" data-act="astats" style="margin-bottom:12px">📊 Товары и посещения</button>
   <button class="btn line block" data-act="gh-publish" style="margin-bottom:12px">🔍 Опубликовать и обновить страницы для поиска</button>
+  ${tgPanel()}
   <details style="margin-bottom:14px"><summary class="btn sm line block" style="list-style:none;text-align:center;cursor:pointer">⚙ Инструменты: копия, восстановление, перевод</summary><div style="margin-top:10px">
   <button class="btn sm line block" data-act="gh-dl" style="margin-bottom:14px">Скачать catalog.json (запасная копия)</button>
   <details class="note" style="margin-bottom:14px"><summary><b>Диагностика полей товаров</b></summary><button class="btn sm line" data-act="diag" style="margin:8px 0">Показать поля 2 товаров</button><pre id="diag" style="white-space:pre-wrap;font-size:15px"></pre></details>
@@ -1781,6 +1783,9 @@ document.addEventListener('click',e=>{
     case 'astats':adminView='stats';render();window.scrollTo(0,0);stLoad();break;
     case 'astats-back':admExit();break;
     case 'an-refresh':anLoad();break;
+    case 'tg-send':tgOne(id);break;
+    case 'tg-save':tgSave();break;
+    case 'tg-bulk':tgBulk();break;
     case 'astats-range':ST.range=Number(id)||7;KEEP=true;render();break;
     case 'astats-refresh':stLoad();break;
     case 'asnap':{
@@ -2014,9 +2019,113 @@ function statEv(t,pid){
 }
 async function stLoad(){try{await anLoad()}catch(e){}}
 
+
+/* ============ Публикация товара в Telegram-канал (токен хранится только в этом браузере, в коде его нет) ============ */
+const tgCfg=()=>{const c=LS.get('ms_tg',null)||{};return {t:String(c.t||''),ch:String(c.ch||'@muslim_shop06')}};
+const tgSent=()=>LS.get('ms_tg_sent',{});
+let tgBusy=false;
+const tgH=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function tgErr(e){
+  const m=String(e&&e.message||e);
+  if(/chat not found/i.test(m))return 'Канал не найден. Проверьте имя канала (например @muslim_shop06).';
+  if(/not a member|kicked|forbidden/i.test(m))return 'Бот не добавлен в канал администратором с правом публикации.';
+  if(/unauthorized|404/i.test(m))return 'Telegram не принял токен. Проверьте, что скопировали его целиком.';
+  if(/failed to fetch|networkerror|load failed/i.test(m))return 'Нет связи с Telegram. Проверьте интернет и попробуйте ещё раз.';
+  return m;
+}
+async function tgApi(method,body,isForm){
+  const c=tgCfg();if(!c.t)throw new Error('Сначала сохраните токен бота в блоке «Telegram-канал».');
+  const r=await fetch('https://api.telegram.org/bot'+c.t+'/'+method,{method:'POST',headers:isForm?undefined:{'Content-Type':'application/json'},body:isForm?body:JSON.stringify(body)});
+  const j=await r.json().catch(()=>null);
+  if(!j||!j.ok)throw new Error((j&&j.description)||('код '+r.status));
+  return j.result;
+}
+function tgCaption(p){
+  let d=String(p.desc&&p.desc.ru||'').replace(/\s+/g,' ').trim();
+  if(d.length>350)d=d.slice(0,350).replace(/\s+\S*$/,'')+'…';
+  let s='<b>'+tgH(p.name.ru||p.name.kk)+'</b>';
+  if(p.price>0)s+='\n\n💰 '+(p.old>p.price?'<s>'+tgH(money(p.old))+'</s> ':'')+'<b>'+tgH(money(p.price))+'</b>';
+  if(p.status==='out')s+='\n⛔ Нет в наличии';
+  if(d)s+='\n\n'+tgH(d);
+  s+='\n\n📞 '+tgH(CONTACT.phone);
+  return s;
+}
+function tgKb(p){
+  const u=prodUrl(p),name=p.name.ru||p.name.kk;
+  return [[{text:'🛒 Открыть на сайте',url:u}],[{text:'💬 Заказать в WhatsApp',url:'https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent('Здравствуйте! Хочу заказать: '+name+(p.price>0?' — '+money(p.price):'')+'\n'+u)}]];
+}
+async function tgBlob(src){
+  try{const r=await fetch(src);if(!r.ok)return null;const b=await r.blob();return(b.size&&b.size<9.5e6)?b:null}catch(e){return null}
+}
+async function tgSend(id){
+  const p=await getFull(id);
+  if(!p)throw new Error('Товар не найден');
+  if(p.status==='hidden')throw new Error('Товар скрыт на сайте. Сначала нажмите «Показать».');
+  const c=tgCfg(),cap=tgCaption(p),kb=tgKb(p),src=(p.images&&p.images[0])||p.img||'';
+  let done=false;
+  if(src){
+    const fd=new FormData();
+    fd.append('chat_id',c.ch);fd.append('caption',cap);fd.append('parse_mode','HTML');fd.append('reply_markup',JSON.stringify({inline_keyboard:kb}));
+    const blob=await tgBlob(src);
+    if(blob){fd.append('photo',blob,'photo.jpg');await tgApi('sendPhoto',fd,true);done=true}
+    else if(/^https?:/i.test(src)){fd.append('photo',src);await tgApi('sendPhoto',fd,true);done=true}
+  }
+  if(!done)await tgApi('sendMessage',{chat_id:c.ch,text:cap,parse_mode:'HTML',reply_markup:{inline_keyboard:kb}});
+  const s=tgSent();s[id]=Date.now();LS.set('ms_tg_sent',s);
+}
+async function tgOne(id){
+  if(tgBusy)return;
+  if(tgSent()[id]&&!confirm('Этот товар уже отправляли в канал. Отправить ещё раз?'))return;
+  tgBusy=true;toast('Отправляю в Telegram…');
+  try{await tgSend(id);toast('Опубликовано в канале ✓');try{admRefresh()}catch(e){}}
+  catch(e){toast('Telegram: '+tgErr(e))}
+  tgBusy=false;
+}
+async function tgBulk(){
+  if(tgBusy)return;
+  const ids=Array.from(SEL);
+  if(!ids.length){toast('Отметьте товары галочками в списке');return}
+  if(!confirm('Отправить в канал товаров: '+ids.length+'?'))return;
+  tgBusy=true;let ok=0;
+  try{
+    for(const id of ids){
+      toast('Отправляю '+(ok+1)+' из '+ids.length+'…');
+      await tgSend(id);ok++;
+      if(ok<ids.length)await new Promise(r=>setTimeout(r,3500));
+    }
+    toast('Отправлено в канал: '+ok+' ✓');
+  }catch(e){toast('Отправлено '+ok+' из '+ids.length+'. Ошибка: '+tgErr(e))}
+  tgBusy=false;try{admRefresh()}catch(e){}
+}
+async function tgSave(){
+  const tk=(($('#tg-token')||{}).value||'').trim();
+  let ch=(($('#tg-ch')||{}).value||'').trim().replace(/^https?:\/\/t\.me\//i,'@').replace(/\/+$/,'');
+  if(ch&&!/^@|^-?\d/.test(ch))ch='@'+ch;
+  const old=tgCfg();
+  const next={t:tk||old.t,ch:ch||old.ch};
+  if(!next.t){toast('Вставьте токен бота');return}
+  LS.set('ms_tg',next);
+  toast('Проверяю…');
+  try{
+    const me=await tgApi('getMe',{});
+    const chat=await tgApi('getChat',{chat_id:next.ch});
+    const t=$('#tg-token');if(t)t.value='';
+    toast('Готово: бот @'+me.username+' → «'+(chat.title||next.ch)+'» ✓');
+  }catch(e){toast('Telegram: '+tgErr(e))}
+}
+function tgPanel(){
+  const c=tgCfg();
+  return `<details class="note" style="margin-bottom:14px"><summary><b>✈ Telegram-канал</b> · ${c.t?'подключён':'не подключён'}</summary><div style="margin-top:10px;display:grid;gap:8px">
+  <div><label for="tg-token">Токен бота</label><input id="tg-token" type="password" autocomplete="off" autocapitalize="none" placeholder="${c.t?'сохранён (оставьте пустым, чтобы не менять)':'вставьте токен от @BotFather'}" style="width:100%"></div>
+  <div><label for="tg-ch">Канал</label><input id="tg-ch" value="${esc(c.ch)}" autocapitalize="none" style="width:100%"></div>
+  <button type="button" class="btn sm gold block" data-act="tg-save">Сохранить и проверить</button>
+  <button type="button" class="btn sm line block" data-act="tg-bulk">Отправить отмеченные товары в канал</button>
+  <div style="font-size:14px">Токен хранится только на этом телефоне. У каждого товара в списке есть кнопка «✈ В Telegram».</div></div></details>`;
+}
+
 /* ============ Своя живая аналитика (Firestore REST, коллекция analytics_daily/{YYYY-MM-DD}) ============ */
 /* Впишите данные своего проекта Firebase (Project settings → General → Your apps → Web app). Пока поля пустые, сайт работает как раньше, а счёт посещений выключен. */
-const AN_CFG={projectId:'muslim-shop-55c12',apiKey:'AIzaSyCCNwtzhDTBPB8GU_Ls7ogvN5xyUDOez3M',database:'ai-studio-muslimshop-6c5697f5-1412-4eb6-8d95-aa2cc7a70c7b'};
+const AN_CFG={projectId:'',apiKey:'',database:'(default)'};
 const AN={rows:{},loaded:false,err:'',at:0,busy:false,lastPath:'',sess:false};
 const anOn=()=>!!(AN_CFG.projectId&&AN_CFG.apiKey);
 const anBase=()=>'https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(AN_CFG.projectId)+'/databases/'+encodeURIComponent(AN_CFG.database||'(default)')+'/documents';
