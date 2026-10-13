@@ -2034,7 +2034,7 @@ const SG_STYLES=[
   {k:'promo',n:'Акция',bg:['#a3161c','#5e0b10'],txt:'#ffffff',sub:'#ffd9a0',acc:'#ffd166',pillBg:'#ffffff',pillTxt:'#a3161c',badgeBg:'#ffd166',badgeTxt:'#7a0d12',ring:'rgba(255,209,102,.6)'},
   {k:'blur',n:'Фото-фон',blur:true,bg:['#111','#111'],txt:'#ffffff',sub:'#f0dfb8',acc:'#e6c27a',pillBg:'#e6c27a',pillTxt:'#1c1d21',badgeBg:'#e6c27a',badgeTxt:'#1c1d21',ring:'rgba(230,194,122,.6)'}
 ];
-const SG={cv:null,id:'',p:null,imgs:[],ii:0,si:0,tok:0};
+const SG={cv:null,id:'',p:null,imgs:[],ii:0,si:0,tok:0,price:true};
 const sgLoad=src=>new Promise((res,rej)=>{const im=new Image();if(/^https?:/i.test(src)&&src.indexOf(location.origin)!==0)im.crossOrigin='anonymous';im.onload=()=>res(im);im.onerror=()=>rej(new Error('Не удалось загрузить фото'));im.src=src});
 let sgLogoP=null;const sgLogo=()=>sgLogoP||(sgLogoP=sgLoad(SG_LOGO_SRC));
 async function sgFonts(){try{await Promise.all([document.fonts.load('700 60px "Playfair Display"'),document.fonts.load('700 40px "PT Sans"'),document.fonts.load('400 40px "PT Sans"')])}catch(e){}}
@@ -2055,43 +2055,67 @@ function sgBadge(p){
   if(p.popular||p.featured)return 'ХИТ';
   return '';
 }
-/* сторис 1080×1920 */
-async function sgDraw(p,imgSrc,st){
+/* сторис 1080×1920: крупное фото товара, тонкая рамка, цена по желанию */
+async function sgDraw(p,imgSrc,st,opt){
+  opt=opt||{};
+  const showPrice=opt.price!==false&&p.price>0;
   await sgFonts();
   const W=1080,H=1920,cv=document.createElement('canvas');cv.width=W;cv.height=H;
   const c=cv.getContext('2d'),im=await sgLoad(imgSrc),logo=await sgLogo().catch(()=>null);
+  c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';
   const SERIF='"Playfair Display",Georgia,"Times New Roman",serif',SANS='"PT Sans","Segoe UI",Arial,sans-serif';
   if(st.blur)sgBlurBg(c,im,W,H,.55);
   else{const g=c.createLinearGradient(0,0,W*.4,H);g.addColorStop(0,st.bg[0]);g.addColorStop(1,st.bg[1]);c.fillStyle=g;c.fillRect(0,0,W,H)}
-  c.strokeStyle=st.ring;c.lineWidth=3;sgRR(c,28,28,W-56,H-56,56);c.stroke();
-  if(logo)c.drawImage(logo,W/2-92,244,184,184);
-  const cx=180,cy=440,cs=720;
-  c.save();c.shadowColor='rgba(0,0,0,.35)';c.shadowBlur=50;c.shadowOffsetY=18;c.fillStyle='#fff';sgRR(c,cx,cy,cs,cs,44);c.fill();c.restore();
-  c.save();sgRR(c,cx,cy,cs,cs,44);c.clip();sgContain(c,im,cx+20,cy+20,cs-40,cs-40);c.restore();
-  c.strokeStyle=st.acc;c.lineWidth=5;sgRR(c,cx,cy,cs,cs,44);c.stroke();
+  c.strokeStyle=st.ring;c.lineWidth=3;sgRR(c,22,22,W-44,H-44,48);c.stroke();
+  if(logo)c.drawImage(logo,W/2-46,40,92,92);
   c.textAlign='center';c.textBaseline='alphabetic';
-  const b=sgBadge(p);
-  if(b){
-    const bx=cx+cs-24,by=cy+24;
-    c.save();c.shadowColor='rgba(0,0,0,.35)';c.shadowBlur=24;c.fillStyle=st.badgeBg;c.beginPath();c.arc(bx,by,96,0,Math.PI*2);c.fill();c.restore();
-    c.fillStyle=st.badgeTxt;c.font='700 '+(b.length>3?50:58)+'px '+SANS;c.fillText(b,bx,by+19);
-  }
+  /* нижний блок считаем снизу вверх, всё остальное место отдаём фото */
+  const BOTTOM=1750;
+  let y=BOTTOM;
+  const btnH=108,btnTop=y-btnH;y=btnTop-18;
+  let pillTop=0,pillH=96,prTxt='',pw=0,oldTxt='';
+  if(showPrice){
+    prTxt=money(p.price);c.font='700 74px '+SANS;pw=c.measureText(prTxt).width+110;
+    pillTop=y-pillH;y=pillTop-12;
+    if(p.old>p.price){oldTxt=money(p.old);y-=40}
+  }else y-=4;
+  const nm=p.name.ru||p.name.kk||'';
+  let nf=60,lines=[];
+  for(;nf>=40;nf-=4){c.font='700 '+nf+'px '+SERIF;lines=sgWrap(c,nm,980,2);if(lines.length<2||c.measureText(lines[lines.length-1]).width<980&&!/…$/.test(lines[lines.length-1]))break}
+  c.font='700 '+nf+'px '+SERIF;lines=sgWrap(c,nm,980,2);
+  const lh=Math.round(nf*1.16),nameTop=y-lines.length*lh;
+  c.fillStyle=st.txt;
+  lines.forEach((l,i)=>c.fillText(l,W/2,nameTop+(i+1)*lh-Math.round(lh*.2)));
+  y=nameTop-8;
   const cat=(DB.cats.find(x=>x.id===p.cat)||{}).name;
-  if(cat&&(cat.ru||cat.kk)){c.fillStyle=st.sub;c.font='700 32px '+SANS;c.fillText(String(cat.ru||cat.kk).toUpperCase(),W/2,1205)}
-  c.fillStyle=st.txt;c.font='700 60px '+SERIF;
-  sgWrap(c,p.name.ru||p.name.kk,900,2).forEach((l,i)=>c.fillText(l,W/2,1282+i*72));
-  if(p.old>p.price&&p.price>0){
-    c.font='400 40px '+SANS;c.fillStyle=st.sub;const o=money(p.old),ow=c.measureText(o).width;
-    c.fillText(o,W/2,1425);c.strokeStyle=st.sub;c.lineWidth=3;c.beginPath();c.moveTo(W/2-ow/2-4,1413);c.lineTo(W/2+ow/2+4,1413);c.stroke();
+  if(cat&&(cat.ru||cat.kk)){c.fillStyle=st.sub;c.font='700 28px '+SANS;c.fillText(String(cat.ru||cat.kk).toUpperCase(),W/2,y-4);y-=42}
+  /* фото: почти во всю ширину, без белой подложки */
+  const bx0=36,bw=W-72,by0=150,bh=y-12-by0;
+  const sc=Math.min(bw/im.width,bh/im.height),dw=Math.round(im.width*sc),dh=Math.round(im.height*sc);
+  const px=Math.round((W-dw)/2),py=Math.round(by0+(bh-dh)/2);
+  c.save();c.shadowColor='rgba(0,0,0,.4)';c.shadowBlur=36;c.shadowOffsetY=10;c.fillStyle='#fff';sgRR(c,px,py,dw,dh,26);c.fill();c.restore();
+  c.save();sgRR(c,px,py,dw,dh,26);c.clip();c.drawImage(im,px,py,dw,dh);c.restore();
+  c.strokeStyle=st.acc;c.lineWidth=4;sgRR(c,px,py,dw,dh,26);c.stroke();
+  /* значок */
+  let b=sgBadge(p);if(!showPrice&&/^-/.test(b))b='';
+  if(b){
+    const r=66,bx=Math.min(px+dw-8,W-r-30),byy=py+8;
+    c.save();c.shadowColor='rgba(0,0,0,.35)';c.shadowBlur=22;c.fillStyle=st.badgeBg;c.beginPath();c.arc(bx,byy,r,0,Math.PI*2);c.fill();c.restore();
+    c.fillStyle=st.badgeTxt;c.font='700 '+(b.length>3?42:50)+'px '+SANS;c.fillText(b,bx,byy+(b.length>3?15:18));
   }
-  const pr=p.price>0?money(p.price):'Цена по запросу';
-  c.font='700 '+(p.price>0?78:54)+'px '+SANS;
-  const pw=c.measureText(pr).width+110;
-  c.fillStyle=st.pillBg;sgRR(c,W/2-pw/2,1440,pw,110,55);c.fill();
-  c.fillStyle=st.pillTxt;c.fillText(pr,W/2,1520);
-  c.fillStyle='#25D366';sgRR(c,140,1590,800,130,65);c.fill();
-  c.fillStyle='#06301a';c.font='700 44px '+SANS;c.fillText('Заказать в WhatsApp',W/2,1648);
-  c.font='400 36px '+SANS;c.fillText(CONTACT.phone,W/2,1696);
+  /* цена */
+  if(showPrice){
+    if(oldTxt){
+      c.font='400 36px '+SANS;c.fillStyle=st.sub;const ow=c.measureText(oldTxt).width,oy=pillTop-16;
+      c.fillText(oldTxt,W/2,oy);c.strokeStyle=st.sub;c.lineWidth=3;c.beginPath();c.moveTo(W/2-ow/2-4,oy-12);c.lineTo(W/2+ow/2+4,oy-12);c.stroke();
+    }
+    c.fillStyle=st.pillBg;sgRR(c,W/2-pw/2,pillTop,pw,pillH,pillH/2);c.fill();
+    c.fillStyle=st.pillTxt;c.font='700 74px '+SANS;c.fillText(prTxt,W/2,pillTop+pillH-24);
+  }
+  /* кнопка WhatsApp */
+  c.fillStyle='#25D366';sgRR(c,140,btnTop,800,btnH,btnH/2);c.fill();
+  c.fillStyle='#06301a';c.font='700 42px '+SANS;c.fillText('Заказать в WhatsApp',W/2,btnTop+52);
+  c.font='400 34px '+SANS;c.fillText(CONTACT.phone,W/2,btnTop+93);
   return cv;
 }
 /* квадратное фото для поста в Telegram: пост получается широким, а не узкой полосой */
@@ -2112,6 +2136,7 @@ function sgModalOpen(){
   m.style.cssText='position:fixed;inset:0;z-index:300;background:rgba(10,10,12,.94);overflow:auto;padding:16px 12px 30px;display:flex;flex-direction:column;align-items:center;gap:12px';
   m.innerHTML='<div style="color:#fff;font-weight:700;text-align:center;max-width:420px">🎬 Сторис: '+esc(SG.p.name.ru||SG.p.name.kk)+'</div>'
    +'<div style="display:flex;gap:8px;overflow-x:auto;max-width:100%;padding-bottom:4px">'+SG_STYLES.map((s,i)=>'<button type="button" class="btn sm line" data-sg="style" data-i="'+i+'" style="white-space:nowrap">'+s.n+'</button>').join('')+'</div>'
+   +'<div style="display:flex;gap:8px"><button type="button" class="btn sm line" data-sg="price" data-v="1">С ценником</button><button type="button" class="btn sm line" data-sg="price" data-v="0">Без ценника</button></div>'
    +'<div id="sgwrap" style="width:min(74vw,330px);aspect-ratio:9/16;background:#222;border-radius:14px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#aaa;text-align:center;padding:10px">Рисую…</div>'
    +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">'+(SG.imgs.length>1?'<button type="button" class="btn sm line" data-sg="photo">Другое фото</button>':'')+'<button type="button" class="btn sm gold" data-sg="dl">Скачать</button><button type="button" class="btn sm gold" data-sg="share">Поделиться</button><button type="button" class="btn sm line" data-sg="close">Закрыть</button></div>'
    +'<div style="color:#bbb;font-size:13px;text-align:center;max-width:340px">Нажмите «Поделиться» и выберите Instagram, TikTok или WhatsApp. Либо скачайте картинку и загрузите её в сторис сами.</div>';
@@ -2120,6 +2145,7 @@ function sgModalOpen(){
     const a=b.dataset.sg;
     if(a==='close')sgModalClose();
     else if(a==='style'){SG.si=+b.dataset.i;LS.set('ms_story_style',SG.si);sgRender()}
+    else if(a==='price'){SG.price=b.dataset.v==='1';LS.set('ms_story_price',SG.price?1:0);sgRender()}
     else if(a==='photo'){SG.ii=(SG.ii+1)%SG.imgs.length;sgRender()}
     else if(a==='dl')sgDownload();
     else if(a==='share')sgShare();
@@ -2130,11 +2156,12 @@ async function sgRender(){
   const tok=++SG.tok,w=document.getElementById('sgwrap');if(!w)return;
   w.textContent='Рисую…';
   try{
-    const cv=await sgDraw(SG.p,SG.imgs[SG.ii],SG_STYLES[SG.si]);
+    const cv=await sgDraw(SG.p,SG.imgs[SG.ii],SG_STYLES[SG.si],{price:SG.price});
     const w2=document.getElementById('sgwrap');
     if(tok!==SG.tok||!w2)return;
     SG.cv=cv;cv.style.cssText='width:100%;height:100%;display:block';w2.textContent='';w2.appendChild(cv);
     document.querySelectorAll('#storymodal [data-sg="style"]').forEach(b=>{b.className='btn sm '+(+b.dataset.i===SG.si?'gold':'line')});
+    document.querySelectorAll('#storymodal [data-sg="price"]').forEach(b=>{b.className='btn sm '+((b.dataset.v==='1')===SG.price?'gold':'line')});
   }catch(e){if(tok===SG.tok)w.textContent='Не удалось нарисовать: '+(e&&e.message||e)}
 }
 function sgBlob(){return new Promise((res,rej)=>{try{SG.cv.toBlob(b=>b?res(b):rej(new Error('blob')),'image/png')}catch(e){rej(e)}})}
@@ -2159,7 +2186,7 @@ async function storyOpen(id){
     SG.p=p;SG.id=String(id).replace(/[^\w-]/g,'');
     SG.imgs=((p.images&&p.images.length)?p.images:[p.img]).filter(x=>typeof x==='string'&&x).slice(0,6);
     if(!SG.imgs.length)throw new Error('У товара нет фото');
-    SG.ii=0;SG.si=Math.min(Math.max(Number(LS.get('ms_story_style',0))||0,0),SG_STYLES.length-1);
+    SG.price=LS.get('ms_story_price',1)!==0;SG.ii=0;SG.si=Math.min(Math.max(Number(LS.get('ms_story_style',0))||0,0),SG_STYLES.length-1);
     sgModalOpen();await sgRender();
   }catch(e){toast('Сторис: '+(e&&e.message||e))}
 }
