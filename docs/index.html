@@ -1532,6 +1532,7 @@ function admRows(){const arr=admFiltered();return arr.map(p=>`<div class="adm-ro
       <button class="btn sm line" data-act="ahide" data-id="${esc(p.id)}">${p.status==='hidden'?'Показать':'Скрыть'}</button>
       <button class="btn sm line" data-act="adel" data-id="${esc(p.id)}">Удалить</button>
       <button class="btn sm line" data-act="tg-send" data-id="${esc(p.id)}">${tgSent()[p.id]?'✓ В канале':'✈ В Telegram'}</button>
+      <button class="btn sm line" data-act="story" data-id="${esc(p.id)}">🎬 Сторис</button>
       <a class="btn sm line" href="#/product/${esc(p.id)}">Открыть</a></div></div>`).join('')||'<div class="empty">'+(DB.products.length?'Ничего не найдено. Измените категорию или поиск.':'Товаров пока нет. Нажмите «Добавить товар».')+'</div>'}
 const admCountTxt=()=>'Показано: '+admFiltered().length+' из '+DB.products.length;
 function admChips(){
@@ -1784,6 +1785,8 @@ document.addEventListener('click',e=>{
     case 'astats-back':admExit();break;
     case 'an-refresh':anLoad();break;
     case 'tg-send':tgOne(id);break;
+    case 'story':storyOpen(id);break;
+    case 'tg-sq':tgSq();break;
     case 'tg-save':tgSave();break;
     case 'tg-bulk':tgBulk();break;
     case 'tg-menu':tgMenu().catch(e=>toast('Ошибка: '+(e&&e.message||e)));break;
@@ -2021,8 +2024,148 @@ function statEv(t,pid){
 async function stLoad(){try{await anLoad()}catch(e){}}
 
 
+
+/* ============ Сторис и квадратные карточки (рисуются на телефоне, ничего никуда не отправляется) ============ */
+const SG_LOGO_SRC='data:image/png;base64,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';
+const SG_STYLES=[
+  {k:'dark',n:'Тёмный',bg:['#1c1d21','#2b2c32'],txt:'#ffffff',sub:'#cdb78a',acc:'#d9b36a',pillBg:'#d9b36a',pillTxt:'#1c1d21',badgeBg:'#d9b36a',badgeTxt:'#1c1d21',ring:'rgba(217,179,106,.55)'},
+  {k:'light',n:'Светлый',bg:['#f8f1e4','#eadcc0'],txt:'#1c1d21',sub:'#7a6035',acc:'#a8823f',pillBg:'#1c1d21',pillTxt:'#e6c27a',badgeBg:'#1c1d21',badgeTxt:'#e6c27a',ring:'rgba(168,130,63,.6)'},
+  {k:'emerald',n:'Изумруд',bg:['#0e4a37','#062a1f'],txt:'#ffffff',sub:'#d9c28e',acc:'#e0bd72',pillBg:'#e0bd72',pillTxt:'#08301f',badgeBg:'#e0bd72',badgeTxt:'#08301f',ring:'rgba(224,189,114,.55)'},
+  {k:'promo',n:'Акция',bg:['#a3161c','#5e0b10'],txt:'#ffffff',sub:'#ffd9a0',acc:'#ffd166',pillBg:'#ffffff',pillTxt:'#a3161c',badgeBg:'#ffd166',badgeTxt:'#7a0d12',ring:'rgba(255,209,102,.6)'},
+  {k:'blur',n:'Фото-фон',blur:true,bg:['#111','#111'],txt:'#ffffff',sub:'#f0dfb8',acc:'#e6c27a',pillBg:'#e6c27a',pillTxt:'#1c1d21',badgeBg:'#e6c27a',badgeTxt:'#1c1d21',ring:'rgba(230,194,122,.6)'}
+];
+const SG={cv:null,id:'',p:null,imgs:[],ii:0,si:0,tok:0};
+const sgLoad=src=>new Promise((res,rej)=>{const im=new Image();if(/^https?:/i.test(src)&&src.indexOf(location.origin)!==0)im.crossOrigin='anonymous';im.onload=()=>res(im);im.onerror=()=>rej(new Error('Не удалось загрузить фото'));im.src=src});
+let sgLogoP=null;const sgLogo=()=>sgLogoP||(sgLogoP=sgLoad(SG_LOGO_SRC));
+async function sgFonts(){try{await Promise.all([document.fonts.load('700 60px "Playfair Display"'),document.fonts.load('700 40px "PT Sans"'),document.fonts.load('400 40px "PT Sans"')])}catch(e){}}
+function sgRR(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()}
+function sgCover(c,im,x,y,w,h){const s=Math.max(w/im.width,h/im.height),dw=im.width*s,dh=im.height*s;c.save();c.beginPath();c.rect(x,y,w,h);c.clip();c.drawImage(im,x+(w-dw)/2,y+(h-dh)/2,dw,dh);c.restore()}
+function sgContain(c,im,x,y,w,h){const s=Math.min(w/im.width,h/im.height),dw=im.width*s,dh=im.height*s;c.drawImage(im,x+(w-dw)/2,y+(h-dh)/2,dw,dh)}
+function sgBlurBg(c,im,W,H,dark){const t=document.createElement('canvas');t.width=Math.max(8,Math.round(W/40));t.height=Math.max(8,Math.round(H/40));sgCover(t.getContext('2d'),im,0,0,t.width,t.height);c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';c.drawImage(t,0,0,W,H);c.fillStyle='rgba(0,0,0,'+dark+')';c.fillRect(0,0,W,H)}
+function sgWrap(c,text,maxW,maxLines){
+  const words=String(text).split(/\s+/).filter(Boolean),lines=[];let cur='';
+  for(const w of words){const t=cur?cur+' '+w:w;if(!cur||c.measureText(t).width<=maxW)cur=t;else{lines.push(cur);cur=w}}
+  if(cur)lines.push(cur);
+  if(lines.length>maxLines){lines.length=maxLines;let l=lines[maxLines-1];while(c.measureText(l+'…').width>maxW&&l.length>1)l=l.slice(0,-1);lines[maxLines-1]=l.replace(/[\s.,;:\-]+$/,'')+'…'}
+  return lines;
+}
+function sgBadge(p){
+  if(p.old>p.price&&p.price>0)return '-'+Math.round((p.old-p.price)*100/p.old)+'%';
+  if(p.isNew)return 'NEW';
+  if(p.popular||p.featured)return 'ХИТ';
+  return '';
+}
+/* сторис 1080×1920 */
+async function sgDraw(p,imgSrc,st){
+  await sgFonts();
+  const W=1080,H=1920,cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  const c=cv.getContext('2d'),im=await sgLoad(imgSrc),logo=await sgLogo().catch(()=>null);
+  const SERIF='"Playfair Display",Georgia,"Times New Roman",serif',SANS='"PT Sans","Segoe UI",Arial,sans-serif';
+  if(st.blur)sgBlurBg(c,im,W,H,.55);
+  else{const g=c.createLinearGradient(0,0,W*.4,H);g.addColorStop(0,st.bg[0]);g.addColorStop(1,st.bg[1]);c.fillStyle=g;c.fillRect(0,0,W,H)}
+  c.strokeStyle=st.ring;c.lineWidth=3;sgRR(c,28,28,W-56,H-56,56);c.stroke();
+  if(logo)c.drawImage(logo,W/2-92,244,184,184);
+  const cx=180,cy=440,cs=720;
+  c.save();c.shadowColor='rgba(0,0,0,.35)';c.shadowBlur=50;c.shadowOffsetY=18;c.fillStyle='#fff';sgRR(c,cx,cy,cs,cs,44);c.fill();c.restore();
+  c.save();sgRR(c,cx,cy,cs,cs,44);c.clip();sgContain(c,im,cx+20,cy+20,cs-40,cs-40);c.restore();
+  c.strokeStyle=st.acc;c.lineWidth=5;sgRR(c,cx,cy,cs,cs,44);c.stroke();
+  c.textAlign='center';c.textBaseline='alphabetic';
+  const b=sgBadge(p);
+  if(b){
+    const bx=cx+cs-24,by=cy+24;
+    c.save();c.shadowColor='rgba(0,0,0,.35)';c.shadowBlur=24;c.fillStyle=st.badgeBg;c.beginPath();c.arc(bx,by,96,0,Math.PI*2);c.fill();c.restore();
+    c.fillStyle=st.badgeTxt;c.font='700 '+(b.length>3?50:58)+'px '+SANS;c.fillText(b,bx,by+19);
+  }
+  const cat=(DB.cats.find(x=>x.id===p.cat)||{}).name;
+  if(cat&&(cat.ru||cat.kk)){c.fillStyle=st.sub;c.font='700 32px '+SANS;c.fillText(String(cat.ru||cat.kk).toUpperCase(),W/2,1205)}
+  c.fillStyle=st.txt;c.font='700 60px '+SERIF;
+  sgWrap(c,p.name.ru||p.name.kk,900,2).forEach((l,i)=>c.fillText(l,W/2,1282+i*72));
+  if(p.old>p.price&&p.price>0){
+    c.font='400 40px '+SANS;c.fillStyle=st.sub;const o=money(p.old),ow=c.measureText(o).width;
+    c.fillText(o,W/2,1425);c.strokeStyle=st.sub;c.lineWidth=3;c.beginPath();c.moveTo(W/2-ow/2-4,1413);c.lineTo(W/2+ow/2+4,1413);c.stroke();
+  }
+  const pr=p.price>0?money(p.price):'Цена по запросу';
+  c.font='700 '+(p.price>0?78:54)+'px '+SANS;
+  const pw=c.measureText(pr).width+110;
+  c.fillStyle=st.pillBg;sgRR(c,W/2-pw/2,1440,pw,110,55);c.fill();
+  c.fillStyle=st.pillTxt;c.fillText(pr,W/2,1520);
+  c.fillStyle='#25D366';sgRR(c,140,1590,800,130,65);c.fill();
+  c.fillStyle='#06301a';c.font='700 44px '+SANS;c.fillText('Заказать в WhatsApp',W/2,1648);
+  c.font='400 36px '+SANS;c.fillText(CONTACT.phone,W/2,1696);
+  return cv;
+}
+/* квадратное фото для поста в Telegram: пост получается широким, а не узкой полосой */
+async function sgSquareBlob(src){
+  const im=await sgLoad(src),S=1080,cv=document.createElement('canvas');cv.width=S;cv.height=S;
+  const c=cv.getContext('2d');
+  sgBlurBg(c,im,S,S,.3);
+  const s=Math.min(960/im.width,960/im.height),dw=im.width*s,dh=im.height*s,x=(S-dw)/2,y=(S-dh)/2;
+  c.save();c.shadowColor='rgba(0,0,0,.45)';c.shadowBlur=40;c.shadowOffsetY=12;c.fillStyle='#fff';sgRR(c,x,y,dw,dh,28);c.fill();c.restore();
+  c.save();sgRR(c,x,y,dw,dh,28);c.clip();c.drawImage(im,x,y,dw,dh);c.restore();
+  return new Promise((res,rej)=>{try{cv.toBlob(b=>b?res(b):rej(new Error('blob')),'image/jpeg',.92)}catch(e){rej(e)}});
+}
+/* окно «Сторис» */
+function sgModalClose(){const m=document.getElementById('storymodal');if(m)m.remove();SG.tok++}
+function sgModalOpen(){
+  sgModalClose();
+  const m=document.createElement('div');m.id='storymodal';
+  m.style.cssText='position:fixed;inset:0;z-index:300;background:rgba(10,10,12,.94);overflow:auto;padding:16px 12px 30px;display:flex;flex-direction:column;align-items:center;gap:12px';
+  m.innerHTML='<div style="color:#fff;font-weight:700;text-align:center;max-width:420px">🎬 Сторис: '+esc(SG.p.name.ru||SG.p.name.kk)+'</div>'
+   +'<div style="display:flex;gap:8px;overflow-x:auto;max-width:100%;padding-bottom:4px">'+SG_STYLES.map((s,i)=>'<button type="button" class="btn sm line" data-sg="style" data-i="'+i+'" style="white-space:nowrap">'+s.n+'</button>').join('')+'</div>'
+   +'<div id="sgwrap" style="width:min(74vw,330px);aspect-ratio:9/16;background:#222;border-radius:14px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#aaa;text-align:center;padding:10px">Рисую…</div>'
+   +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">'+(SG.imgs.length>1?'<button type="button" class="btn sm line" data-sg="photo">Другое фото</button>':'')+'<button type="button" class="btn sm gold" data-sg="dl">Скачать</button><button type="button" class="btn sm gold" data-sg="share">Поделиться</button><button type="button" class="btn sm line" data-sg="close">Закрыть</button></div>'
+   +'<div style="color:#bbb;font-size:13px;text-align:center;max-width:340px">Нажмите «Поделиться» и выберите Instagram, TikTok или WhatsApp. Либо скачайте картинку и загрузите её в сторис сами.</div>';
+  m.addEventListener('click',e=>{
+    const b=e.target.closest('[data-sg]');if(!b)return;
+    const a=b.dataset.sg;
+    if(a==='close')sgModalClose();
+    else if(a==='style'){SG.si=+b.dataset.i;LS.set('ms_story_style',SG.si);sgRender()}
+    else if(a==='photo'){SG.ii=(SG.ii+1)%SG.imgs.length;sgRender()}
+    else if(a==='dl')sgDownload();
+    else if(a==='share')sgShare();
+  });
+  document.body.appendChild(m);
+}
+async function sgRender(){
+  const tok=++SG.tok,w=document.getElementById('sgwrap');if(!w)return;
+  w.textContent='Рисую…';
+  try{
+    const cv=await sgDraw(SG.p,SG.imgs[SG.ii],SG_STYLES[SG.si]);
+    const w2=document.getElementById('sgwrap');
+    if(tok!==SG.tok||!w2)return;
+    SG.cv=cv;cv.style.cssText='width:100%;height:100%;display:block';w2.textContent='';w2.appendChild(cv);
+    document.querySelectorAll('#storymodal [data-sg="style"]').forEach(b=>{b.className='btn sm '+(+b.dataset.i===SG.si?'gold':'line')});
+  }catch(e){if(tok===SG.tok)w.textContent='Не удалось нарисовать: '+(e&&e.message||e)}
+}
+function sgBlob(){return new Promise((res,rej)=>{try{SG.cv.toBlob(b=>b?res(b):rej(new Error('blob')),'image/png')}catch(e){rej(e)}})}
+async function sgDownload(){
+  try{
+    const b=await sgBlob(),a=document.createElement('a');
+    a.href=URL.createObjectURL(b);a.download='story-'+SG.id+'.png';document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);toast('Картинка сохранена');
+  }catch(e){toast('Не удалось сохранить: фото товара лежит на другом сайте')}
+}
+async function sgShare(){
+  try{
+    const b=await sgBlob(),f=new File([b],'story-'+SG.id+'.png',{type:'image/png'});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f]})}catch(e){}}
+    else await sgDownload();
+  }catch(e){toast('Не удалось поделиться: фото товара лежит на другом сайте')}
+}
+async function storyOpen(id){
+  try{
+    toast('Готовлю…');
+    const p=await getFull(id);if(!p)throw new Error('Товар не найден');
+    SG.p=p;SG.id=String(id).replace(/[^\w-]/g,'');
+    SG.imgs=((p.images&&p.images.length)?p.images:[p.img]).filter(x=>typeof x==='string'&&x).slice(0,6);
+    if(!SG.imgs.length)throw new Error('У товара нет фото');
+    SG.ii=0;SG.si=Math.min(Math.max(Number(LS.get('ms_story_style',0))||0,0),SG_STYLES.length-1);
+    sgModalOpen();await sgRender();
+  }catch(e){toast('Сторис: '+(e&&e.message||e))}
+}
+
 /* ============ Публикация товара в Telegram-канал (токен хранится только в этом браузере, в коде его нет) ============ */
-const tgCfg=()=>{const c=LS.get('ms_tg',null)||{};return {t:String(c.t||''),ch:String(c.ch||'@muslim_shop06')}};
+const tgCfg=()=>{const c=LS.get('ms_tg',null)||{};return {t:String(c.t||''),ch:String(c.ch||'@muslim_shop06'),sq:c.sq!==false}};
 const tgSent=()=>LS.get('ms_tg_sent',{});
 let tgBusy=false;
 const tgH=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -2051,14 +2194,13 @@ function tgTag(cid){
 const tgCatUrl=cid=>location.origin+location.pathname+'#/catalog?cat='+encodeURIComponent(cid);
 function tgCaption(p){
   let d=String(p.desc&&p.desc.ru||'').replace(/\s+/g,' ').trim();
-  if(d.length>350)d=d.slice(0,350).replace(/\s+\S*$/,'')+'…';
+  if(d.length>220)d=d.slice(0,220).replace(/\s+\S*$/,'')+'…';
   let s='<b>'+tgH(p.name.ru||p.name.kk)+'</b>';
   if(p.price>0)s+='\n\n💰 '+(p.old>p.price?'<s>'+tgH(money(p.old))+'</s> ':'')+'<b>'+tgH(money(p.price))+'</b>';
   if(p.status==='out')s+='\n⛔ Нет в наличии';
   if(d)s+='\n\n'+tgH(d);
   const cn=(DB.cats.find(x=>x.id===p.cat)||{}).name;
   if(cn&&(cn.ru||cn.kk))s+='\n\n📂 <a href="'+tgH(tgCatUrl(p.cat))+'">'+tgH(cn.ru||cn.kk)+'</a>';
-  s+='\n\n📞 '+tgH(CONTACT.phone);
   return s;
 }
 function tgKb(p){
@@ -2077,7 +2219,9 @@ async function tgSend(id){
   if(src){
     const fd=new FormData();
     fd.append('chat_id',c.ch);fd.append('caption',cap);fd.append('parse_mode','HTML');fd.append('reply_markup',JSON.stringify({inline_keyboard:kb}));
-    const blob=await tgBlob(src);
+    let blob=null;
+    if(c.sq){try{blob=await sgSquareBlob(src)}catch(e){blob=null}}
+    if(!blob)blob=await tgBlob(src);
     if(blob){fd.append('photo',blob,'photo.jpg');await tgApi('sendPhoto',fd,true);done=true}
     else if(/^https?:/i.test(src)){fd.append('photo',src);await tgApi('sendPhoto',fd,true);done=true}
   }
@@ -2130,12 +2274,17 @@ async function tgMenu(){
   }catch(e){toast('Telegram: '+tgErr(e))}
   tgBusy=false;
 }
+function tgSq(){
+  const c=tgCfg();c.sq=!c.sq;LS.set('ms_tg',c);
+  const b=document.querySelector('[data-act="tg-sq"]');if(b)b.textContent=c.sq?'Фото в посте: квадрат (широкий пост) ✓':'Фото в посте: как загружено (узкое)';
+  toast(c.sq?'Фото в постах будет квадратным':'Фото в постах будет как загружено');
+}
 async function tgSave(){
   const tk=(($('#tg-token')||{}).value||'').trim();
   let ch=(($('#tg-ch')||{}).value||'').trim().replace(/^https?:\/\/t\.me\//i,'@').replace(/\/+$/,'');
   if(ch&&!/^@|^-?\d/.test(ch))ch='@'+ch;
   const old=tgCfg();
-  const next={t:tk||old.t,ch:ch||old.ch};
+  const next={t:tk||old.t,ch:ch||old.ch,sq:old.sq};
   if(!next.t){toast('Вставьте токен бота');return}
   LS.set('ms_tg',next);
   toast('Проверяю…');
@@ -2152,6 +2301,7 @@ function tgPanel(){
   <div><label for="tg-token">Токен бота</label><input id="tg-token" type="password" autocomplete="off" autocapitalize="none" placeholder="${c.t?'сохранён (оставьте пустым, чтобы не менять)':'вставьте токен от @BotFather'}" style="width:100%"></div>
   <div><label for="tg-ch">Канал</label><input id="tg-ch" value="${esc(c.ch)}" autocapitalize="none" style="width:100%"></div>
   <button type="button" class="btn sm gold block" data-act="tg-save">Сохранить и проверить</button>
+  <button type="button" class="btn sm line block" data-act="tg-sq">${c.sq?'Фото в посте: квадрат (широкий пост) ✓':'Фото в посте: как загружено (узкое)'}</button>
   <button type="button" class="btn sm line block" data-act="tg-bulk">Отправить отмеченные товары в канал</button>
   <button type="button" class="btn sm line block" data-act="tg-menu">Обновить меню категорий в канале</button>
   <div style="font-size:14px">Токен хранится только на этом телефоне. У каждого товара в списке есть кнопка «✈ В Telegram».</div></div></details>`;
