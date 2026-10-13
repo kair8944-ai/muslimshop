@@ -1786,6 +1786,7 @@ document.addEventListener('click',e=>{
     case 'tg-send':tgOne(id);break;
     case 'tg-save':tgSave();break;
     case 'tg-bulk':tgBulk();break;
+    case 'tg-menu':tgMenu().catch(e=>toast('Ошибка: '+(e&&e.message||e)));break;
     case 'astats-range':ST.range=Number(id)||7;KEEP=true;render();break;
     case 'astats-refresh':stLoad();break;
     case 'asnap':{
@@ -2040,6 +2041,12 @@ async function tgApi(method,body,isForm){
   if(!j||!j.ok)throw new Error((j&&j.description)||('код '+r.status));
   return j.result;
 }
+function tgTag(cid){
+  const c=(DB.cats||[]).find(x=>x.id===cid);
+  const n=(c&&c.name&&(c.name.ru||c.name.kk))||'';
+  const t=String(n).replace(/[^\p{L}\p{N}]+/gu,'_').replace(/^_+|_+$/g,'');
+  return t?'#'+t:'';
+}
 function tgCaption(p){
   let d=String(p.desc&&p.desc.ru||'').replace(/\s+/g,' ').trim();
   if(d.length>350)d=d.slice(0,350).replace(/\s+\S*$/,'')+'…';
@@ -2047,6 +2054,7 @@ function tgCaption(p){
   if(p.price>0)s+='\n\n💰 '+(p.old>p.price?'<s>'+tgH(money(p.old))+'</s> ':'')+'<b>'+tgH(money(p.price))+'</b>';
   if(p.status==='out')s+='\n⛔ Нет в наличии';
   if(d)s+='\n\n'+tgH(d);
+  const tag=tgTag(p.cat);if(tag)s+='\n\n'+tag;
   s+='\n\n📞 '+tgH(CONTACT.phone);
   return s;
 }
@@ -2097,6 +2105,26 @@ async function tgBulk(){
   }catch(e){toast('Отправлено '+ok+' из '+ids.length+'. Ошибка: '+tgErr(e))}
   tgBusy=false;try{admRefresh()}catch(e){}
 }
+async function tgMenu(){
+  if(tgBusy)return;
+  const has={};DB.products.forEach(p=>{if(p.status!=='hidden')has[p.cat]=1});
+  const tags=DB.cats.filter(c=>has[c.id]).map(c=>tgTag(c.id)).filter(Boolean);
+  if(!tags.length){toast('Нет категорий с товарами');return}
+  tgBusy=true;toast('Обновляю меню в канале…');
+  const c=tgCfg(),text='📚 <b>Каталог по категориям</b>\nНажмите на категорию, чтобы увидеть все товары:\n\n'+tags.join('\n');
+  const kb={inline_keyboard:[[{text:'🛒 Открыть магазин',url:location.origin+location.pathname}]]};
+  try{
+    const m=LS.get('ms_tg_menu',null);let done=false;
+    if(m&&m.ch===c.ch&&m.id){try{await tgApi('editMessageText',{chat_id:c.ch,message_id:m.id,text,parse_mode:'HTML',reply_markup:kb});done=true}catch(e){if(/not modified/i.test(String(e&&e.message)))done=true}}
+    if(!done){
+      const r=await tgApi('sendMessage',{chat_id:c.ch,text,parse_mode:'HTML',reply_markup:kb});
+      LS.set('ms_tg_menu',{ch:c.ch,id:r.message_id});
+      try{await tgApi('pinChatMessage',{chat_id:c.ch,message_id:r.message_id,disable_notification:true})}catch(e){}
+    }
+    toast('Меню категорий в канале обновлено ✓');
+  }catch(e){toast('Telegram: '+tgErr(e))}
+  tgBusy=false;
+}
 async function tgSave(){
   const tk=(($('#tg-token')||{}).value||'').trim();
   let ch=(($('#tg-ch')||{}).value||'').trim().replace(/^https?:\/\/t\.me\//i,'@').replace(/\/+$/,'');
@@ -2120,6 +2148,7 @@ function tgPanel(){
   <div><label for="tg-ch">Канал</label><input id="tg-ch" value="${esc(c.ch)}" autocapitalize="none" style="width:100%"></div>
   <button type="button" class="btn sm gold block" data-act="tg-save">Сохранить и проверить</button>
   <button type="button" class="btn sm line block" data-act="tg-bulk">Отправить отмеченные товары в канал</button>
+  <button type="button" class="btn sm line block" data-act="tg-menu">Обновить меню категорий в канале</button>
   <div style="font-size:14px">Токен хранится только на этом телефоне. У каждого товара в списке есть кнопка «✈ В Telegram».</div></div></details>`;
 }
 
