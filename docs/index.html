@@ -1576,7 +1576,7 @@ function adminForm(p){
      <input type="file" id="pfile" accept="image/*" multiple></div>
    <div><label for="f-nr">Название (RU)</label><input id="f-nr" name="nr" value="${esc(p.name.ru||'')}" required></div>
    <div><label for="f-nk">Название (KZ), по желанию</label><input id="f-nk" name="nk" value="${esc(p.name.kk||'')}"></div>
-   <div><label for="f-cat">Категория</label><select id="f-cat" name="cat">${DB.cats.map(c=>o(c.id,esc(L(c.name)),c.id===p.cat)).join('')}</select></div>
+   <div><label for="f-cat">Категория</label><select id="f-cat" name="cat">${DB.cats.map(c=>o(c.id,esc(L(c.name)),c.id===p.cat)).join('')}</select><button type="button" class="btn sm line" data-act="pcat-new" style="margin-top:8px">+ Новая категория</button></div>
    <div class="two"><div><label for="f-pr">Цена, ₸</label><input id="f-pr" name="price" type="number" inputmode="numeric" min="0" value="${p.price||''}" required></div>
      <div><label for="f-old">Старая цена, ₸</label><input id="f-old" name="old" type="number" inputmode="numeric" min="0" value="${p.old||''}"></div></div>
    <div class="two"><div><label for="f-st">Наличие</label><select id="f-st" name="status">${o('in','В наличии',p.status==='in')}${o('out','Нет в наличии',p.status==='out')}${o('hidden','Скрыт',p.status==='hidden')}</select></div>
@@ -1591,7 +1591,19 @@ function adminForm(p){
    <button class="btn line block" type="button" data-act="acancel">Отмена</button>
   </form>`;
 }
-function blankProduct(){return {_new:1,id:'',slug:'',cat:DB.cats[0]?DB.cats[0].id:'',name:{ru:'',kk:''},price:0,old:0,status:'in',qty:1,sku:'',img:'',images:[],isNew:0,popular:0,featured:0,desc:{ru:'',kk:''},specs:{ru:'',kk:''}}}
+/* Следующий свободный артикул: MS-0001, MS-0002 ... (не повторяет уже занятые) */
+function nextSku(){
+  let mx=0;const used=new Set();
+  DB.products.forEach(p=>{
+    const v=String(p.sku||'').trim();if(!v)return;
+    used.add(v.toLowerCase());
+    const m=/^MS-(\d+)$/i.exec(v);if(m){const n=parseInt(m[1],10);if(n>mx)mx=n}
+  });
+  let n=mx+1,s;
+  do{s='MS-'+String(n).padStart(4,'0');n++}while(used.has(s.toLowerCase()));
+  return s;
+}
+function blankProduct(){return {_new:1,id:'',slug:'',cat:DB.cats[0]?DB.cats[0].id:'',name:{ru:'',kk:''},price:0,old:0,status:'in',qty:1,sku:nextSku(),img:'',images:[],isNew:0,popular:0,featured:0,desc:{ru:'',kk:''},specs:{ru:'',kk:''}}}
 function compress(file,cb){
   const fr=new FileReader();
   fr.onload=()=>{const im=new Image();im.onload=()=>{const m=1600,s=Math.min(1,m/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);cb(c.toDataURL('image/jpeg',.88))};im.onerror=()=>cb(null);im.src=fr.result};
@@ -1819,6 +1831,17 @@ document.addEventListener('click',e=>{
       })();
       break;
     }
+    case 'pcat-new':{
+      const nm=(prompt('Название новой категории (RU):')||'').trim();if(!nm)break;
+      const ex=DB.cats.find(x=>String(x.name.ru||'').trim().toLowerCase()===nm.toLowerCase());
+      if(ex){const s0=$('#f-cat');if(s0)s0.value=ex.id;toast('Такая категория уже есть, выбрана она');break}
+      saveCategory({_new:1,id:''},nm,'',false).then(cid=>{
+        try{touchMeta()}catch(e){}
+        const s1=$('#f-cat');
+        if(s1){s1.innerHTML=DB.cats.map(c=>'<option value="'+esc(c.id)+'">'+esc(L(c.name))+'</option>').join('');s1.value=cid}
+        EDIT_DIRTY=true;toast('Категория «'+nm+'» добавлена');
+      }).catch(err=>showFail(fbErrText(err),'Категория не сохранена'));
+      break}
     case 'acat-new':catEditing={_new:1,id:'',main:0,name:{ru:'',kk:''}};EDIT_DIRTY=false;render();window.scrollTo(0,0);break;
     case 'acat-edit':{const c=DB.cats.find(x=>x.id===id);if(c){catEditing=JSON.parse(JSON.stringify(c));EDIT_DIRTY=false;render();window.scrollTo(0,0)}break}
     case 'acat-cancel':admExit();break;
@@ -1899,6 +1922,14 @@ async function handleForm2(f){
     p.isNew=fd.get('isNew')?1:0;p.popular=fd.get('popular')?1:0;p.featured=fd.get('featured')?1:0;
     if(!p.name.ru){toast('Укажите название товара');return}
     if(p.price<=0){toast('Укажите цену товара');return}
+    if(!p.sku)p.sku=nextSku();
+    {
+      const was=p._new?'':String((DB.products.find(x=>x.id===p.id)||{}).sku||'').trim();
+      if(p._new||p.sku.toLowerCase()!==was.toLowerCase()){
+        const dup=DB.products.find(x=>x.id!==p.id&&String(x.sku||'').trim().toLowerCase()===p.sku.toLowerCase());
+        if(dup){toast('Артикул «'+p.sku+'» уже есть у товара «'+L(dup.name)+'». Укажите другой.');return}
+      }
+    }
     const btn=f.querySelector('button[type=submit]'),lbl=btn?btn.textContent:'';
     if(btn){btn.disabled=true;btn.textContent='СОХРАНЯЮ…'}
     const isNew=!!p._new;
