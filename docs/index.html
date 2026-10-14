@@ -2034,7 +2034,7 @@ const SG_STYLES=[
   {k:'promo',n:'Акция',bg:['#a3161c','#5e0b10'],txt:'#ffffff',sub:'#ffd9a0',acc:'#ffd166',pillBg:'#ffffff',pillTxt:'#a3161c',badgeBg:'#ffd166',badgeTxt:'#7a0d12',ring:'rgba(255,209,102,.6)'},
   {k:'blur',n:'Фото-фон',blur:true,bg:['#111','#111'],txt:'#ffffff',sub:'#f0dfb8',acc:'#e6c27a',pillBg:'#e6c27a',pillTxt:'#1c1d21',badgeBg:'#e6c27a',badgeTxt:'#1c1d21',ring:'rgba(230,194,122,.6)'}
 ];
-const SG={cv:null,id:'',p:null,imgs:[],ii:0,si:0,tok:0,price:true};
+const SG={cv:null,id:'',p:null,imgs:[],ii:0,si:0,tok:0,price:true,safe:true};
 const sgLoad=src=>new Promise((res,rej)=>{const im=new Image();if(/^https?:/i.test(src)&&src.indexOf(location.origin)!==0)im.crossOrigin='anonymous';im.onload=()=>res(im);im.onerror=()=>rej(new Error('Не удалось загрузить фото'));im.src=src});
 let sgLogoP=null;const sgLogo=()=>sgLogoP||(sgLogoP=sgLoad(SG_LOGO_SRC));
 async function sgFonts(){try{await Promise.all([document.fonts.load('700 60px "Playfair Display"'),document.fonts.load('700 40px "PT Sans"'),document.fonts.load('400 40px "PT Sans"')])}catch(e){}}
@@ -2055,10 +2055,10 @@ function sgBadge(p){
   if(p.popular||p.featured)return 'ХИТ';
   return '';
 }
-/* сторис 1080×1920: крупное фото товара, тонкая рамка, цена по желанию */
+/* сторис 1080×1920. safe — поля под интерфейс Instagram (сверху и снизу по ~250 px), price — показывать ли цену */
 async function sgDraw(p,imgSrc,st,opt){
   opt=opt||{};
-  const showPrice=opt.price!==false&&p.price>0;
+  const showPrice=opt.price!==false&&p.price>0,safe=opt.safe!==false;
   await sgFonts();
   const W=1080,H=1920,cv=document.createElement('canvas');cv.width=W;cv.height=H;
   const c=cv.getContext('2d'),im=await sgLoad(imgSrc),logo=await sgLogo().catch(()=>null);
@@ -2067,21 +2067,23 @@ async function sgDraw(p,imgSrc,st,opt){
   if(st.blur)sgBlurBg(c,im,W,H,.55);
   else{const g=c.createLinearGradient(0,0,W*.4,H);g.addColorStop(0,st.bg[0]);g.addColorStop(1,st.bg[1]);c.fillStyle=g;c.fillRect(0,0,W,H)}
   c.strokeStyle=st.ring;c.lineWidth=3;sgRR(c,22,22,W-44,H-44,48);c.stroke();
-  if(logo)c.drawImage(logo,W/2-46,40,92,92);
+  const logoS=safe?96:92,logoY=safe?236:40;
+  if(logo)c.drawImage(logo,W/2-logoS/2,logoY,logoS,logoS);
   c.textAlign='center';c.textBaseline='alphabetic';
   /* нижний блок считаем снизу вверх, всё остальное место отдаём фото */
-  const BOTTOM=1750;
+  const BOTTOM=safe?1670:1750,TOP=safe?logoY+logoS+16:150;
   let y=BOTTOM;
   const btnH=108,btnTop=y-btnH;y=btnTop-18;
   let pillTop=0,pillH=96,prTxt='',pw=0,oldTxt='';
   if(showPrice){
     prTxt=money(p.price);c.font='700 74px '+SANS;pw=c.measureText(prTxt).width+110;
     pillTop=y-pillH;y=pillTop-12;
-    if(p.old>p.price){oldTxt=money(p.old);y-=40}
+    if(p.old>p.price){oldTxt=money(p.old);y-=54}
   }else y-=4;
   const nm=p.name.ru||p.name.kk||'';
   let nf=60,lines=[];
   for(;nf>=40;nf-=4){c.font='700 '+nf+'px '+SERIF;lines=sgWrap(c,nm,980,2);if(lines.length<2||c.measureText(lines[lines.length-1]).width<980&&!/…$/.test(lines[lines.length-1]))break}
+  if(nf<40)nf=40;
   c.font='700 '+nf+'px '+SERIF;lines=sgWrap(c,nm,980,2);
   const lh=Math.round(nf*1.16),nameTop=y-lines.length*lh;
   c.fillStyle=st.txt;
@@ -2090,14 +2092,15 @@ async function sgDraw(p,imgSrc,st,opt){
   const cat=(DB.cats.find(x=>x.id===p.cat)||{}).name;
   if(cat&&(cat.ru||cat.kk)){c.fillStyle=st.sub;c.font='700 28px '+SANS;c.fillText(String(cat.ru||cat.kk).toUpperCase(),W/2,y-4);y-=42}
   /* фото: почти во всю ширину, без белой подложки */
-  const bx0=36,bw=W-72,by0=150,bh=y-12-by0;
+  const bw=W-72,by0=TOP,bh=y-12-by0;
   const sc=Math.min(bw/im.width,bh/im.height),dw=Math.round(im.width*sc),dh=Math.round(im.height*sc);
   const px=Math.round((W-dw)/2),py=Math.round(by0+(bh-dh)/2);
   c.save();c.shadowColor='rgba(0,0,0,.4)';c.shadowBlur=36;c.shadowOffsetY=10;c.fillStyle='#fff';sgRR(c,px,py,dw,dh,26);c.fill();c.restore();
   c.save();sgRR(c,px,py,dw,dh,26);c.clip();c.drawImage(im,px,py,dw,dh);c.restore();
   c.strokeStyle=st.acc;c.lineWidth=4;sgRR(c,px,py,dw,dh,26);c.stroke();
-  /* значок */
-  let b=sgBadge(p);if(!showPrice&&/^-/.test(b))b='';
+  /* значок: если цена скрыта, скидку не показываем, но NEW и ХИТ остаются */
+  let b=sgBadge(p);
+  if(!showPrice&&/^-/.test(b))b=p.isNew?'NEW':((p.popular||p.featured)?'ХИТ':'');
   if(b){
     const r=66,bx=Math.min(px+dw-8,W-r-30),byy=py+8;
     c.save();c.shadowColor='rgba(0,0,0,.35)';c.shadowBlur=22;c.fillStyle=st.badgeBg;c.beginPath();c.arc(bx,byy,r,0,Math.PI*2);c.fill();c.restore();
@@ -2106,7 +2109,7 @@ async function sgDraw(p,imgSrc,st,opt){
   /* цена */
   if(showPrice){
     if(oldTxt){
-      c.font='400 36px '+SANS;c.fillStyle=st.sub;const ow=c.measureText(oldTxt).width,oy=pillTop-16;
+      c.font='400 36px '+SANS;c.fillStyle=st.sub;const ow=c.measureText(oldTxt).width,oy=pillTop-18;
       c.fillText(oldTxt,W/2,oy);c.strokeStyle=st.sub;c.lineWidth=3;c.beginPath();c.moveTo(W/2-ow/2-4,oy-12);c.lineTo(W/2+ow/2+4,oy-12);c.stroke();
     }
     c.fillStyle=st.pillBg;sgRR(c,W/2-pw/2,pillTop,pw,pillH,pillH/2);c.fill();
@@ -2118,12 +2121,13 @@ async function sgDraw(p,imgSrc,st,opt){
   c.font='400 34px '+SANS;c.fillText(CONTACT.phone,W/2,btnTop+93);
   return cv;
 }
-/* квадратное фото для поста в Telegram: пост получается широким, а не узкой полосой */
-async function sgSquareBlob(src){
-  const im=await sgLoad(src),S=1080,cv=document.createElement('canvas');cv.width=S;cv.height=S;
+/* фото для поста в Telegram: квадрат или широкое 4:3 (пост занимает всю ширину, а не узкую полосу) */
+async function sgPostBlob(src,fmt){
+  const im=await sgLoad(src),W=1200,H=fmt==='wide'?900:1200,cv=document.createElement('canvas');cv.width=W;cv.height=H;
   const c=cv.getContext('2d');
-  sgBlurBg(c,im,S,S,.3);
-  const s=Math.min(960/im.width,960/im.height),dw=im.width*s,dh=im.height*s,x=(S-dw)/2,y=(S-dh)/2;
+  c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';
+  sgBlurBg(c,im,W,H,.3);
+  const s=Math.min((W-88)/im.width,(H-88)/im.height),dw=im.width*s,dh=im.height*s,x=(W-dw)/2,y=(H-dh)/2;
   c.save();c.shadowColor='rgba(0,0,0,.45)';c.shadowBlur=40;c.shadowOffsetY=12;c.fillStyle='#fff';sgRR(c,x,y,dw,dh,28);c.fill();c.restore();
   c.save();sgRR(c,x,y,dw,dh,28);c.clip();c.drawImage(im,x,y,dw,dh);c.restore();
   return new Promise((res,rej)=>{try{cv.toBlob(b=>b?res(b):rej(new Error('blob')),'image/jpeg',.92)}catch(e){rej(e)}});
@@ -2137,6 +2141,7 @@ function sgModalOpen(){
   m.innerHTML='<div style="color:#fff;font-weight:700;text-align:center;max-width:420px">🎬 Сторис: '+esc(SG.p.name.ru||SG.p.name.kk)+'</div>'
    +'<div style="display:flex;gap:8px;overflow-x:auto;max-width:100%;padding-bottom:4px">'+SG_STYLES.map((s,i)=>'<button type="button" class="btn sm line" data-sg="style" data-i="'+i+'" style="white-space:nowrap">'+s.n+'</button>').join('')+'</div>'
    +'<div style="display:flex;gap:8px"><button type="button" class="btn sm line" data-sg="price" data-v="1">С ценником</button><button type="button" class="btn sm line" data-sg="price" data-v="0">Без ценника</button></div>'
+   +'<div style="display:flex;gap:8px"><button type="button" class="btn sm line" data-sg="safe" data-v="1">Для Instagram</button><button type="button" class="btn sm line" data-sg="safe" data-v="0">Крупнее</button></div>'
    +'<div id="sgwrap" style="width:min(74vw,330px);aspect-ratio:9/16;background:#222;border-radius:14px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#aaa;text-align:center;padding:10px">Рисую…</div>'
    +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">'+(SG.imgs.length>1?'<button type="button" class="btn sm line" data-sg="photo">Другое фото</button>':'')+'<button type="button" class="btn sm gold" data-sg="dl">Скачать</button><button type="button" class="btn sm gold" data-sg="share">Поделиться</button><button type="button" class="btn sm line" data-sg="close">Закрыть</button></div>'
    +'<div style="color:#bbb;font-size:13px;text-align:center;max-width:340px">Нажмите «Поделиться» и выберите Instagram, TikTok или WhatsApp. Либо скачайте картинку и загрузите её в сторис сами.</div>';
@@ -2146,6 +2151,7 @@ function sgModalOpen(){
     if(a==='close')sgModalClose();
     else if(a==='style'){SG.si=+b.dataset.i;LS.set('ms_story_style',SG.si);sgRender()}
     else if(a==='price'){SG.price=b.dataset.v==='1';LS.set('ms_story_price',SG.price?1:0);sgRender()}
+    else if(a==='safe'){SG.safe=b.dataset.v==='1';LS.set('ms_story_safe',SG.safe?1:0);sgRender()}
     else if(a==='photo'){SG.ii=(SG.ii+1)%SG.imgs.length;sgRender()}
     else if(a==='dl')sgDownload();
     else if(a==='share')sgShare();
@@ -2156,12 +2162,13 @@ async function sgRender(){
   const tok=++SG.tok,w=document.getElementById('sgwrap');if(!w)return;
   w.textContent='Рисую…';
   try{
-    const cv=await sgDraw(SG.p,SG.imgs[SG.ii],SG_STYLES[SG.si],{price:SG.price});
+    const cv=await sgDraw(SG.p,SG.imgs[SG.ii],SG_STYLES[SG.si],{price:SG.price,safe:SG.safe});
     const w2=document.getElementById('sgwrap');
     if(tok!==SG.tok||!w2)return;
     SG.cv=cv;cv.style.cssText='width:100%;height:100%;display:block';w2.textContent='';w2.appendChild(cv);
     document.querySelectorAll('#storymodal [data-sg="style"]').forEach(b=>{b.className='btn sm '+(+b.dataset.i===SG.si?'gold':'line')});
     document.querySelectorAll('#storymodal [data-sg="price"]').forEach(b=>{b.className='btn sm '+((b.dataset.v==='1')===SG.price?'gold':'line')});
+    document.querySelectorAll('#storymodal [data-sg="safe"]').forEach(b=>{b.className='btn sm '+((b.dataset.v==='1')===SG.safe?'gold':'line')});
   }catch(e){if(tok===SG.tok)w.textContent='Не удалось нарисовать: '+(e&&e.message||e)}
 }
 function sgBlob(){return new Promise((res,rej)=>{try{SG.cv.toBlob(b=>b?res(b):rej(new Error('blob')),'image/png')}catch(e){rej(e)}})}
@@ -2186,13 +2193,13 @@ async function storyOpen(id){
     SG.p=p;SG.id=String(id).replace(/[^\w-]/g,'');
     SG.imgs=((p.images&&p.images.length)?p.images:[p.img]).filter(x=>typeof x==='string'&&x).slice(0,6);
     if(!SG.imgs.length)throw new Error('У товара нет фото');
-    SG.price=LS.get('ms_story_price',1)!==0;SG.ii=0;SG.si=Math.min(Math.max(Number(LS.get('ms_story_style',0))||0,0),SG_STYLES.length-1);
+    SG.price=LS.get('ms_story_price',1)!==0;SG.safe=LS.get('ms_story_safe',1)!==0;SG.ii=0;SG.si=Math.min(Math.max(Number(LS.get('ms_story_style',0))||0,0),SG_STYLES.length-1);
     sgModalOpen();await sgRender();
   }catch(e){toast('Сторис: '+(e&&e.message||e))}
 }
 
 /* ============ Публикация товара в Telegram-канал (токен хранится только в этом браузере, в коде его нет) ============ */
-const tgCfg=()=>{const c=LS.get('ms_tg',null)||{};return {t:String(c.t||''),ch:String(c.ch||'@muslim_shop06'),sq:c.sq!==false}};
+const tgCfg=()=>{const c=LS.get('ms_tg',null)||{};return {t:String(c.t||''),ch:String(c.ch||'@muslim_shop06'),fmt:(c.fmt==='sq'||c.fmt==='wide'||c.fmt==='orig')?c.fmt:(c.sq===false?'orig':'wide')}};
 const tgSent=()=>LS.get('ms_tg_sent',{});
 let tgBusy=false;
 const tgH=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -2247,7 +2254,7 @@ async function tgSend(id){
     const fd=new FormData();
     fd.append('chat_id',c.ch);fd.append('caption',cap);fd.append('parse_mode','HTML');fd.append('reply_markup',JSON.stringify({inline_keyboard:kb}));
     let blob=null;
-    if(c.sq){try{blob=await sgSquareBlob(src)}catch(e){blob=null}}
+    if(c.fmt!=='orig'){try{blob=await sgPostBlob(src,c.fmt)}catch(e){blob=null}}
     if(!blob)blob=await tgBlob(src);
     if(blob){fd.append('photo',blob,'photo.jpg');await tgApi('sendPhoto',fd,true);done=true}
     else if(/^https?:/i.test(src)){fd.append('photo',src);await tgApi('sendPhoto',fd,true);done=true}
@@ -2301,17 +2308,18 @@ async function tgMenu(){
   }catch(e){toast('Telegram: '+tgErr(e))}
   tgBusy=false;
 }
+const TG_FMT={wide:'Фото в посте: широкое 4:3 ✓',sq:'Фото в посте: квадрат',orig:'Фото в посте: как загружено (узкое)'};
 function tgSq(){
-  const c=tgCfg();c.sq=!c.sq;LS.set('ms_tg',c);
-  const b=document.querySelector('[data-act="tg-sq"]');if(b)b.textContent=c.sq?'Фото в посте: квадрат (широкий пост) ✓':'Фото в посте: как загружено (узкое)';
-  toast(c.sq?'Фото в постах будет квадратным':'Фото в постах будет как загружено');
+  const c=tgCfg(),nx={wide:'sq',sq:'orig',orig:'wide'};c.fmt=nx[c.fmt]||'wide';LS.set('ms_tg',c);
+  const b=document.querySelector('[data-act="tg-sq"]');if(b)b.textContent=TG_FMT[c.fmt];
+  toast(TG_FMT[c.fmt]);
 }
 async function tgSave(){
   const tk=(($('#tg-token')||{}).value||'').trim();
   let ch=(($('#tg-ch')||{}).value||'').trim().replace(/^https?:\/\/t\.me\//i,'@').replace(/\/+$/,'');
   if(ch&&!/^@|^-?\d/.test(ch))ch='@'+ch;
   const old=tgCfg();
-  const next={t:tk||old.t,ch:ch||old.ch,sq:old.sq};
+  const next={t:tk||old.t,ch:ch||old.ch,fmt:old.fmt};
   if(!next.t){toast('Вставьте токен бота');return}
   LS.set('ms_tg',next);
   toast('Проверяю…');
@@ -2328,7 +2336,7 @@ function tgPanel(){
   <div><label for="tg-token">Токен бота</label><input id="tg-token" type="password" autocomplete="off" autocapitalize="none" placeholder="${c.t?'сохранён (оставьте пустым, чтобы не менять)':'вставьте токен от @BotFather'}" style="width:100%"></div>
   <div><label for="tg-ch">Канал</label><input id="tg-ch" value="${esc(c.ch)}" autocapitalize="none" style="width:100%"></div>
   <button type="button" class="btn sm gold block" data-act="tg-save">Сохранить и проверить</button>
-  <button type="button" class="btn sm line block" data-act="tg-sq">${c.sq?'Фото в посте: квадрат (широкий пост) ✓':'Фото в посте: как загружено (узкое)'}</button>
+  <button type="button" class="btn sm line block" data-act="tg-sq">${TG_FMT[c.fmt]}</button>
   <button type="button" class="btn sm line block" data-act="tg-bulk">Отправить отмеченные товары в канал</button>
   <button type="button" class="btn sm line block" data-act="tg-menu">Обновить меню категорий в канале</button>
   <div style="font-size:14px">Токен хранится только на этом телефоне. У каждого товара в списке есть кнопка «✈ В Telegram».</div></div></details>`;
