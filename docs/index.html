@@ -2132,6 +2132,56 @@ async function sgPostBlob(src,fmt){
   c.save();sgRR(c,x,y,dw,dh,28);c.clip();c.drawImage(im,x,y,dw,dh);c.restore();
   return new Promise((res,rej)=>{try{cv.toBlob(b=>b?res(b):rej(new Error('blob')),'image/jpeg',.92)}catch(e){rej(e)}});
 }
+/* карточка для поста в Telegram: фото + название + цена прямо на картинке (текст не зависит от размера шрифта в Telegram) */
+async function sgCardBlob(p,src){
+  await sgFonts();
+  const st=SG_STYLES[Math.min(Math.max(Number(LS.get('ms_story_style',0))||0,0),SG_STYLES.length-1)];
+  const W=1200,H=1200,im=await sgLoad(src),cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  const c=cv.getContext('2d');c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';
+  const SERIF='"Playfair Display",Georgia,"Times New Roman",serif',SANS='"PT Sans","Segoe UI",Arial,sans-serif';
+  if(st.blur)sgBlurBg(c,im,W,H,.55);
+  else{const g=c.createLinearGradient(0,0,W*.5,H);g.addColorStop(0,st.bg[0]);g.addColorStop(1,st.bg[1]);c.fillStyle=g;c.fillRect(0,0,W,H)}
+  c.strokeStyle=st.ring;c.lineWidth=3;sgRR(c,16,16,W-32,H-32,40);c.stroke();
+  c.textAlign='center';c.textBaseline='alphabetic';
+  const show=p.price>0;let y=H-60,pillTop=0,pillH=112,pr='',pw=0,old='';
+  if(show){
+    pr=money(p.price);c.font='700 78px '+SANS;pw=c.measureText(pr).width+120;
+    pillTop=y-pillH;y=pillTop-14;
+    if(p.old>p.price){old=money(p.old);y-=52}
+  }
+  const nm=p.name.ru||p.name.kk||'';
+  let nf=66,lines=[];
+  for(;nf>=46;nf-=4){c.font='700 '+nf+'px '+SERIF;lines=sgWrap(c,nm,1080,2);if(lines.length<2||(c.measureText(lines[lines.length-1]).width<1080&&!/…$/.test(lines[lines.length-1])))break}
+  if(nf<46)nf=46;
+  c.font='700 '+nf+'px '+SERIF;lines=sgWrap(c,nm,1080,2);
+  const lh=Math.round(nf*1.16),nameTop=y-lines.length*lh;
+  c.fillStyle=st.txt;
+  lines.forEach((l,i)=>c.fillText(l,W/2,nameTop+(i+1)*lh-Math.round(lh*.2)));
+  y=nameTop-10;
+  const cat=(DB.cats.find(x=>x.id===p.cat)||{}).name;
+  if(cat&&(cat.ru||cat.kk)){c.fillStyle=st.sub;c.font='700 32px '+SANS;c.fillText(String(cat.ru||cat.kk).toUpperCase(),W/2,y-4);y-=46}
+  const bx0=56,by0=48,bw=W-112,bh=y-16-by0;
+  const sc=Math.min(bw/im.width,bh/im.height),dw=Math.round(im.width*sc),dh=Math.round(im.height*sc);
+  const px=Math.round((W-dw)/2),py=Math.round(by0+(bh-dh)/2);
+  c.save();c.shadowColor='rgba(0,0,0,.4)';c.shadowBlur=36;c.shadowOffsetY=10;c.fillStyle='#fff';sgRR(c,px,py,dw,dh,26);c.fill();c.restore();
+  c.save();sgRR(c,px,py,dw,dh,26);c.clip();c.drawImage(im,px,py,dw,dh);c.restore();
+  c.strokeStyle=st.acc;c.lineWidth=4;sgRR(c,px,py,dw,dh,26);c.stroke();
+  const b=sgBadge(p);
+  if(b){
+    const r=70,bx=Math.min(px+dw-6,W-r-28),byy=py+10;
+    c.save();c.shadowColor='rgba(0,0,0,.35)';c.shadowBlur=22;c.fillStyle=st.badgeBg;c.beginPath();c.arc(bx,byy,r,0,Math.PI*2);c.fill();c.restore();
+    c.fillStyle=st.badgeTxt;c.font='700 '+(b.length>3?44:54)+'px '+SANS;c.fillText(b,bx,byy+(b.length>3?16:19));
+  }
+  if(show){
+    if(old){
+      c.font='400 38px '+SANS;c.fillStyle=st.sub;const ow=c.measureText(old).width,oy=pillTop-18;
+      c.fillText(old,W/2,oy);c.strokeStyle=st.sub;c.lineWidth=3;c.beginPath();c.moveTo(W/2-ow/2-4,oy-12);c.lineTo(W/2+ow/2+4,oy-12);c.stroke();
+    }
+    c.fillStyle=st.pillBg;sgRR(c,W/2-pw/2,pillTop,pw,pillH,pillH/2);c.fill();
+    c.fillStyle=st.pillTxt;c.font='700 78px '+SANS;c.fillText(pr,W/2,pillTop+pillH-28);
+  }
+  return new Promise((res,rej)=>{try{cv.toBlob(x=>x?res(x):rej(new Error('blob')),'image/jpeg',.93)}catch(e){rej(e)}});
+}
 /* окно «Сторис» */
 function sgModalClose(){const m=document.getElementById('storymodal');if(m)m.remove();SG.tok++}
 function sgModalOpen(){
@@ -2199,7 +2249,7 @@ async function storyOpen(id){
 }
 
 /* ============ Публикация товара в Telegram-канал (токен хранится только в этом браузере, в коде его нет) ============ */
-const tgCfg=()=>{const c=LS.get('ms_tg',null)||{};return {t:String(c.t||''),ch:String(c.ch||'@muslim_shop06'),fmt:(c.fmt==='sq'||c.fmt==='wide'||c.fmt==='orig')?c.fmt:(c.sq===false?'orig':'wide')}};
+const tgCfg=()=>{const c=LS.get('ms_tg',null)||{};return {t:String(c.t||''),ch:String(c.ch||'@muslim_shop06'),fmt:(c.fmt==='card'||c.fmt==='sq'||c.fmt==='wide'||c.fmt==='orig')?c.fmt:(c.sq===false?'orig':'card')}};
 const tgSent=()=>LS.get('ms_tg_sent',{});
 let tgBusy=false;
 const tgH=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -2226,13 +2276,13 @@ function tgTag(cid){
   return t?'#'+t+(/^@\w+$/.test(ch)?ch:''):'';
 }
 const tgCatUrl=cid=>location.origin+location.pathname+'#/catalog?cat='+encodeURIComponent(cid);
-function tgCaption(p){
+function tgCaption(p,mode){
   let d=String(p.desc&&p.desc.ru||'').replace(/\s+/g,' ').trim();
   if(d.length>220)d=d.slice(0,220).replace(/\s+\S*$/,'')+'…';
   let s='<b>'+tgH(p.name.ru||p.name.kk)+'</b>';
-  if(p.price>0)s+='\n\n💰 '+(p.old>p.price?'<s>'+tgH(money(p.old))+'</s> ':'')+'<b>'+tgH(money(p.price))+'</b>';
-  if(p.status==='out')s+='\n⛔ Нет в наличии';
-  if(d)s+='\n\n'+tgH(d);
+  if(mode!=='card'&&p.price>0)s+='\n\n💰 '+(p.old>p.price?'<s>'+tgH(money(p.old))+'</s> ':'')+'<b>'+tgH(money(p.price))+'</b>';
+  if(mode!=='card'&&p.status==='out')s+='\n⛔ Нет в наличии';
+  if(mode!=='card'&&d)s+='\n\n'+tgH(d);
   const cn=(DB.cats.find(x=>x.id===p.cat)||{}).name;
   if(cn&&(cn.ru||cn.kk))s+='\n\n📂 <a href="'+tgH(tgCatUrl(p.cat))+'">'+tgH(cn.ru||cn.kk)+'</a>';
   return s;
@@ -2248,14 +2298,16 @@ async function tgSend(id){
   const p=await getFull(id);
   if(!p)throw new Error('Товар не найден');
   if(p.status==='hidden')throw new Error('Товар скрыт на сайте. Сначала нажмите «Показать».');
-  const c=tgCfg(),cap=tgCaption(p),kb=tgKb(p),src=(p.images&&p.images[0])||p.img||'';
-  let done=false;
+  const c=tgCfg(),kb=tgKb(p),src=(p.images&&p.images[0])||p.img||'';
+  let cap=tgCaption(p),done=false;
   if(src){
+    let blob=null,carded=false;
+    if(c.fmt==='card'){try{blob=await sgCardBlob(p,src);carded=!!blob}catch(e){blob=null}}
+    else if(c.fmt!=='orig'){try{blob=await sgPostBlob(src,c.fmt)}catch(e){blob=null}}
+    if(!blob)blob=await tgBlob(src);
+    cap=tgCaption(p,carded?'card':'');
     const fd=new FormData();
     fd.append('chat_id',c.ch);fd.append('caption',cap);fd.append('parse_mode','HTML');fd.append('reply_markup',JSON.stringify({inline_keyboard:kb}));
-    let blob=null;
-    if(c.fmt!=='orig'){try{blob=await sgPostBlob(src,c.fmt)}catch(e){blob=null}}
-    if(!blob)blob=await tgBlob(src);
     if(blob){fd.append('photo',blob,'photo.jpg');await tgApi('sendPhoto',fd,true);done=true}
     else if(/^https?:/i.test(src)){fd.append('photo',src);await tgApi('sendPhoto',fd,true);done=true}
   }
@@ -2308,9 +2360,9 @@ async function tgMenu(){
   }catch(e){toast('Telegram: '+tgErr(e))}
   tgBusy=false;
 }
-const TG_FMT={wide:'Фото в посте: широкое 4:3 ✓',sq:'Фото в посте: квадрат',orig:'Фото в посте: как загружено (узкое)'};
+const TG_FMT={card:'Фото в посте: карточка с названием и ценой ✓',wide:'Фото в посте: широкое 4:3',sq:'Фото в посте: квадрат',orig:'Фото в посте: как загружено (узкое)'};
 function tgSq(){
-  const c=tgCfg(),nx={wide:'sq',sq:'orig',orig:'wide'};c.fmt=nx[c.fmt]||'wide';LS.set('ms_tg',c);
+  const c=tgCfg(),nx={card:'wide',wide:'sq',sq:'orig',orig:'card'};c.fmt=nx[c.fmt]||'card';LS.set('ms_tg',c);
   const b=document.querySelector('[data-act="tg-sq"]');if(b)b.textContent=TG_FMT[c.fmt];
   toast(TG_FMT[c.fmt]);
 }
