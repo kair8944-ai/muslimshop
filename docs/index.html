@@ -2334,10 +2334,18 @@ function tgParts(p,carded,level){
   const cn=(DB.cats.find(x=>x.id===p.cat)||{}).name;
   const cat=(cn&&(cn.ru||cn.kk))?'📂 <a href="'+tgH(tgCatUrl(p.cat))+'">'+tgH(cn.ru||cn.kk)+'</a>':'';
   const cap=head+(d?'\n\n'+tgH(d):'')+(cat?'\n\n'+cat:'');
-  const plain=cap.replace(/<[^>]+>/g,'').replace(/&(amp|lt|gt);/g,'x').length;
-  if(plain<=1000)return {cap,body:''};
-  /* текст не влезает в подпись к фото (лимит Telegram 1024 знака): отправим его отдельным сообщением */
-  return {cap:head+(cat?'\n\n'+cat:''),body:d};
+  const pl=x=>x.replace(/<[^>]+>/g,'').replace(/&(amp|lt|gt);/g,'x').length,LIM=1000;
+  if(pl(cap)<=LIM)return {cap,body:''};
+  /* текст не влезает в подпись к фото (лимит Telegram 1024 знака): сокращаем описание, всё остаётся ОДНИМ сообщением */
+  const tail=cat?'\n\n'+cat:'';
+  const room=LIM-pl(head)-pl(tail)-2-1;
+  if(!d||room<30)return {cap:head+tail,body:''};
+  let cut=d.slice(0,room);
+  if(/[\uD800-\uDBFF]$/.test(cut))cut=cut.slice(0,-1);
+  const ws=cut.search(/\s\S*$/);
+  if(ws>room*0.6)cut=cut.slice(0,ws);
+  cut=cut.replace(/[\s,;:\-–—]+$/,'');
+  return {cap:head+'\n\n'+tgH(cut)+'…'+tail,body:''};
 }
 function tgKb(p){
   const u=prodUrl(p),name=p.name.ru||p.name.kk;
@@ -2363,9 +2371,9 @@ async function tgSend(id){
     if(blob){fd.append('photo',blob,'photo.jpg');await tgApi('sendPhoto',fd,true);done=true}
     else if(/^https?:/i.test(src)){fd.append('photo',src);await tgApi('sendPhoto',fd,true);done=true}
   }
-  if(!done)await tgApi('sendMessage',{chat_id:c.ch,text:parts.cap,parse_mode:'HTML',reply_markup:{inline_keyboard:kb}});
+  if(!done)await tgApi('sendMessage',{chat_id:c.ch,text:parts.cap,parse_mode:'HTML',link_preview_options:{is_disabled:true},reply_markup:{inline_keyboard:kb}});
   if(parts.body){
-    for(let i=0;i<parts.body.length;i+=3800)await tgApi('sendMessage',{chat_id:c.ch,text:tgH(parts.body.slice(i,i+3800)),parse_mode:'HTML'});
+    for(let i=0;i<parts.body.length;i+=3800)await tgApi('sendMessage',{chat_id:c.ch,text:tgH(parts.body.slice(i,i+3800)),parse_mode:'HTML',link_preview_options:{is_disabled:true}});
   }
   const s=tgSent();s[id]=Date.now();LS.set('ms_tg_sent',s);
 }
