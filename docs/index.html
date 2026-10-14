@@ -2250,10 +2250,11 @@ async function storyOpen(id){
 }
 
 /* ============ Публикация товара в Telegram-канал (токен хранится только в этом браузере, в коде его нет) ============ */
+const TGMEM={};
 const tgCfg=()=>{
-  const c=LS.get('ms_tg',null)||{};
+  const c=Object.assign({},LS.get('ms_tg',null)||{},TGMEM);
   const fmt=(c.fmt==='card'||c.fmt==='sq'||c.fmt==='wide'||c.fmt==='orig')?c.fmt:(c.sq===false?'orig':'card');
-  const cap=(c.cap==='short'||c.cap==='mid'||c.cap==='full')?c.cap:(fmt==='card'?'short':'mid');
+  const cap=(c.cap==='short'||c.cap==='mid'||c.cap==='full'||c.cap==='site')?c.cap:(fmt==='card'?'short':'mid');
   return {t:String(c.t||''),ch:String(c.ch||'@muslim_shop06'),fmt,cap};
 };
 const tgSent=()=>LS.get('ms_tg_sent',{});
@@ -2284,11 +2285,19 @@ function tgTag(cid){
 const tgCatUrl=cid=>location.origin+location.pathname+'#/catalog?cat='+encodeURIComponent(cid);
 /* подпись: card — название и цена уже на картинке; level: short (коротко), mid (описание кратко), full (описание полностью) */
 function tgParts(p,carded,level){
+  const site=level==='site';
   let head='<b>'+tgH(p.name.ru||p.name.kk)+'</b>';
-  if(!carded&&p.price>0)head+='\n\n💰 '+(p.old>p.price?'<s>'+tgH(money(p.old))+'</s> ':'')+'<b>'+tgH(money(p.price))+'</b>';
-  if(p.status==='out')head+='\n⛔ Нет в наличии';
-  let d=String(p.desc&&p.desc.ru||'');
-  if(level==='full')d=d.replace(/\r/g,'').replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+  if((!carded||site)&&p.price>0)head+='\n\n💰 '+(p.old>p.price?'<s>'+tgH(money(p.old))+'</s> ':'')+'<b>'+tgH(money(p.price))+'</b>';
+  if(site)head+='\n'+(p.status==='out'?'⛔ Нет в наличии':'✅ В наличии');
+  else if(p.status==='out')head+='\n⛔ Нет в наличии';
+  if(site&&p.sku)head+='\nАртикул: '+tgH(p.sku);
+  let d=String(p.desc&&p.desc.ru||'').replace(/\r/g,'');
+  if(site){
+    d=d.trim();
+    const sp=String(p.specs&&p.specs.ru||'').replace(/\r/g,'').trim();
+    if(sp)d+=(d?'\n\n':'')+'Характеристики:\n'+sp;
+  }
+  else if(level==='full')d=d.replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
   else if(level==='mid'){d=d.replace(/\s+/g,' ').trim();if(d.length>220)d=d.slice(0,220).replace(/\s+\S*$/,'')+'…'}
   else d='';
   const cn=(DB.cats.find(x=>x.id===p.cat)||{}).name;
@@ -2296,7 +2305,7 @@ function tgParts(p,carded,level){
   const cap=head+(d?'\n\n'+tgH(d):'')+(cat?'\n\n'+cat:'');
   const plain=cap.replace(/<[^>]+>/g,'').replace(/&(amp|lt|gt);/g,'x').length;
   if(plain<=1000)return {cap,body:''};
-  /* описание не влезает в подпись к фото (лимит Telegram 1024 знака): отправим его отдельным сообщением */
+  /* текст не влезает в подпись к фото (лимит Telegram 1024 знака): отправим его отдельным сообщением */
   return {cap:head+(cat?'\n\n'+cat:''),body:d};
 }
 function tgKb(p){
@@ -2376,11 +2385,13 @@ async function tgMenu(){
   tgBusy=false;
 }
 const TG_FMTS=[['card','Карточка'],['wide','Широкое 4:3'],['sq','Квадрат'],['orig','Как есть']];
-const TG_CAPS=[['short','Коротко'],['mid','Описание кратко'],['full','Описание полностью']];
+const TG_CAPS=[['short','Коротко'],['mid','Описание кратко'],['full','Описание полностью'],['site','Как на сайте']];
 function tgSet(key,val){
-  const c=tgCfg();c[key]=val;LS.set('ms_tg',c);
+  TGMEM[key]=val;
+  const c=tgCfg();
+  const ok=LS.set('ms_tg',{t:c.t,ch:c.ch,fmt:c.fmt,cap:c.cap});
   document.querySelectorAll('[data-act="tg-fmt"],[data-act="tg-cap"]').forEach(b=>{const k=b.dataset.act==='tg-fmt'?'fmt':'cap';b.className='btn sm '+(c[k]===b.dataset.id?'gold':'line')});
-  toast('Сохранено');
+  toast(ok?'Сохранено':'Выбрано, но память браузера заполнена: после перезагрузки настройка может сброситься');
 }
 async function tgSave(){
   const tk=(($('#tg-token')||{}).value||'').trim();
@@ -2389,7 +2400,7 @@ async function tgSave(){
   const old=tgCfg();
   const next={t:tk||old.t,ch:ch||old.ch,fmt:old.fmt,cap:old.cap};
   if(!next.t){toast('Вставьте токен бота');return}
-  LS.set('ms_tg',next);
+  Object.assign(TGMEM,next);LS.set('ms_tg',next);
   toast('Проверяю…');
   try{
     const me=await tgApi('getMe',{});
