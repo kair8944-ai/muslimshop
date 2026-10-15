@@ -276,6 +276,21 @@ h2::after{content:"";position:absolute;left:0;bottom:0;width:60px;height:3px;bac
 #wafab.up{bottom:calc(92px + env(safe-area-inset-bottom,0px))}
 #wafab:active{transform:scale(.94)}
 @media(min-width:640px){#wafab.up{bottom:calc(16px + env(safe-area-inset-bottom,0px))}}
+/* блок «Наш магазин» */
+.shopcard{background:var(--white);border-radius:12px;overflow:hidden;box-shadow:var(--shadow);border-left:5px solid var(--gold)}
+.shopcard .shopph{display:block;cursor:zoom-in}
+.shopcard img{display:block;width:100%;height:auto}
+.shopinfo{padding:16px;display:grid;gap:8px;font-size:18px;line-height:1.45}
+.shopbtns{display:grid;gap:10px;margin-top:6px}
+/* заставка при открытии (один раз за визит, никогда не блокирует нажатия) */
+#splash{position:fixed;inset:0;z-index:9999;background:#141517;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;animation:spOut .5s ease 1.1s forwards}
+#splash b{font:700 clamp(30px,9vw,46px)/1.1 Georgia,'Times New Roman',serif;letter-spacing:.14em;color:#B08D57;animation:spIn .8s ease both}
+#splash i{display:block;width:0;height:2px;background:#B08D57;margin:14px 0 12px;animation:spLine .8s ease .2s forwards}
+#splash small{font-size:13px;letter-spacing:.16em;color:#cfc6b4;opacity:0;animation:spIn .8s ease .35s both}
+@keyframes spIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes spLine{to{width:120px}}
+@keyframes spOut{to{opacity:0;visibility:hidden}}
+@media(prefers-reduced-motion:reduce){#splash{display:none}}
 .lock{display:inline-block;padding:10px 12px;margin:-10px -6px -10px 0;opacity:.32;color:inherit;vertical-align:middle;line-height:1;text-decoration:none}
 .lock:hover,.lock:focus-visible{opacity:.9}
 .lock svg{width:12px;height:12px;display:block}
@@ -334,6 +349,8 @@ h2::after{content:"";position:absolute;left:0;bottom:0;width:60px;height:3px;bac
 </style>
 </head>
 <body>
+<div id="splash" aria-hidden="true"><b>MUSLIM SHOP</b><i></i><small>АТЫРАУ • РЫНОК ДИНА • БУТИК 24</small></div>
+<script>try{var _sp=document.getElementById('splash');if(sessionStorage.getItem('sp')||/^#\/admin/.test(location.hash)){_sp.remove()}else{sessionStorage.setItem('sp','1');setTimeout(function(){_sp.remove()},1800)}}catch(e){try{document.getElementById('splash').remove()}catch(e2){}}</script>
 <header>
   <div class="wrap hbar">
     <button class="hbtn" data-act="menu" aria-label="Меню" id="menubtn">☰ <span class="m-t" style="margin-left:6px"></span></button>
@@ -1032,9 +1049,22 @@ function viewHome(){
   </section>
   ${(pop.length||neu.length||fea.length)?sec(t('popular'),pop)+sec(t('news'),neu)+sec(t('featured'),fea):sec(t('all_items'),vis.slice(0,12))}
   <section><a class="btn block" href="#/catalog">${t('all_items')} (${vis.length})</a></section>
+  ${shopBlock()}
   <section id="about"><h2>${t('about')}</h2><div class="about">${t('about_txt')}</div></section>
   <section id="social"><h2>${t('social')}</h2>${socials()}</section>
   <section id="contacts"><h2>${t('contacts')}</h2>${contactBox()}</section>`;
+}
+function shopBlock(){
+  const kk=lang==='kk';
+  const wa='https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(kk?'Сәлеметсіз бе! MUSLIM SHOP бойынша сұрағым бар.':'Здравствуйте! Хочу задать вопрос по MUSLIM SHOP.');
+  return `<section id="shop"><h2>${kk?'Біздің дүкен':'Наш магазин'}</h2><div class="shopcard">
+    <div class="shopph" data-act="shopzoom"><img src="shop-front.jpg" width="1400" height="1201" loading="lazy" alt="${kk?'MUSLIM SHOP дүкені, Дина базары, 24-бутик, Атырау':'Магазин MUSLIM SHOP, Рынок Дина, Бутик 24, Атырау'}" onerror="this.closest('#shop').style.display='none'"></div>
+    <div class="shopinfo"><div><b>${kk?'Атырау, Дина базары, 24-бутик':'Атырау, Рынок Дина, Бутик 24'}</b></div>
+    <div>${kk?'Күн сайын 10:00–19:00':'Ежедневно 10:00–19:00'}</div>
+    <div>${kk?'Тауарларды тікелей келіп көріңіз.':'Приходите посмотреть товары вживую.'}</div>
+    <div class="shopbtns"><a class="btn block gold" href="${CONTACT.gis}" target="_blank" rel="noopener">${kk?'2ГИС картасында ашу':'Маршрут в 2ГИС'}</a>
+    <a class="btn block line" href="${wa}" target="_blank" rel="noopener">${kk?'WhatsApp-қа жазу':'Написать в WhatsApp'}</a></div></div>
+  </div></section>`;
 }
 function socials(){
   return `<div class="socs">
@@ -1838,6 +1868,13 @@ document.addEventListener('click',e=>{
       })();
       break;
     }
+    case 'shopzoom':{
+      const o=document.createElement('div');
+      o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:200;display:flex;align-items:center;justify-content:center;padding:10px;cursor:zoom-out';
+      o.innerHTML='<img src="shop-front.jpg" alt="" style="max-width:100%;max-height:100%;border-radius:8px">';
+      o.addEventListener('click',()=>o.remove());
+      document.body.appendChild(o);
+      break}
     case 'pcat-new':{
       const nm=(prompt('Название новой категории (RU):')||'').trim();if(!nm)break;
       const ex=DB.cats.find(x=>String(x.name.ru||'').trim().toLowerCase()===nm.toLowerCase());
