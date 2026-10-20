@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MUSLIM SHOP — Купить халяль товары и витамины iHerb в Атырау | Бутик №24</title>
+<title>MUSLIM SHOP — халяль витамины iHerb в Атырау | Бутик №24</title>
 <meta name="description" content="Оригинальные халяль-витамины, БАДы, мед и товары для здоровья в Атырау. Бутик №24. Быстрая доставка по Казахстану. Ежедневно с 10:00 до 19:00.">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://muslimshop.kz/">
@@ -16,14 +16,14 @@
 <meta property="og:site_name" content="MUSLIM SHOP — Бутик №24, Атырау">
 <meta property="og:locale" content="ru_KZ">
 <meta property="og:url" content="https://muslimshop.kz/">
-<meta property="og:title" content="MUSLIM SHOP — Купить халяль товары и витамины iHerb в Атырау | Бутик №24">
+<meta property="og:title" content="MUSLIM SHOP — халяль витамины iHerb в Атырау | Бутик №24">
 <meta property="og:description" content="Оригинальные халяль-витамины, БАДы, мед и товары для здоровья в Атырау. Бутик №24. Быстрая доставка по Казахстану. Ежедневно с 10:00 до 19:00.">
 <meta property="og:image" content="https://muslimshop.kz/og-banner.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="MUSLIM SHOP — халяль товары, витамины и БАДы в Атырау, Бутик №24">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="MUSLIM SHOP — Купить халяль товары и витамины iHerb в Атырау | Бутик №24">
+<meta name="twitter:title" content="MUSLIM SHOP — халяль витамины iHerb в Атырау | Бутик №24">
 <meta name="twitter:description" content="Оригинальные халяль-витамины, БАДы, мед и товары для здоровья в Атырау. Бутик №24.">
 <meta name="twitter:image" content="https://muslimshop.kz/og-banner.png">
 <script type="application/ld+json">
@@ -283,7 +283,7 @@ h2::after{content:"";position:absolute;left:0;bottom:0;width:60px;height:3px;bac
 .shopinfo{padding:16px;display:grid;gap:8px;font-size:18px;line-height:1.45}
 .shopbtns{display:grid;gap:10px;margin-top:6px}
 /* заставка при открытии (один раз за визит, никогда не блокирует нажатия) */
-#splash{position:fixed;inset:0;z-index:9999;background:#141517;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;animation:spOut .5s ease 1.1s forwards}
+#splash{position:fixed;inset:0;z-index:9999;background:#141517;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;animation:spOut .3s ease .5s forwards}
 #splash b{font:700 clamp(30px,9vw,46px)/1.1 Georgia,'Times New Roman',serif;letter-spacing:.14em;color:#B08D57;animation:spIn .8s ease both}
 #splash i{display:block;width:0;height:2px;background:#B08D57;margin:14px 0 12px;animation:spLine .8s ease .2s forwards}
 #splash small{font-size:13px;letter-spacing:.16em;color:#cfc6b4;opacity:0;animation:spIn .8s ease .35s both}
@@ -350,7 +350,7 @@ h2::after{content:"";position:absolute;left:0;bottom:0;width:60px;height:3px;bac
 </head>
 <body>
 <div id="splash" aria-hidden="true"><b>MUSLIM SHOP</b><i></i><small>АТЫРАУ • РЫНОК ДИНА • БУТИК 24</small></div>
-<script>try{var _sp=document.getElementById('splash');if(sessionStorage.getItem('sp')||/^#\/admin/.test(location.hash)){_sp.remove()}else{sessionStorage.setItem('sp','1');setTimeout(function(){_sp.remove()},1800)}}catch(e){try{document.getElementById('splash').remove()}catch(e2){}}</script>
+<script>try{var _sp=document.getElementById('splash');if(sessionStorage.getItem('sp')||/^#\/admin/.test(location.hash)){_sp.remove()}else{sessionStorage.setItem('sp','1');setTimeout(function(){_sp.remove()},800)}}catch(e){try{document.getElementById('splash').remove()}catch(e2){}}</script>
 <header>
   <div class="wrap hbar">
     <button class="hbtn" data-act="menu" aria-label="Меню" id="menubtn">☰ <span class="m-t" style="margin-left:6px"></span></button>
@@ -674,7 +674,7 @@ const ymOwner=()=>{try{const q=new URLSearchParams(location.search).get('owner')
 let ymOn=false,ymLast=location.href;
 if(!ymOwner()){
   (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};m[i].l=1*new Date();k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})(window,document,'script','https://mc.yandex.ru/metrika/tag.js?id='+YM_ID,'ym');
-  window.ym(YM_ID,'init',{webvisor:true,clickmap:true,trackLinks:true,accurateTrackBounce:true,referrer:document.referrer,url:location.href});
+  window.ym(YM_ID,'init',{webvisor:false,clickmap:true,trackLinks:true,accurateTrackBounce:true,referrer:document.referrer,url:location.href});
   ymOn=true;
 }
 function ymHit(){
@@ -1562,7 +1562,7 @@ function catForm(c){
 let adminQ='',adminCat='';
 const admFiltered=()=>{const base=DB.products.filter(p=>!adminCat||p.cat===adminCat);return adminQ.trim()?searchRank(base,adminQ,{noDesc:true}).list:base};
 function admRows(){const arr=admFiltered();return arr.map(p=>`<div class="adm-row">${imgBox(p,'ph')}
-    <div><label class="checks" style="display:flex;min-height:36px"><input type="checkbox" data-sel="${esc(p.id)}" ${SEL.has(p.id)?'checked':''} style="width:24px;height:24px"> <b>${esc(L(p.name))}</b></label>${p.status==='hidden'?'<span class="hidden-badge">скрыт</span>':''}${isDemo(p)?'<span class="hidden-badge">демо</span>':''}<br>${money(p.price)} · ${p.status==='out'?'нет в наличии':p.status==='hidden'?'скрыт':'в наличии'} · ${esc(catName(p.cat))}</div>
+    <div><label class="checks" style="display:flex;min-height:44px"><input type="checkbox" data-sel="${esc(p.id)}" ${SEL.has(p.id)?'checked':''} style="width:24px;height:24px"> <b>${esc(L(p.name))}</b></label>${p.status==='hidden'?'<span class="hidden-badge">скрыт</span>':''}${isDemo(p)?'<span class="hidden-badge">демо</span>':''}<br>${money(p.price)} · ${p.status==='out'?'нет в наличии':p.status==='hidden'?'скрыт':'в наличии'} · ${esc(catName(p.cat))}</div>
     <div class="adm-btns">
       <button class="btn sm line" data-act="aedit" data-id="${esc(p.id)}">Редактировать</button>
       <button class="btn sm line" data-act="ahide" data-id="${esc(p.id)}">${p.status==='hidden'?'Показать':'Скрыть'}</button>
