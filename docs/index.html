@@ -2108,8 +2108,38 @@ const SG_STYLES=[
   {k:'light',n:'Светлый',bg:['#f8f1e4','#eadcc0'],txt:'#1c1d21',sub:'#7a6035',acc:'#a8823f',pillBg:'#1c1d21',pillTxt:'#e6c27a',badgeBg:'#1c1d21',badgeTxt:'#e6c27a',ring:'rgba(168,130,63,.6)'},
   {k:'emerald',n:'Изумруд',bg:['#0e4a37','#062a1f'],txt:'#ffffff',sub:'#d9c28e',acc:'#e0bd72',pillBg:'#e0bd72',pillTxt:'#08301f',badgeBg:'#e0bd72',badgeTxt:'#08301f',ring:'rgba(224,189,114,.55)'},
   {k:'promo',n:'Акция',bg:['#a3161c','#5e0b10'],txt:'#ffffff',sub:'#ffd9a0',acc:'#ffd166',pillBg:'#ffffff',pillTxt:'#a3161c',badgeBg:'#ffd166',badgeTxt:'#7a0d12',ring:'rgba(255,209,102,.6)'},
-  {k:'blur',n:'Фото-фон',blur:true,bg:['#111','#111'],txt:'#ffffff',sub:'#f0dfb8',acc:'#e6c27a',pillBg:'#e6c27a',pillTxt:'#1c1d21',badgeBg:'#e6c27a',badgeTxt:'#1c1d21',ring:'rgba(230,194,122,.6)'}
+  {k:'blur',n:'Фото-фон',blur:true,bg:['#111','#111'],txt:'#ffffff',sub:'#f0dfb8',acc:'#e6c27a',pillBg:'#e6c27a',pillTxt:'#1c1d21',badgeBg:'#e6c27a',badgeTxt:'#1c1d21',ring:'rgba(230,194,122,.6)'},
+  {k:'auto',n:'Авто',auto:true,bg:['#1c1d21','#2b2c32'],txt:'#ffffff',sub:'#cdb78a',acc:'#d9b36a',pillBg:'#d9b36a',pillTxt:'#1c1d21',badgeBg:'#d9b36a',badgeTxt:'#1c1d21',ring:'rgba(217,179,106,.55)'}
 ];
+/* «Авто»: цвета карточки подбираются по главному цвету фото товара (серое фото остаётся в тёмно-золотом) */
+function sgAuto(st,im){
+  if(!st||!st.auto)return st;
+  try{
+    const t=document.createElement('canvas');t.width=t.height=40;
+    const x=t.getContext('2d',{willReadFrequently:true});x.drawImage(im,0,0,40,40);
+    const d=x.getImageData(0,0,40,40).data;let sx=0,sy=0,sw=0;
+    for(let i=0;i<d.length;i+=4){
+      const r=d[i]/255,g=d[i+1]/255,b=d[i+2]/255,mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,df=mx-mn;
+      if(d[i+3]<200||df<.08||l<.12||l>.92)continue;
+      let h=mx===r?((g-b)/df)%6:(mx===g?(b-r)/df+2:(r-g)/df+4);h*=60;if(h<0)h+=360;
+      const w=df*df*(1-Math.abs(2*l-1));
+      sx+=Math.cos(h*Math.PI/180)*w;sy+=Math.sin(h*Math.PI/180)*w;sw+=w;
+    }
+    if(!(sw>0.5))return st;
+    const H=Math.round((Math.atan2(sy,sx)*180/Math.PI+360)%360),hs=(s2,l)=>'hsl('+H+','+s2+'%,'+l+'%)';
+    return Object.assign({},st,{bg:[hs(42,12),hs(46,21)],txt:'#ffffff',sub:hs(40,80),acc:hs(65,68),pillBg:hs(65,68),pillTxt:hs(50,11),badgeBg:hs(65,68),badgeTxt:hs(50,11),ring:'hsla('+H+',60%,70%,.55)'});
+  }catch(e){return st}
+}
+/* плавное уменьшение фото в несколько шагов: текст на упаковке остаётся чётким */
+function sgScale(im,dw,dh){
+  let cur=im,w=im.width,h=im.height;
+  while(w>dw*2){
+    const nw=Math.max(dw,Math.round(w/2)),nh=Math.max(dh,Math.round(h/2)),t=document.createElement('canvas');t.width=nw;t.height=nh;
+    const x=t.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(cur,0,0,nw,nh);
+    cur=t;w=nw;h=nh;
+  }
+  return cur;
+}
 const SG={cv:null,id:'',p:null,imgs:[],ii:0,si:0,tok:0,price:true,safe:true};
 const sgLoad=src=>new Promise((res,rej)=>{const im=new Image();if(/^https?:/i.test(src)&&src.indexOf(location.origin)!==0)im.crossOrigin='anonymous';im.onload=()=>res(im);im.onerror=()=>rej(new Error('Не удалось загрузить фото'));im.src=src});
 let sgLogoP=null;const sgLogo=()=>sgLogoP||(sgLogoP=sgLoad(SG_LOGO_SRC));
@@ -2138,21 +2168,16 @@ async function sgDraw(p,imgSrc,st,opt){
   await sgFonts();
   const W=1080,H=1920,cv=document.createElement('canvas');cv.width=W;cv.height=H;
   const c=cv.getContext('2d'),im=await sgLoad(imgSrc),logo=await sgLogo().catch(()=>null);
+  st=sgAuto(st,im);
   c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';
   const SERIF='"Playfair Display",Georgia,"Times New Roman",serif',SANS='"PT Sans","Segoe UI",Arial,sans-serif';
   if(st.blur)sgBlurBg(c,im,W,H,.55);
   else{const g=c.createLinearGradient(0,0,W*.4,H);g.addColorStop(0,st.bg[0]);g.addColorStop(1,st.bg[1]);c.fillStyle=g;c.fillRect(0,0,W,H)}
   c.strokeStyle=st.ring;c.lineWidth=3;sgRR(c,22,22,W-44,H-44,48);c.stroke();
-  const logoS=safe?96:92,logoY=safe?236:40;
-  if(logo)c.drawImage(logo,W/2-logoS/2,logoY,logoS,logoS);
+  const logoS=safe?96:80,logoY=safe?236:36;
   c.textAlign='center';c.textBaseline='alphabetic';
-  /* адрес сайта под логотипом (в безопасной зоне, кнопки Instagram/TikTok его не закрывают) */
-  c.fillStyle=st.k==='light'?st.sub:st.acc;c.font='700 34px '+SANS;
-  try{c.letterSpacing='3px'}catch(e){}
-  c.fillText('muslimshop.kz',W/2,logoY+logoS+44);
-  try{c.letterSpacing='0px'}catch(e){}
-  /* нижний блок считаем снизу вверх, всё остальное место отдаём фото */
-  const BOTTOM=safe?1670:1750,TOP=safe?logoY+logoS+62:196;
+  /* низ: кнопка WhatsApp, а под ней «Наш сайт». Всё считаем снизу вверх, остальное место отдаём фото */
+  const SITE_B=safe?1668:1852,BOTTOM=SITE_B-60;
   let y=BOTTOM;
   const btnH=120,btnTop=y-btnH;y=btnTop-18;
   let pillTop=0,pillH=96,prTxt='',pw=0,oldTxt='';
@@ -2172,18 +2197,21 @@ async function sgDraw(p,imgSrc,st,opt){
   y=nameTop-8;
   const cat=(DB.cats.find(x=>x.id===p.cat)||{}).name;
   if(cat&&(cat.ru||cat.kk)){c.fillStyle=st.sub;c.font='700 28px '+SANS;c.fillText(String(cat.ru||cat.kk).toUpperCase(),W/2,y-4);y-=42}
-  /* фото: почти во всю ширину, без белой подложки */
-  const bw=W-72,by0=TOP,bh=y-12-by0;
-  const sc=Math.min(bw/im.width,bh/im.height),dw=Math.round(im.width*sc),dh=Math.round(im.height*sc);
-  const px=Math.round((W-dw)/2),py=Math.round(by0+(bh-dh)/2);
+  /* фото: как можно крупнее. Узкое высокое фото получает больше высоты: логотип уходит в левый верхний угол, а фото поднимается вверх */
+  const bw=W-72;
+  const lay=top=>{const bh=y-12-top,sc=Math.min(bw/im.width,bh/im.height),dw=Math.round(im.width*sc),dh=Math.round(im.height*sc);return {dw,dh,px:Math.round((W-dw)/2),py:Math.round(top+(bh-dh)/2)}};
+  let LAY=lay(logoY+logoS+14),corner=false;
+  if(logo){const LB=lay(safe?logoY:44);if(LB.px>=logoS+56){LAY=LB;corner=true}}
+  const dw=LAY.dw,dh=LAY.dh,px=LAY.px,py=LAY.py;
+  if(logo){if(corner)c.drawImage(logo,40,py+10,logoS,logoS);else c.drawImage(logo,W/2-logoS/2,logoY,logoS,logoS)}
   c.save();c.shadowColor='rgba(0,0,0,.4)';c.shadowBlur=36;c.shadowOffsetY=10;c.fillStyle='#fff';sgRR(c,px,py,dw,dh,26);c.fill();c.restore();
-  c.save();sgRR(c,px,py,dw,dh,26);c.clip();c.drawImage(im,px,py,dw,dh);c.restore();
+  c.save();sgRR(c,px,py,dw,dh,26);c.clip();c.drawImage(sgScale(im,dw,dh),px,py,dw,dh);c.restore();
   c.strokeStyle=st.acc;c.lineWidth=4;sgRR(c,px,py,dw,dh,26);c.stroke();
   /* значок: если цена скрыта, скидку не показываем, но NEW и ХИТ остаются */
   let b=sgBadge(p);
   if(!showPrice&&/^-/.test(b))b=p.isNew?'NEW':((p.popular||p.featured)?'ХИТ':'');
   if(b){
-    const r=66,bx=Math.min(px+dw-8,W-r-30),byy=py+8;
+    const r=66,bx=Math.min(px+dw-8,W-r-30),byy=Math.max(py+8,94);
     c.save();c.shadowColor='rgba(0,0,0,.35)';c.shadowBlur=22;c.fillStyle=st.badgeBg;c.beginPath();c.arc(bx,byy,r,0,Math.PI*2);c.fill();c.restore();
     c.fillStyle=st.badgeTxt;c.font='700 '+(b.length>3?42:50)+'px '+SANS;c.fillText(b,bx,byy+(b.length>3?15:18));
   }
@@ -2200,6 +2228,13 @@ async function sgDraw(p,imgSrc,st,opt){
   c.fillStyle='#25D366';sgRR(c,140,btnTop,800,btnH,btnH/2);c.fill();
   c.fillStyle='#021a0c';c.font='700 38px '+SANS;c.fillText('Заказать в WhatsApp',W/2,btnTop+46);
   c.font='700 50px '+SANS;c.fillText(CONTACT.phone,W/2,btnTop+101);
+  /* под кнопкой: «Наш сайт: muslimshop.kz» */
+  c.textAlign='left';
+  c.font='400 32px '+SANS;const lw=c.measureText('Наш сайт:').width;
+  c.font='700 38px '+SANS;const sw2=c.measureText('muslimshop.kz').width,gap=14,x0=Math.round((W-(lw+gap+sw2))/2);
+  c.fillStyle=st.sub;c.font='400 32px '+SANS;c.fillText('Наш сайт:',x0,SITE_B);
+  c.fillStyle=st.k==='light'?st.txt:st.acc;c.font='700 38px '+SANS;c.fillText('muslimshop.kz',x0+lw+gap,SITE_B);
+  c.textAlign='center';
   return cv;
 }
 /* фото для поста в Telegram: квадрат или широкое 4:3 (пост занимает всю ширину, а не узкую полосу) */
@@ -2216,8 +2251,9 @@ async function sgPostBlob(src,fmt){
 /* карточка для поста в Telegram: фото + название + цена прямо на картинке (текст не зависит от размера шрифта в Telegram) */
 async function sgCardBlob(p,src){
   await sgFonts();
-  const st=SG_STYLES[Math.min(Math.max(Number(LS.get('ms_story_style',0))||0,0),SG_STYLES.length-1)];
+  let st=SG_STYLES[Math.min(Math.max(Number(LS.get('ms_story_style',SG_STYLES.length-1))||0,0),SG_STYLES.length-1)];
   const W=1200,H=1200,im=await sgLoad(src),cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  st=sgAuto(st,im);
   const c=cv.getContext('2d');c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';
   const SERIF='"Playfair Display",Georgia,"Times New Roman",serif',SANS='"PT Sans","Segoe UI",Arial,sans-serif';
   if(st.blur)sgBlurBg(c,im,W,H,.55);
@@ -2324,7 +2360,7 @@ async function storyOpen(id){
     SG.p=p;SG.id=String(id).replace(/[^\w-]/g,'');
     SG.imgs=((p.images&&p.images.length)?p.images:[p.img]).filter(x=>typeof x==='string'&&x).slice(0,6);
     if(!SG.imgs.length)throw new Error('У товара нет фото');
-    SG.price=LS.get('ms_story_price',1)!==0;SG.safe=LS.get('ms_story_safe',1)!==0;SG.ii=0;SG.si=Math.min(Math.max(Number(LS.get('ms_story_style',0))||0,0),SG_STYLES.length-1);
+    SG.price=LS.get('ms_story_price',1)!==0;SG.safe=LS.get('ms_story_safe',1)!==0;SG.ii=0;SG.si=Math.min(Math.max(Number(LS.get('ms_story_style',SG_STYLES.length-1))||0,0),SG_STYLES.length-1);
     sgModalOpen();await sgRender();
   }catch(e){toast('Сторис: '+(e&&e.message||e))}
 }
