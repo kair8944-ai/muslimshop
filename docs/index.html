@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MUSLIM SHOP — халяль витамины iHerb в Атырау | Бутик №24</title>
+<title>MUSLIM SHOP — Купить халяль витамины iHerb в Атырау | Бутик №24</title>
 <meta name="description" content="Оригинальные халяль-витамины, БАДы, мед и товары для здоровья в Атырау. Бутик №24. Быстрая доставка по Казахстану. Ежедневно с 10:00 до 19:00.">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://muslimshop.kz/">
@@ -16,14 +16,14 @@
 <meta property="og:site_name" content="MUSLIM SHOP — Бутик №24, Атырау">
 <meta property="og:locale" content="ru_KZ">
 <meta property="og:url" content="https://muslimshop.kz/">
-<meta property="og:title" content="MUSLIM SHOP — халяль витамины iHerb в Атырау | Бутик №24">
+<meta property="og:title" content="MUSLIM SHOP — Купить халяль витамины iHerb в Атырау | Бутик №24">
 <meta property="og:description" content="Оригинальные халяль-витамины, БАДы, мед и товары для здоровья в Атырау. Бутик №24. Быстрая доставка по Казахстану. Ежедневно с 10:00 до 19:00.">
 <meta property="og:image" content="https://muslimshop.kz/og-banner.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="MUSLIM SHOP — халяль товары, витамины и БАДы в Атырау, Бутик №24">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="MUSLIM SHOP — халяль витамины iHerb в Атырау | Бутик №24">
+<meta name="twitter:title" content="MUSLIM SHOP — Купить халяль витамины iHerb в Атырау | Бутик №24">
 <meta name="twitter:description" content="Оригинальные халяль-витамины, БАДы, мед и товары для здоровья в Атырау. Бутик №24.">
 <meta name="twitter:image" content="https://muslimshop.kz/og-banner.png">
 <script type="application/ld+json">
@@ -1569,6 +1569,7 @@ function admRows(){const arr=admFiltered();return arr.map(p=>`<div class="adm-ro
       <button class="btn sm line" data-act="adel" data-id="${esc(p.id)}">Удалить</button>
       <button class="btn sm line" data-act="tg-send" data-id="${esc(p.id)}">${tgSent()[p.id]?'✓ В канале':'✈ В Telegram'}</button>
       <button class="btn sm line" data-act="story" data-id="${esc(p.id)}">🎬 Сторис</button>
+      <button class="btn sm line" data-act="reel" data-id="${esc(p.id)}">🎞 Рилс</button>
       <a class="btn sm line" href="#/product/${esc(p.id)}">Открыть</a></div></div>`).join('')||'<div class="empty">'+(DB.products.length?'Ничего не найдено. Измените категорию или поиск.':'Товаров пока нет. Нажмите «Добавить товар».')+'</div>'}
 const admCountTxt=()=>'Показано: '+admFiltered().length+' из '+DB.products.length;
 function admChips(){
@@ -1835,6 +1836,7 @@ document.addEventListener('click',e=>{
     case 'an-refresh':anLoad();break;
     case 'tg-send':tgOne(id);break;
     case 'story':storyOpen(id);break;
+    case 'reel':reelOpen(id);break;
     case 'tg-fmt':tgSet('fmt',id);break;
     case 'tg-cap':tgSet('cap',id);break;
     case 'tg-save':tgSave();break;
@@ -2237,6 +2239,115 @@ async function sgDraw(p,imgSrc,st,opt){
   c.textAlign='center';
   return cv;
 }
+/* ============ Рилс: 3-4 вертикальных кадра 1080×1920 в том же стиле, что и сторис (видео монтируете сами) ============ */
+async function rlDraw(p,imgs,st0,opt){
+  opt=opt||{};
+  const showPrice=opt.price!==false&&p.price>0;
+  await sgFonts();
+  const W=1080,H=1920,SERIF='"Playfair Display",Georgia,"Times New Roman",serif',SANS='"PT Sans","Segoe UI",Arial,sans-serif';
+  const ims=[];
+  for(const src of imgs){try{ims.push(await sgLoad(src))}catch(e){}}
+  if(!ims.length)throw new Error('Не удалось загрузить фото');
+  const logo=await sgLogo().catch(()=>null);
+  const st=sgAuto(st0,ims[0]);
+  const nm=p.name.ru||p.name.kk||'';
+  const catO=(DB.cats.find(x=>x.id===p.cat)||{}).name;
+  const catT=catO&&(catO.ru||catO.kk)?String(catO.ru||catO.kk).toUpperCase():'';
+  /* Reels закрывает низ и правый край кнопками: всё важное держим в центре (поля по бокам 130, низ до 1500) */
+  const SX=130,CW=W-2*SX;
+  const base=()=>{
+    const cv=document.createElement('canvas');cv.width=W;cv.height=H;
+    const c=cv.getContext('2d');c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';
+    if(st.blur)sgBlurBg(c,ims[0],W,H,.55);
+    else{const g=c.createLinearGradient(0,0,W*.4,H);g.addColorStop(0,st.bg[0]);g.addColorStop(1,st.bg[1]);c.fillStyle=g;c.fillRect(0,0,W,H)}
+    c.strokeStyle=st.ring;c.lineWidth=3;sgRR(c,22,22,W-44,H-44,48);c.stroke();
+    c.textAlign='center';c.textBaseline='alphabetic';
+    return {cv,c};
+  };
+  const fit=(im,w,h)=>{const sc=Math.min(w/im.width,h/im.height);return {dw:Math.round(im.width*sc),dh:Math.round(im.height*sc)}};
+  const photo=(c,im,x,y,w,h)=>{
+    const f=fit(im,w,h),dw=f.dw,dh=f.dh,px=Math.round(x+(w-dw)/2),py=Math.round(y+(h-dh)/2);
+    c.save();c.shadowColor='rgba(0,0,0,.4)';c.shadowBlur=36;c.shadowOffsetY=10;c.fillStyle='#fff';sgRR(c,px,py,dw,dh,26);c.fill();c.restore();
+    c.save();sgRR(c,px,py,dw,dh,26);c.clip();c.drawImage(sgScale(im,dw,dh),px,py,dw,dh);c.restore();
+    c.strokeStyle=st.acc;c.lineWidth=4;sgRR(c,px,py,dw,dh,26);c.stroke();
+    return {px,py,dw,dh};
+  };
+  const badge=(c,r)=>{
+    let b=sgBadge(p);if(!showPrice&&/^-/.test(b))b=p.isNew?'NEW':((p.popular||p.featured)?'ХИТ':'');
+    if(!b)return;
+    const R=60,bx=Math.min(r.px+r.dw-8,W-R-110),by=r.py+10;
+    c.save();c.shadowColor='rgba(0,0,0,.35)';c.shadowBlur=22;c.fillStyle=st.badgeBg;c.beginPath();c.arc(bx,by,R,0,Math.PI*2);c.fill();c.restore();
+    c.fillStyle=st.badgeTxt;c.font='700 '+(b.length>3?38:46)+'px '+SANS;c.fillText(b,bx,by+(b.length>3?13:16));
+  };
+  const fitName=(c,maxW,maxLines,f0,fmin)=>{
+    let f=f0,l=[];
+    for(;f>=fmin;f-=4){c.font='700 '+f+'px '+SERIF;l=sgWrap(c,nm,maxW,maxLines);if(l.length<maxLines||(c.measureText(l[l.length-1]).width<maxW&&!/…$/.test(l[l.length-1])))break}
+    if(f<fmin)f=fmin;c.font='700 '+f+'px '+SERIF;l=sgWrap(c,nm,maxW,maxLines);
+    return {f,l,lh:Math.round(f*1.16)};
+  };
+  const frames=[];
+  /* кадр 1: обложка (логотип, фото, категория, название) */
+  {
+    const {cv,c}=base();
+    if(logo)c.drawImage(logo,W/2-42,190,84,84);
+    const N=fitName(c,CW,2,66,44),textH=(catT?46:0)+N.l.length*N.lh+10;
+    const f=fit(ims[0],CW,1200-textH-30),total=f.dh+30+textH,y0=300+Math.round((1200-total)/2);
+    const r=photo(c,ims[0],SX,y0,CW,f.dh);badge(c,r);
+    let y=r.py+r.dh+30;
+    if(catT){c.fillStyle=st.sub;c.font='700 28px '+SANS;c.fillText(catT,W/2,y+30);y+=46}
+    c.fillStyle=st.txt;c.font='700 '+N.f+'px '+SERIF;
+    N.l.forEach((l,i)=>c.fillText(l,W/2,y+(i+1)*N.lh-Math.round(N.lh*.2)));
+    frames.push(cv);
+  }
+  /* кадры с фото товара крупно, без текста (если фото одно, оно повторяется один раз) */
+  const extra=ims.length>1?ims.slice(1,showPrice?2:3):[ims[0]];
+  for(const im of extra){const {cv,c}=base();photo(c,im,110,250,W-220,1280);frames.push(cv)}
+  /* кадр с ценой (если цена включена) */
+  if(showPrice){
+    const {cv,c}=base(),N=fitName(c,CW,2,52,40),pr=money(p.price),hasOld=p.old>p.price,pillH=170;
+    c.font='700 112px '+SANS;const pw=c.measureText(pr).width+150;
+    const textH=N.l.length*N.lh+(hasOld?74:0)+24+pillH;
+    const f=fit(ims[0],CW,Math.min(1200-textH-40,760)),total=f.dh+40+textH,y0=300+Math.round((1200-total)/2);
+    const r=photo(c,ims[0],SX,y0,CW,f.dh);
+    let y=r.py+r.dh+40;
+    c.fillStyle=st.txt;c.font='700 '+N.f+'px '+SERIF;
+    N.l.forEach((l,i)=>c.fillText(l,W/2,y+(i+1)*N.lh-Math.round(N.lh*.2)));
+    y+=N.l.length*N.lh+24;
+    if(hasOld){
+      const ot=money(p.old);c.font='400 46px '+SANS;c.fillStyle=st.sub;const ow=c.measureText(ot).width;
+      c.fillText(ot,W/2,y+46);c.strokeStyle=st.sub;c.lineWidth=3;c.beginPath();c.moveTo(W/2-ow/2-4,y+32);c.lineTo(W/2+ow/2+4,y+32);c.stroke();y+=74;
+    }
+    c.fillStyle=st.pillBg;sgRR(c,W/2-pw/2,y,pw,pillH,pillH/2);c.fill();
+    c.fillStyle=st.pillTxt;c.font='700 112px '+SANS;c.fillText(pr,W/2,y+pillH-40);
+    frames.push(cv);
+  }
+  /* последний кадр: как заказать */
+  {
+    const {cv,c}=base(),ls=190;
+    if(logo)c.drawImage(logo,W/2-ls/2,300,ls,ls);
+    c.fillStyle=st.txt;c.font='700 62px '+SERIF;c.fillText('MUSLIM SHOP',W/2,560);
+    c.fillStyle=st.sub;c.font='700 28px '+SANS;
+    try{c.letterSpacing='3px'}catch(e){}
+    c.fillText('АТЫРАУ • РЫНОК ДИНА • БУТИК 24',W/2,616);
+    try{c.letterSpacing='0px'}catch(e){}
+    const N=fitName(c,CW,2,54,40);
+    c.fillStyle=st.txt;c.font='700 '+N.f+'px '+SERIF;
+    N.l.forEach((l,i)=>c.fillText(l,W/2,760+i*N.lh));
+    const by=760+N.l.length*N.lh+40,bw=780,bh=180;
+    c.fillStyle='#25D366';sgRR(c,(W-bw)/2,by,bw,bh,bh/2);c.fill();
+    c.fillStyle='#021a0c';c.font='700 42px '+SANS;c.fillText('Заказать в WhatsApp',W/2,by+66);
+    c.font='700 64px '+SANS;c.fillText(CONTACT.phone,W/2,by+142);
+    const sy=by+bh+120;
+    c.textAlign='left';
+    c.font='400 40px '+SANS;const lw=c.measureText('Наш сайт:').width;
+    c.font='700 60px '+SANS;const sw=c.measureText('muslimshop.kz').width,gap=18,x0=Math.round((W-(lw+gap+sw))/2);
+    c.fillStyle=st.sub;c.font='400 40px '+SANS;c.fillText('Наш сайт:',x0,sy);
+    c.fillStyle=st.k==='light'?st.txt:st.acc;c.font='700 60px '+SANS;c.fillText('muslimshop.kz',x0+lw+gap,sy);
+    c.textAlign='center';
+    frames.push(cv);
+  }
+  return frames;
+}
 /* фото для поста в Telegram: квадрат или широкое 4:3 (пост занимает всю ширину, а не узкую полосу) */
 async function sgPostBlob(src,fmt){
   const im=await sgLoad(src),W=1200,H=fmt==='wide'?900:1200,cv=document.createElement('canvas');cv.width=W;cv.height=H;
@@ -2363,6 +2474,78 @@ async function storyOpen(id){
     SG.price=LS.get('ms_story_price',1)!==0;SG.safe=LS.get('ms_story_safe',1)!==0;SG.ii=0;SG.si=Math.min(Math.max(Number(LS.get('ms_story_style',SG_STYLES.length-1))||0,0),SG_STYLES.length-1);
     sgModalOpen();await sgRender();
   }catch(e){toast('Сторис: '+(e&&e.message||e))}
+}
+
+/* ============ Рилс: окно с кадрами 9:16 ============ */
+const RL={p:null,id:'',imgs:[],si:0,price:true,cvs:[],tok:0};
+function rlModalClose(){const m=document.getElementById('reelmodal');if(m)m.remove();RL.tok++}
+function rlModalOpen(){
+  rlModalClose();
+  const m=document.createElement('div');m.id='reelmodal';
+  m.style.cssText='position:fixed;inset:0;z-index:300;background:rgba(10,10,12,.94);overflow:auto;padding:16px 12px 30px;display:flex;flex-direction:column;align-items:center;gap:12px';
+  m.innerHTML='<div style="color:#fff;font-weight:700;text-align:center;max-width:420px">🎞 Рилс: '+esc(RL.p.name.ru||RL.p.name.kk)+'</div>'
+   +'<div style="display:flex;gap:8px;overflow-x:auto;max-width:100%;padding-bottom:4px">'+SG_STYLES.map((s,i)=>'<button type="button" class="btn sm line" data-rl="style" data-i="'+i+'" style="white-space:nowrap">'+s.n+'</button>').join('')+'</div>'
+   +'<div style="display:flex;gap:8px"><button type="button" class="btn sm line" data-rl="price" data-v="1">С ценником</button><button type="button" class="btn sm line" data-rl="price" data-v="0">Без ценника</button></div>'
+   +'<div id="rlgrid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:min(92vw,420px);color:#aaa;text-align:center">Рисую…</div>'
+   +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button type="button" class="btn sm gold" data-rl="dlall">Скачать все</button><button type="button" class="btn sm gold" data-rl="shareall">Поделиться все</button><button type="button" class="btn sm line" data-rl="close">Закрыть</button></div>'
+   +'<div style="color:#bbb;font-size:13px;text-align:center;max-width:340px">Кадры 9:16 (1080×1920). Видео соберите сами в Instagram, CapCut или другом редакторе. Номер и сайт стоят ближе к центру: низ и правый край в Reels закрыты кнопками.</div>';
+  m.addEventListener('click',e=>{
+    const b=e.target.closest('[data-rl]');if(!b)return;
+    const a=b.dataset.rl;
+    if(a==='close')rlModalClose();
+    else if(a==='style'){RL.si=+b.dataset.i;LS.set('ms_story_style',RL.si);rlRender()}
+    else if(a==='price'){RL.price=b.dataset.v==='1';LS.set('ms_story_price',RL.price?1:0);rlRender()}
+    else if(a==='dl')rlDownload(+b.dataset.i);
+    else if(a==='dlall')rlDownload(null);
+    else if(a==='shareall')rlShare();
+  });
+  document.body.appendChild(m);
+}
+async function rlRender(){
+  const tok=++RL.tok,g=document.getElementById('rlgrid');if(!g)return;
+  g.textContent='Рисую…';
+  try{
+    const cvs=await rlDraw(RL.p,RL.imgs,SG_STYLES[RL.si],{price:RL.price});
+    const g2=document.getElementById('rlgrid');
+    if(tok!==RL.tok||!g2)return;
+    RL.cvs=cvs;g2.textContent='';
+    cvs.forEach((cv,i)=>{
+      const cell=document.createElement('div');
+      cv.style.cssText='width:100%;height:auto;display:block;border-radius:10px;background:#222';
+      const bt=document.createElement('button');bt.type='button';bt.className='btn sm line';bt.dataset.rl='dl';bt.dataset.i=String(i);bt.style.marginTop='6px';bt.textContent='Скачать '+(i+1);
+      cell.appendChild(cv);cell.appendChild(bt);g2.appendChild(cell);
+    });
+    document.querySelectorAll('#reelmodal [data-rl="style"]').forEach(b=>{b.className='btn sm '+(+b.dataset.i===RL.si?'gold':'line')});
+    document.querySelectorAll('#reelmodal [data-rl="price"]').forEach(b=>{b.className='btn sm '+((b.dataset.v==='1')===RL.price?'gold':'line')});
+  }catch(e){if(tok===RL.tok)g.textContent='Не удалось нарисовать: '+(e&&e.message||e)}
+}
+const rlBlob=cv=>new Promise((res,rej)=>{try{cv.toBlob(b=>b?res(b):rej(new Error('blob')),'image/png')}catch(e){rej(e)}});
+function rlSave(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+async function rlDownload(i){
+  try{
+    const idx=(i==null||isNaN(i))?RL.cvs.map((_,k)=>k):[i];
+    for(const k of idx){rlSave(await rlBlob(RL.cvs[k]),'reel-'+RL.id+'-'+(k+1)+'.png');await new Promise(r=>setTimeout(r,450))}
+    toast(idx.length>1?'Кадры сохранены':'Кадр сохранён');
+  }catch(e){toast('Не удалось сохранить: фото товара лежит на другом сайте')}
+}
+async function rlShare(){
+  try{
+    const files=[];
+    for(let k=0;k<RL.cvs.length;k++)files.push(new File([await rlBlob(RL.cvs[k])],'reel-'+RL.id+'-'+(k+1)+'.png',{type:'image/png'}));
+    if(navigator.canShare&&navigator.canShare({files})){try{await navigator.share({files})}catch(e){}}
+    else await rlDownload(null);
+  }catch(e){toast('Не удалось поделиться: фото товара лежит на другом сайте')}
+}
+async function reelOpen(id){
+  try{
+    toast('Готовлю…');
+    const p=await getFull(id);if(!p)throw new Error('Товар не найден');
+    RL.p=p;RL.id=String(id).replace(/[^\w-]/g,'');
+    RL.imgs=((p.images&&p.images.length)?p.images:[p.img]).filter(x=>typeof x==='string'&&x).slice(0,6);
+    if(!RL.imgs.length)throw new Error('У товара нет фото');
+    RL.price=LS.get('ms_story_price',1)!==0;RL.si=Math.min(Math.max(Number(LS.get('ms_story_style',SG_STYLES.length-1))||0,0),SG_STYLES.length-1);
+    rlModalOpen();await rlRender();
+  }catch(e){toast('Рилс: '+(e&&e.message||e))}
 }
 
 /* ============ Публикация товара в Telegram-канал (токен хранится только в этом браузере, в коде его нет) ============ */
