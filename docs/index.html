@@ -2146,10 +2146,15 @@ async function sgDraw(p,imgSrc,st,opt){
   const logoS=safe?96:92,logoY=safe?236:40;
   if(logo)c.drawImage(logo,W/2-logoS/2,logoY,logoS,logoS);
   c.textAlign='center';c.textBaseline='alphabetic';
+  /* адрес сайта под логотипом (в безопасной зоне, кнопки Instagram/TikTok его не закрывают) */
+  c.fillStyle=st.k==='light'?st.sub:st.acc;c.font='700 34px '+SANS;
+  try{c.letterSpacing='3px'}catch(e){}
+  c.fillText('muslimshop.kz',W/2,logoY+logoS+44);
+  try{c.letterSpacing='0px'}catch(e){}
   /* нижний блок считаем снизу вверх, всё остальное место отдаём фото */
-  const BOTTOM=safe?1670:1750,TOP=safe?logoY+logoS+16:150;
+  const BOTTOM=safe?1670:1750,TOP=safe?logoY+logoS+62:196;
   let y=BOTTOM;
-  const btnH=108,btnTop=y-btnH;y=btnTop-18;
+  const btnH=120,btnTop=y-btnH;y=btnTop-18;
   let pillTop=0,pillH=96,prTxt='',pw=0,oldTxt='';
   if(showPrice){
     prTxt=money(p.price);c.font='700 74px '+SANS;pw=c.measureText(prTxt).width+110;
@@ -2193,8 +2198,8 @@ async function sgDraw(p,imgSrc,st,opt){
   }
   /* кнопка WhatsApp */
   c.fillStyle='#25D366';sgRR(c,140,btnTop,800,btnH,btnH/2);c.fill();
-  c.fillStyle='#06301a';c.font='700 42px '+SANS;c.fillText('Заказать в WhatsApp',W/2,btnTop+52);
-  c.font='400 34px '+SANS;c.fillText(CONTACT.phone,W/2,btnTop+93);
+  c.fillStyle='#021a0c';c.font='700 38px '+SANS;c.fillText('Заказать в WhatsApp',W/2,btnTop+46);
+  c.font='700 50px '+SANS;c.fillText(CONTACT.phone,W/2,btnTop+101);
   return cv;
 }
 /* фото для поста в Telegram: квадрат или широкое 4:3 (пост занимает всю ширину, а не узкую полосу) */
