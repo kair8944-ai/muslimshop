@@ -1025,7 +1025,7 @@ function searchBox(q=''){
 }
 
 /* ============ Views ============ */
-const LOCK='<a class="lock" href="#/admin" aria-label="Вход для владельца"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></a>';
+const LOCK='';
 function banner(){
   if(!CONFIGURED)return `<div class="note" style="margin-top:20px">Магазин ещё не подключён к базе товаров (Firebase).</div>`;
   if(LOAD_ERR)return `<div class="note" style="margin-top:20px">${t('err_load')}</div>`;
