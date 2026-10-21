@@ -448,12 +448,12 @@ async function ghBase(){
   return GH.base={dir:dir?dir+'/':'',br};
 }
 async function ghFetchCatalog(){
-  const g=ghGet();
-  if(g&&g.t){
+  const g=ghGet();GH.src='pub';
+  if(g&&g.t&&/^#\/admin/.test(location.hash||'')){
     try{
       const b=await ghBase();
       const r=await fetch('https://api.github.com/repos/'+g.o+'/'+g.r+'/contents/'+b.dir+'catalog.json?ref='+encodeURIComponent(b.br),{headers:Object.assign(ghHdr(g.t),{Accept:'application/vnd.github.raw+json'}),cache:'no-store'});
-      if(r.ok){return await r.json()}
+      if(r.ok){const j=await r.json();GH.src='api';return j}
     }catch(e){}
   }
   const r=await fetch('catalog.json',{cache:'no-cache'});
@@ -1877,7 +1877,7 @@ function renderInner(){
   else if(path.startsWith('/product/'))html=viewProduct(safeDec(path.slice(9)));
   else if(path==='/cart')html=viewCart();
   else if(path==='/podbor'){html=DB.loaded?viewQuiz():'<div class="note" style="margin-top:20px">Загрузка…</div>';document.title=(lang==='kk'?'Дәрумендерді таңдау':'Подбор витаминов')+' — MUSLIM SHOP'}
-  else if(path==='/admin')html=viewAdmin();
+  else if(path==='/admin'){html=viewAdmin();if(GH.src==='pub'&&!GH.dirty&&!GH.reload){const g=ghGet();if(g&&g.t){GH.reload=1;GH.ready=ghLoadAll().then(()=>{GH.reload=0;return loadData()}).then(()=>render()).catch(()=>{GH.reload=0})}}}
   else html=viewHome();
   app.innerHTML=html;if(after)after();
   renderChrome();ymHit();try{statHit()}catch(e){}
