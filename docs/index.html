@@ -368,6 +368,12 @@ html,body{overflow-x:clip;max-width:100%}
 .hero2 .hacts{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 .hero2 .hacts{flex-wrap:nowrap}.hero2 .hacts .btn{flex:1 1 0;min-height:52px;padding:0 10px;font-size:15px}
 .btn.wa{background:#25D366;border-color:#25D366;color:#fff}
+.qz h2{margin-top:18px}.qzbar{height:6px;background:#e8e2d6;border-radius:6px;overflow:hidden;margin:8px 0 6px}.qzbar span{display:block;height:100%;background:var(--gold);transition:width .3s}
+.qzopts{display:grid;gap:10px;grid-template-columns:1fr}.qzo{min-height:58px;padding:12px 16px;border:2px solid rgba(176,141,87,.45);background:#fff;border-radius:12px;font:inherit;font-weight:700;font-size:17px;text-align:left;cursor:pointer;color:inherit}.qzo.on,.qzo:active{border-color:var(--gold);background:#fbf6ec}
+.qzback{background:none;border:0;color:var(--gold-dark);font:inherit;font-weight:700;padding:8px 0;cursor:pointer}.qzsum{font-size:20px;margin:16px 0 10px}.qznote{font-size:14px;color:#666;margin-top:14px}
+.qzcta{display:block;text-decoration:none;color:#fff;background:linear-gradient(135deg,#1F2022,#3a3226);border:2px solid var(--gold);border-radius:16px;padding:18px 18px 16px}.qzcta b{display:block;font-size:21px;margin-bottom:4px}.qzcta span{display:block;opacity:.85}.qzcta em{display:inline-block;margin-top:12px;font-style:normal;font-weight:700;color:#1F2022;background:var(--gold);padding:10px 16px;border-radius:10px}
+.bundles{display:grid;gap:14px;grid-template-columns:1fr}.bundle{background:#fff;border:1px solid rgba(176,141,87,.35);border-radius:14px;padding:14px;box-shadow:0 2px 10px rgba(0,0,0,.05)}.bimgs{display:flex;gap:8px;margin-bottom:10px}.bimgs a{flex:1;min-width:0}.bph{display:block;aspect-ratio:1;background:#f7f5f1;border-radius:10px;overflow:hidden}.bph img{width:100%;height:100%;object-fit:contain}.bph .noimg{display:flex;align-items:center;justify-content:center;height:100%;font-weight:700;color:var(--gold)}.bt{display:block;font-size:19px}.bs{color:#555;font-size:15px;margin:2px 0 6px}
+@media(min-width:640px){.qzopts{grid-template-columns:1fr 1fr}.bundles{grid-template-columns:1fr 1fr}}
 .needs{display:flex;gap:10px;overflow-x:auto;padding:4px 2px 10px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
 .need{flex:0 0 118px;scroll-snap-align:start;background:#fff;border:1px solid rgba(176,141,87,.35);border-radius:12px;padding:14px 10px;text-align:center;text-decoration:none;color:inherit;box-shadow:0 2px 10px rgba(0,0,0,.05)}
 .need svg{width:34px;height:34px;stroke:var(--gold-dark);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;display:block;margin:0 auto 8px}
@@ -1081,6 +1087,86 @@ function needsBlock(){
   const href=n=>n[0]==='cat'?'#/catalog?cat='+encodeURIComponent(n[1]):'#/catalog?q='+encodeURIComponent(n[1]);
   return `<section style="padding-top:26px"><h2>${t('needs_t')}</h2><div class="needs">${NEEDS.filter(n=>n[0]!=='cat'||DB.cats.some(c=>c.id===n[1])).map(n=>`<a class="need" href="${href(n)}"><svg viewBox="0 0 24 24" aria-hidden="true">${n[4]}</svg><span>${esc(kk?n[3]:n[2])}</span></a>`).join('')}</div></section>`;
 }
+/* ============ Подбор витаминов + наборы ============ */
+const QZ_GOALS={
+ a:[['imm','Иммунитет и простуда','Иммунитет және суық тию'],['en','Энергия и усталость','Қуат және шаршау'],['sleep','Сон, стресс, нервы','Ұйқы, стресс, жүйке'],['joint','Суставы и кости','Буындар мен сүйектер'],['beauty','Кожа, волосы, ногти','Тері, шаш, тырнақ'],['heart','Сердце и сосуды','Жүрек және тамырлар'],['mem','Память и концентрация','Есте сақтау және зейін'],['diet','Похудение','Арықтау']],
+ m:[['men','Мужская сила','Ерлер күші']],
+ w:[['iron','Гемоглобин и железо','Гемоглобин және темір']],
+ k:[['kimm','Иммунитет','Иммунитет'],['kmem','Память и учёба','Есте сақтау және оқу'],['ksleep','Сон и спокойствие','Ұйқы және тыныштық'],['kbone','Кости, зубы, рост','Сүйек, тіс, өсу'],['kapp','Аппетит','Тәбет']]
+};
+const QZ_MAP={
+ imm:['prod-1789482405171','prod-1789581978450','prod-1789481341086','prod-1789481851198','prod-1790060868898','pmv6f29td0dzo'],
+ en:['prod-1789481106368','prod-1789904696612','prod-1789481406134','prod-1790688609740','prod-1789827766675'],
+ sleep:['prod-1789584226696','prod-1789481775781','prod-4','prod-1789481917870'],
+ joint:['prod-1789674170720','prod-1789482030210','prod-1789583998270','prod-1789482621778','prod-1790582349356'],
+ beauty:['prod-1789643893951','prod-1790684668736','pmv6f29td0dzo','prod-1789645812871','prod-1789584103607'],
+ heart:['prod-1789480326421','prod-5','prod-1789480153573','pmvdv3k7m00mm'],
+ mem:['prod-1790688985190','prod-1789481989300','prod-1789759302194'],
+ diet:['prod-1789644629498','prod-1789645121357','prod-1789644508370','prod-1789644299395'],
+ men:['prod-1789478345595','prod-1789481016742','prod-1789727935263','prod-1789581978450'],
+ iron:['prod-1789827766675','prod-1790857193667','prod-1789481851198'],
+ kimm:['pmv9yydck1gnb','prod-1790233305964','prod-1789480808913','prod-1789480925676'],
+ kmem:['pmv9knfns0gdw','prod-1791217193889','prod-1790236709505'],
+ ksleep:['pmv85kszf2gfl','pmv8m6tiv1azp'],
+ kbone:['prod-1790242012611','prod-1789480925676','pmv82dwsf0w60'],
+ kapp:['prod-1790242811773','prod-1790151238215','prod-1791194234158']
+};
+const BUNDLES=[
+ {id:'b-imm',ru:'Иммунитет на зиму',kk:'Қысқы иммунитет',sru:'Витамин D3 + цинк + витамин C',skk:'D3 дәрумені + мырыш + C дәрумені',ids:['prod-1789482405171','prod-1789581978450','prod-1789481851198']},
+ {id:'b-kid',ru:'Детский иммунитет',kk:'Балалар иммунитеті',sru:'Иммунный сироп + витамин C + D3',skk:'Иммундық шәрбат + C дәрумені + D3',ids:['pmv9yydck1gnb','prod-1790233305964','prod-1789480925676']},
+ {id:'b-bea',ru:'Красота изнутри',kk:'Іштен сұлулық',sru:'Коллаген + биотин + цинк',skk:'Коллаген + биотин + мырыш',ids:['prod-1789643893951','prod-1790684668736','pmv6f29td0dzo']},
+ {id:'b-slp',ru:'Спокойный сон',kk:'Тыныш ұйқы',sru:'Магний глицинат + ашваганда',skk:'Магний глицинат + ашваганда',ids:['prod-1789584226696','prod-1789481775781']}
+];
+const qzKK=()=>lang==='kk';
+const inStockIds=ids=>ids.map(prodById).filter(p=>p&&p.status==='in');
+let QZ={step:0,who:'',goal:'',bud:0};
+function qzPick(){
+  const all=inStockIds(QZ_MAP[QZ.goal]||[]);
+  if(!QZ.bud)return all.slice(0,3);
+  const out=[];let s=0;
+  for(const p of all){if(out.length>=3)break;if(s+p.price<=QZ.bud||!out.length){out.push(p);s+=p.price}}
+  return out;
+}
+function viewQuiz(){
+  const kk=qzKK(),o=(v,label,k)=>`<button class="qzo${QZ[k]===v?' on':''}" data-act="qz" data-k="${k}" data-v="${esc(String(v))}">${esc(label)}</button>`;
+  const head=`<h1 style="margin-top:16px">${kk?'Дәрумендерді 1 минутта таңдау':'Подбор витаминов за 1 минуту'}</h1><div class="qzbar"><span style="width:${[10,40,70,100][QZ.step]}%"></span></div>`;
+  let body='';
+  if(QZ.step===0){
+    body=`<h2>${kk?'Кімге таңдаймыз?':'Для кого подбираем?'}</h2><div class="qzopts">${o('m',kk?'Ер адамға':'Мужчине','who')}${o('w',kk?'Әйелге':'Женщине','who')}${o('k',kk?'Балаға':'Ребёнку','who')}</div>`;
+  }else if(QZ.step===1){
+    const g=QZ.who==='k'?QZ_GOALS.k:QZ_GOALS.a.concat(QZ_GOALS[QZ.who]||[]);
+    body=`<h2>${kk?'Не маңызды?':'Что сейчас важнее всего?'}</h2><div class="qzopts">${g.filter(x=>inStockIds(QZ_MAP[x[0]]).length).map(x=>o(x[0],kk?x[2]:x[1],'goal')).join('')}</div>`;
+  }else if(QZ.step===2){
+    body=`<h2>${kk?'Бюджет қандай?':'Какой бюджет?'}</h2><div class="qzopts">${o(10000,kk?'10 000 ₸ дейін':'До 10 000 ₸','bud')}${o(20000,kk?'20 000 ₸ дейін':'До 20 000 ₸','bud')}${o(0,kk?'Маңызды емес':'Не важно','bud')}</div>`;
+  }else{
+    const list=qzPick(),sum=list.reduce((s,p)=>s+p.price,0);
+    const wa='https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent((kk?'Сәлеметсіз бе! Сайттағы таңдау бойынша сұрағым бар:\n':'Здравствуйте! Подобрал на сайте, хочу уточнить:\n')+list.map(p=>'• '+cleanName(p.name.ru)+' — '+money(p.price)).join('\n'));
+    body=list.length?`<h2>${kk?'Сізге ұсынамыз':'Мы рекомендуем'}</h2><div class="grid">${list.map(card).join('')}</div>
+      <div class="qzsum">${kk?'Барлығы':'Итого'}: <b>${money(sum)}</b></div>
+      <button class="btn block gold" data-act="qzall">${kk?'Барлығын себетке салу':'Добавить всё в корзину'}</button>
+      <a class="btn block wa" style="margin-top:10px" target="_blank" rel="noopener" href="${wa}">${kk?'WhatsApp-та кеңес алу':'Уточнить у консультанта в WhatsApp'}</a>
+      <p class="qznote">${kk?'ББҚ дәрі емес. Қабылдар алдында дәрігермен кеңесіңіз.':'БАД не является лекарством. Перед приёмом проконсультируйтесь с врачом, детям — с педиатром.'}</p>`
+      :`<div class="note">${kk?'Қазір лайықты тауар жоқ. WhatsApp-қа жазыңыз, таңдап береміз.':'Сейчас подходящих товаров нет в наличии. Напишите в WhatsApp, подберём вручную.'}</div>`;
+    body+=`<button class="btn block line" style="margin-top:12px" data-act="qzreset">${kk?'Қайта таңдау':'Подобрать заново'}</button>`;
+  }
+  const back=QZ.step>0&&QZ.step<3?`<button class="qzback" data-act="qzback">← ${kk?'Артқа':'Назад'}</button>`:'';
+  return `<div class="qz">${head}${back}${body}</div>`;
+}
+function qzBlock(){
+  const kk=qzKK();
+  return `<section style="padding-top:22px"><a class="qzcta" href="#/podbor"><b>${kk?'Не алуды білмейсіз бе?':'Не знаете, что выбрать?'}</b><span>${kk?'3 сұраққа жауап беріңіз — дәрумендерді таңдап береміз':'Ответьте на 3 вопроса — подберём витамины под вашу задачу'}</span><em>${kk?'Таңдауды бастау →':'Начать подбор →'}</em></a></section>`;
+}
+function bundlesBlock(){
+  const kk=qzKK();
+  const bs=BUNDLES.map(b=>({b,items:inStockIds(b.ids)})).filter(x=>x.items.length===x.b.ids.length);
+  if(!bs.length)return '';
+  return `<section id="bundles"><h2>${kk?'Дайын жинақтар':'Готовые наборы'}</h2><div class="bundles">${bs.map(({b,items})=>{
+    const sum=items.reduce((s,p)=>s+p.price,0);
+    return `<div class="bundle"><div class="bimgs">${items.map(p=>`<a href="#/product/${esc(p.slug)}">${imgBox(p,'bph')}</a>`).join('')}</div>
+      <b class="bt">${esc(kk?b.kk:b.ru)}</b><div class="bs">${esc(kk?b.skk:b.sru)}</div>
+      <div class="price">${money(sum)}</div>
+      <button class="btn block sm" data-act="bundle" data-id="${b.id}">${kk?'Жинақты себетке салу':'Добавить набор в корзину'}</button></div>`}).join('')}</div></section>`;
+}
 function viewHome(){
   const main=DB.cats.filter(c=>c.main),rest=DB.cats.filter(c=>!c.main);
   const vis=visible();
@@ -1092,12 +1178,14 @@ function viewHome(){
     <div class="trust">${t('trust').map((x,i)=>`<div><b>${esc(x[0])}${i===0?LOCK:''}</b>${esc(x[1])}</div>`).join('')}</div></div>
   ${banner()}
   ${needsBlock()}
+  ${qzBlock()}
   <section id="cats" style="padding-top:28px"><h2>${t('cats')}</h2>
     <div class="cats">${main.map(tile).join('')}</div>
     ${rest.length?`<div class="cats cats-extra" id="catsx">${rest.map(tile).join('')}</div>
     <button class="btn block line" style="margin-top:12px" data-act="allcats" id="allcatsbtn">${t('allcats')}</button>`:''}
   </section>
   ${(pop.length||neu.length||fea.length)?sec(t('popular'),pop)+sec(t('news'),neu,1)+sec(t('featured'),fea,1):sec(t('all_items'),vis.slice(0,12))}
+  ${bundlesBlock()}
   <section><a class="btn block" href="#/catalog">${t('all_items')} (${vis.length})</a></section>
   ${shopBlock()}
   <section id="about"><h2>${t('about')}</h2><div class="about">${t('about_txt')}</div></section>
@@ -1788,6 +1876,7 @@ function renderInner(){
   else if(path==='/catalog'){html=viewCatalog(q);after=updateCatalog}
   else if(path.startsWith('/product/'))html=viewProduct(safeDec(path.slice(9)));
   else if(path==='/cart')html=viewCart();
+  else if(path==='/podbor'){html=DB.loaded?viewQuiz():'<div class="note" style="margin-top:20px">Загрузка…</div>';document.title=(lang==='kk'?'Дәрумендерді таңдау':'Подбор витаминов')+' — MUSLIM SHOP'}
   else if(path==='/admin')html=viewAdmin();
   else html=viewHome();
   app.innerHTML=html;if(after)after();
@@ -1854,6 +1943,11 @@ document.addEventListener('click',e=>{
     case 'lang':lang=id;LS.set('ms_lang',lang);render();break;
     case 'allcats':{const x=$('#catsx');x.classList.toggle('open');b.textContent=x.classList.contains('open')?t('hidecats'):t('allcats');break}
     case 'add':addToCart(id,1);break;
+    case 'qz':{const k=b.dataset.k,v=b.dataset.v;QZ[k]=k==='bud'?Number(v):v;if(k==='who')QZ.goal='';QZ.step=k==='who'?1:k==='goal'?2:3;if(QZ.step===3)ymGoal('quiz_done');render();break}
+    case 'qzback':QZ.step=Math.max(0,QZ.step-1);render();break;
+    case 'qzreset':QZ={step:0,who:'',goal:'',bud:0};render();break;
+    case 'qzall':qzPick().forEach(p=>addToCart(p.id,1));location.hash='#/cart';break;
+    case 'bundle':{const bd=BUNDLES.find(x=>x.id===id);if(bd){inStockIds(bd.ids).forEach(p=>addToCart(p.id,1));ymGoal('bundle_add');location.hash='#/cart'}break}
     case 'q+':pq=Math.min(99,pq+1);$('#qv').textContent=pq;break;
     case 'q-':pq=Math.max(1,pq-1);$('#qv').textContent=pq;break;
     case 'padd':addToCart(id,pq);break;
