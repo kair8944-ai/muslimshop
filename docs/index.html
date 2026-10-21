@@ -1027,7 +1027,7 @@ function addToCart(id,q=1){
   const p=prodById(id);if(!p||p.status!=='in')return;
   const it=cart.find(i=>i.id===id);
   if(it)it.q+=q;else cart.push({id,q});
-  saveCart();toast(t('added'));ymGoal('add_to_cart');try{statEv('c',id)}catch(e){}
+  saveCart();toast(t('added'));ymGoal('add_to_cart');try{ntCart(id)}catch(e){}try{statEv('c',id)}catch(e){}
 }
 const cartLines=()=>cart.map(i=>({p:prodById(i.id),q:i.q})).filter(x=>x.p&&x.p.status!=='hidden');
 
@@ -1634,6 +1634,7 @@ function adminList(){
   <button class="btn line block" data-act="acats" style="margin-bottom:12px">Категории (${DB.cats.length})</button>
   <button class="btn line block" data-act="astats" style="margin-bottom:12px">📊 Товары и посещения</button>
   <button class="btn line block" data-act="gh-publish" style="margin-bottom:12px">🔍 Опубликовать и обновить страницы для поиска</button>
+  ${ntPanel()}
   ${tgPanel()}
   <details style="margin-bottom:14px"><summary class="btn sm line block" style="list-style:none;text-align:center;cursor:pointer">⚙ Инструменты: копия, восстановление, перевод</summary><div style="margin-top:10px">
   <button class="btn sm line block" data-act="gh-dl" style="margin-bottom:14px">Скачать catalog.json (запасная копия)</button>
@@ -1885,6 +1886,9 @@ document.addEventListener('click',e=>{
     case 'tg-fmt':tgSet('fmt',id);break;
     case 'tg-cap':tgSet('cap',id);break;
     case 'tg-save':tgSave();break;
+    case 'nt-save':ntSave();break;
+    case 'nt-test':ntTest();break;
+    case 'nt-off':ntOff();break;
     case 'tg-bulk':tgBulk();break;
     case 'tg-menu':tgMenu().catch(e=>toast('Ошибка: '+(e&&e.message||e)));break;
     case 'astats-range':ST.range=Number(id)||7;KEEP=true;render();break;
@@ -2818,6 +2822,7 @@ function anPage(){
   AN.sess=true;
   if(isNew){
     inc.totalVisits=1;inc['hourly.'+anHour()]=1;
+    try{ntVisit(path)}catch(e){}
     try{const today=stDay();if(anVid()&&localStorage.getItem('app_last_visit_date')!==today){inc.uniqueVisitors=1;localStorage.setItem('app_last_visit_date',today)}}catch(e){}
   }
   anSend(inc);
@@ -2930,6 +2935,92 @@ function adminStats(){
   ${rows.map(r=>`<div class="note" style="margin-bottom:8px;display:flex;justify-content:space-between;gap:10px"><span>${esc(r.n)}</span><b>${r.v} из ${r.all}</b></div>`).join('')}
   <h2 style="margin:18px 0 10px">Яндекс Метрика</h2>
   <div class="note">Посещения считает Яндекс Метрика (счётчик ${YM_ID}). Откройте <a href="https://metrika.yandex.ru/dashboard?id=${YM_ID}" target="_blank" rel="noopener"><b>metrika.yandex.ru</b></a>. Заходы с этого телефона, где вы вошли в управление, не считаются.</div>`;
+}
+
+
+/* ============ Уведомления владельцу в Telegram: новый посетитель и добавление в корзину ============ */
+/* Настройки (токен бота и чат владельца) лежат в analytics_daily/_notify и вводятся в управлении. Заходы владельца и ботов не отправляются (anIgnored). */
+const NT_DOC=()=>anBase()+'/analytics_daily/_notify';
+let NT_P=null;
+function ntCfg(){
+  if(NT_P)return NT_P;
+  NT_P=(async()=>{
+    try{const c=sessionStorage.getItem('ms_nt');if(c)return JSON.parse(c)}catch(e){}
+    let cfg={};
+    try{
+      const r=await fetch(NT_DOC()+'?key='+encodeURIComponent(AN_CFG.apiKey));
+      if(r.ok){const j=await r.json();const f=j.fields||{};cfg={t:(f.t&&f.t.stringValue)||'',c:(f.c&&f.c.stringValue)||'',on:!(f.on&&f.on.booleanValue===false)}}
+    }catch(e){}
+    try{sessionStorage.setItem('ms_nt',JSON.stringify(cfg))}catch(e){}
+    return cfg;
+  })();
+  return NT_P;
+}
+const ntTime=()=>new Date(Date.now()+5*3600e3).toISOString().slice(11,16);
+const ntDev=()=>{const u=navigator.userAgent||'';return /iPhone|iPad/i.test(u)?'iPhone':/Android/i.test(u)?'Android':/Mobi/i.test(u)?'телефон':'компьютер'};
+async function ntSend(text,force){
+  try{
+    if(!force&&(!anOn()||anIgnored()))return;
+    const c=await ntCfg();
+    if(!c||!c.t||!c.c||(c.on===false&&!force))return;
+    await fetch('https://api.telegram.org/bot'+c.t+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:c.c,text,disable_web_page_preview:true}),keepalive:true});
+  }catch(e){}
+}
+function ntPageName(path){
+  if(!path||path==='/')return 'Главная';
+  if(path.startsWith('/product/')){const p=prodById(safeDec(path.slice(9)));return p?'Товар: '+cleanName(p.name.ru||p.name.kk):'Страница товара'}
+  if(path.startsWith('/catalog'))return 'Каталог';
+  if(path.startsWith('/cart'))return 'Корзина';
+  return path;
+}
+function ntVisit(path){
+  let src='';try{src=stSrc()}catch(e){}
+  ntSend('👀 Новый посетитель на сайте\n'+ntPageName(path)+'\nОткуда: '+(src||'—')+'\nУстройство: '+ntDev()+' · '+(lang==='kk'?'KZ':'RU')+'\nВремя: '+ntTime());
+}
+function ntCart(id){
+  const p=prodById(id);if(!p)return;
+  let n=0,sum=0;try{cartLines().forEach(x=>{n+=x.q;sum+=x.q*(x.p.price||0)})}catch(e){}
+  ntSend('🛒 Товар добавлен в корзину\n'+cleanName(p.name.ru||p.name.kk)+(p.price>0?' — '+money(p.price):'')+'\nВ корзине: '+n+' шт. на '+money(sum)+'\nВремя: '+ntTime());
+}
+async function ntWrite(fields){
+  const f={};const mask=[];
+  for(const k in fields){mask.push('updateMask.fieldPaths='+k);f[k]=typeof fields[k]==='boolean'?{booleanValue:fields[k]}:{stringValue:String(fields[k])}}
+  const r=await fetch(NT_DOC()+'?key='+encodeURIComponent(AN_CFG.apiKey)+'&'+mask.join('&'),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:f})});
+  if(!r.ok)throw new Error('не удалось сохранить настройки ('+r.status+')');
+  NT_P=null;try{sessionStorage.removeItem('ms_nt')}catch(e){}
+}
+async function ntSave(){
+  const tk=(($('#nt-token')||{}).value||'').trim();
+  if(!tk){toast('Вставьте токен бота от @BotFather');return}
+  toast('Проверяю бота…');
+  try{
+    const me=await fetch('https://api.telegram.org/bot'+tk+'/getMe').then(r=>r.json());
+    if(!me.ok)throw new Error('Telegram не принял токен. Скопируйте его целиком.');
+    const up=await fetch('https://api.telegram.org/bot'+tk+'/getUpdates').then(r=>r.json());
+    const msgs=((up&&up.result)||[]).map(u=>u.message||u.my_chat_member||u.edited_message).filter(m=>m&&m.chat&&m.chat.type==='private');
+    if(!msgs.length)throw new Error('Откройте своего бота @'+me.result.username+' в Telegram, нажмите «Старт» и потом снова «Подключить».');
+    const chat=msgs[msgs.length-1].chat;
+    await ntWrite({t:tk,c:String(chat.id),on:true});
+    const i=$('#nt-token');if(i)i.value='';
+    await ntSend('✅ Уведомления MUSLIM SHOP подключены.\nСюда будут приходить новые посетители и добавления в корзину.',true);
+    toast('Готово: уведомления придут в чат с @'+me.result.username+' ✓');
+    ntSt('включены');
+  }catch(e){toast('Telegram: '+(e&&e.message||e))}
+}
+async function ntTest(){await ntSend('🔔 Тестовое уведомление MUSLIM SHOP, '+ntTime(),true);toast('Тест отправлен')}
+async function ntOff(){
+  try{const c=await ntCfg();await ntWrite({on:!(c&&c.on!==false)});const off=(c&&c.on!==false);toast(off?'Уведомления выключены':'Уведомления включены');ntSt(off?'выключены':'включены');}catch(e){toast(String(e&&e.message||e))}
+}
+let NT_ADM=null;
+function ntSt(v){NT_ADM=v;const el=document.getElementById('nt-st');if(el)el.textContent=v}
+function ntPanel(){
+  if(!NT_ADM){NT_ADM='…';ntCfg().then(c=>{NT_ADM=c&&c.t&&c.c?(c.on===false?'выключены':'включены'):'не подключены';const el=document.getElementById('nt-st');if(el)el.textContent=NT_ADM})}
+  return `<details class="note" style="margin-bottom:14px"><summary><b>🔔 Уведомления о посетителях</b> · <span id="nt-st">${esc(NT_ADM)}</span></summary><div style="margin-top:10px;display:grid;gap:8px">
+  <div style="font-size:15px">1. В @BotFather создайте бота и скопируйте токен. 2. Откройте своего бота и нажмите «Старт». 3. Вставьте токен сюда и нажмите «Подключить».</div>
+  <div><label for="nt-token">Токен бота</label><input id="nt-token" type="password" autocomplete="off" autocapitalize="none" placeholder="вставьте токен от @BotFather" style="width:100%"></div>
+  <button type="button" class="btn sm gold block" data-act="nt-save">Подключить</button>
+  <div class="two"><button type="button" class="btn sm line" data-act="nt-test">Тест</button><button type="button" class="btn sm line" data-act="nt-off">Вкл / выкл</button></div>
+  <div style="font-size:14px">Приходит: новый посетитель (один раз за визит) и каждое добавление в корзину. Ваши собственные заходы не отправляются.</div></div></details>`;
 }
 
 /* ============ Плавающая кнопка WhatsApp ============ */
