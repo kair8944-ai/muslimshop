@@ -432,10 +432,18 @@ function ghFromJson(j){
   GH.cols.products=P;GH.cols.categories=C;GH.cols.catalog={};
 }
 const ghHdr=t=>({Authorization:'Bearer '+t,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'});
+/* fetch с таймаутом: если GitHub или интернет не отвечает, через ms выдаём понятную ошибку, а не висим вечно */
+async function ghFetchT(url,o,ms){
+  const ac=typeof AbortController!=='undefined'?new AbortController():null;
+  let tm;const lim=new Promise((_,rej)=>{tm=setTimeout(()=>{try{ac&&ac.abort()}catch(e){}rej(new Error('GitHub не отвечает больше '+Math.round(ms/1000)+' сек. Проверьте интернет и нажмите «Опубликовать» ещё раз.'))},ms)});
+  try{return await Promise.race([fetch(url,Object.assign({},o||{},ac?{signal:ac.signal}:{})),lim])}
+  catch(e){if(e&&e.name==='AbortError')throw new Error('GitHub не отвечает больше '+Math.round(ms/1000)+' сек. Проверьте интернет и нажмите «Опубликовать» ещё раз.');if(e&&e.name==='TypeError')throw new Error('Нет связи с GitHub. Проверьте интернет и попробуйте ещё раз.');throw e}
+  finally{clearTimeout(tm)}
+}
 async function ghApi(path,opt){
   const g=ghGet();if(!g||!g.t)throw new Error('Нет доступа к GitHub: войдите в управление заново.');
   opt=opt||{};const h=ghHdr(g.t);if(opt.body)h['Content-Type']='application/json';
-  const r=await fetch('https://api.github.com/repos/'+g.o+'/'+g.r+path,{method:opt.method||'GET',headers:h,body:opt.body});
+  const r=await ghFetchT('https://api.github.com/repos/'+g.o+'/'+g.r+path,{method:opt.method||'GET',headers:h,body:opt.body,cache:'no-store'},opt.ms||(opt.body?90000:30000));
   const j=await r.json().catch(()=>({}));
   if(!r.ok){const m=String(j.message||'');throw new Error(r.status===401?'GitHub не принял токен (401). Войдите заново с новым токеном.':(r.status===403||r.status===404)?'У токена нет права записи в репозиторий ('+r.status+'). Нужно разрешение Contents: Read and write.':r.status+': '+m)}
   return j;
@@ -443,7 +451,7 @@ async function ghApi(path,opt){
 async function ghBase(){
   if(GH.base)return GH.base;
   const g=ghGet();let br=g.br||'main',dir=g.dir==null?'docs':g.dir;
-  try{const j=await ghApi('/pages');if(j&&j.source){br=j.source.branch||br;dir=String(j.source.path||'/')}}catch(e){}
+  try{const j=await ghApi('/pages',{ms:15000});if(j&&j.source){br=j.source.branch||br;dir=String(j.source.path||'/')}}catch(e){}
   dir=String(dir).replace(/^\/+|\/+$/g,'');
   return GH.base={dir:dir?dir+'/':'',br};
 }
@@ -452,11 +460,11 @@ async function ghFetchCatalog(){
   if(g&&g.t&&/^#\/admin/.test(location.hash||'')){
     try{
       const b=await ghBase();
-      const r=await fetch('https://api.github.com/repos/'+g.o+'/'+g.r+'/contents/'+b.dir+'catalog.json?ref='+encodeURIComponent(b.br),{headers:Object.assign(ghHdr(g.t),{Accept:'application/vnd.github.raw+json'}),cache:'no-store'});
+      const r=await ghFetchT('https://api.github.com/repos/'+g.o+'/'+g.r+'/contents/'+b.dir+'catalog.json?ref='+encodeURIComponent(b.br),{headers:Object.assign(ghHdr(g.t),{Accept:'application/vnd.github.raw+json'}),cache:'no-store'},45000);
       if(r.ok){const j=await r.json();GH.src='api';return j}
     }catch(e){}
   }
-  const r=await fetch('catalog.json',{cache:'no-cache'});
+  const r=await ghFetchT('catalog.json',{cache:'no-cache'},45000);
   if(!r.ok)throw new Error('Не найден файл catalog.json рядом с index.html (код '+r.status+'). Загрузите catalog.json в ту же папку на GitHub, где лежит index.html.');
   return r.json();
 }
@@ -504,7 +512,7 @@ async function ghLoginDo(o,r,tk,dir,msg){
   msg('Проверяю доступ к GitHub…');
   let j;
   try{
-    const rr=await fetch('https://api.github.com/repos/'+o+'/'+r,{headers:ghHdr(tk)});
+    const rr=await ghFetchT('https://api.github.com/repos/'+o+'/'+r,{headers:ghHdr(tk)},20000);
     j=await rr.json().catch(()=>({}));
     if(rr.status===401){msg('GitHub не принял токен. Скопируйте токен целиком или создайте новый.');return false}
     if(rr.status===404){msg('Репозиторий '+o+'/'+r+' не найден, либо у токена нет доступа к нему.');return false}
@@ -621,8 +629,9 @@ async function ghPublish(){
   if(GH.publishing)return;
   GH.publishing=true;GH.msg='Готовлю публикацию…';ghBar();
   try{
-    await GH.ready;
-    if(GH.err||!Object.keys(GH.cols.products).length)throw new Error('Каталог не загружен, публиковать нельзя.');
+    let rt;await Promise.race([GH.ready,new Promise((_,rej)=>{rt=setTimeout(()=>rej(new Error('Каталог так и не загрузился за 60 сек. Обновите страницу управления и нажмите «Опубликовать» ещё раз.')),60000)})]).finally(()=>clearTimeout(rt));
+    if(GH.err||!Object.keys(GH.cols.products).length)throw new Error('Каталог не загружен, публиковать нельзя.'+(GH.err?' ('+GH.err+')':''));
+    GH.msg='Подключаюсь к GitHub…';ghBar();
     const b=await ghBase();
     const sha1=async s=>{const h=await crypto.subtle.digest('SHA-1',new TextEncoder().encode(s));return [...new Uint8Array(h)].slice(0,6).map(x=>x.toString(16).padStart(2,'0')).join('')};
     const todo=[],seen={},map={},bad=[];
@@ -1877,7 +1886,7 @@ function renderInner(){
   else if(path.startsWith('/product/'))html=viewProduct(safeDec(path.slice(9)));
   else if(path==='/cart')html=viewCart();
   else if(path==='/podbor'){html=DB.loaded?viewQuiz():'<div class="note" style="margin-top:20px">Загрузка…</div>';document.title=(lang==='kk'?'Дәрумендерді таңдау':'Подбор витаминов')+' — MUSLIM SHOP'}
-  else if(path==='/admin'){html=viewAdmin();if(GH.src==='pub'&&!GH.dirty&&!GH.reload){const g=ghGet();if(g&&g.t){GH.reload=1;GH.ready=ghLoadAll().then(()=>{GH.reload=0;return loadData()}).then(()=>render()).catch(()=>{GH.reload=0})}}}
+  else if(path==='/admin'){html=viewAdmin();if(GH.src==='pub'&&!GH.dirty&&!GH.reload){const g=ghGet();if(g&&g.t){GH.reload=1;const gp=ghLoadAll();GH.ready=gp;gp.then(()=>{GH.reload=0;return loadData()}).then(()=>render()).catch(()=>{GH.reload=0})}}}
   else html=viewHome();
   app.innerHTML=html;if(after)after();
   renderChrome();ymHit();try{statHit()}catch(e){}
