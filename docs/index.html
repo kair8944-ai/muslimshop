@@ -416,7 +416,50 @@ let FBLOAD_ERR='';
 let ADMIN_EMAILS=[];
 const FBP=Promise.resolve();
 const GH={cols:{products:{},catalog:{},categories:{},visits:{}},dirty:0,up:{},cbs:[],publishing:false,msg:'',base:null,err:''};
-const ghGet=()=>{try{return JSON.parse(localStorage.getItem('ms_gh')||'null')}catch(e){return null}};
+let GH_MEM=null;/* доступ к GitHub после входа по паролю: только в памяти вкладки, не в браузере */
+const ghGet=()=>{if(GH_MEM)return GH_MEM;try{return JSON.parse(localStorage.getItem('ms_gh')||'null')}catch(e){return null}};
+/* ============ Вход владельца по почте и паролю (Firebase Authentication) ============ */
+/* Токен GitHub хранится в Firestore admin/secrets, читать его может только владелец (см. правила базы). */
+const FA_KEY='AIzaSyCCNwtzhDTBPB8GU_Ls7ogvN5xyUDOez3M',FA_PROJ='muslim-shop-55c12';
+const FA_DOCS='https://firestore.googleapis.com/v1/projects/'+FA_PROJ+'/databases/(default)/documents';
+let FA_TOK=null;
+const faGet=()=>{try{return JSON.parse(localStorage.getItem('ms_fa')||'null')}catch(e){return null}};
+function faErr(m){m=String(m||'');if(/INVALID_LOGIN_CREDENTIALS|INVALID_PASSWORD|EMAIL_NOT_FOUND|INVALID_EMAIL/.test(m))return 'Неверная почта или пароль.';if(/TOO_MANY_ATTEMPTS/.test(m))return 'Слишком много попыток. Подождите несколько минут.';if(/USER_DISABLED/.test(m))return 'Этот вход отключён.';if(/TOKEN_EXPIRED|INVALID_REFRESH_TOKEN|USER_NOT_FOUND/.test(m))return 'Вход устарел. Войдите заново.';if(/OPERATION_NOT_ALLOWED/.test(m))return 'Вход по паролю не включён в Firebase.';return 'Ошибка входа: '+m}
+async function faPost(url,body,form){
+  let r;try{r=await fetch(url,{method:'POST',headers:{'Content-Type':form?'application/x-www-form-urlencoded':'application/json'},body:form?body:JSON.stringify(body)})}catch(e){throw new Error('Нет связи. Проверьте интернет.')}
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(faErr((j.error&&j.error.message)||r.status));
+  return j;
+}
+async function faSignIn(email,pass){
+  const j=await faPost('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+FA_KEY,{email,password:pass,returnSecureToken:true});
+  FA_TOK={id:j.idToken,exp:Date.now()+(Number(j.expiresIn)||3600)*1000-60000};
+  try{localStorage.setItem('ms_fa',JSON.stringify({rt:j.refreshToken,email:j.email||email}))}catch(e){}
+  return j;
+}
+async function faIdToken(){
+  if(FA_TOK&&FA_TOK.exp>Date.now())return FA_TOK.id;
+  const s0=faGet();if(!s0||!s0.rt)throw new Error('Войдите по почте и паролю.');
+  const j=await faPost('https://securetoken.googleapis.com/v1/token?key='+FA_KEY,'grant_type=refresh_token&refresh_token='+encodeURIComponent(s0.rt),true);
+  FA_TOK={id:j.id_token,exp:Date.now()+(Number(j.expires_in)||3600)*1000-60000};
+  if(j.refresh_token&&j.refresh_token!==s0.rt){s0.rt=j.refresh_token;try{localStorage.setItem('ms_fa',JSON.stringify(s0))}catch(e){}}
+  return FA_TOK.id;
+}
+async function faSecrets(){
+  const t=await faIdToken();
+  const r=await fetch(FA_DOCS+'/admin/secrets',{headers:{Authorization:'Bearer '+t},cache:'no-store'});
+  if(r.status===404)return null;
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(r.status===403?'Нет доступа к настройкам. Проверьте правила базы (Rules) и почту владельца в них.':'Ошибка базы: '+r.status);
+  const f=j.fields||{},v=k=>(f[k]&&f[k].stringValue)||'';
+  return {o:v('gh_o'),r:v('gh_r'),t:v('gh_t'),dir:f.gh_dir?v('gh_dir'):null};
+}
+async function faSaveSecrets(g){
+  const t=await faIdToken();
+  const fields={gh_o:{stringValue:String(g.o)},gh_r:{stringValue:String(g.r)},gh_t:{stringValue:String(g.t)},gh_dir:{stringValue:g.dir==null?'docs':String(g.dir)}};
+  const r=await fetch(FA_DOCS+'/admin/secrets',{method:'PATCH',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify({fields})});
+  if(!r.ok)throw new Error(r.status===403?'База не дала сохранить. Сначала опубликуйте новые правила базы (Rules).':'Ошибка базы: '+r.status);
+}
 const ghStamp=()=>({seconds:Math.floor(Date.now()/1000),nanoseconds:0});
 const ghClean=v=>{if(v&&v.__ts)return ghStamp();if(Array.isArray(v))return v.map(ghClean);if(v&&typeof v==='object'){const o={};for(const k in v)o[k]=ghClean(v[k]);return o}return v};
 const ghClone=v=>JSON.parse(JSON.stringify(v));
@@ -505,10 +548,17 @@ Timestamp={now:ghStamp,fromMillis:ms=>({seconds:Math.floor(ms/1000),nanoseconds:
 /* --- вход владельца: токен GitHub вместо пароля Firebase --- */
 getAuth=initializeAuth=()=>({});
 browserLocalPersistence={};inMemoryPersistence={};
-onAuthStateChanged=(a,cb)=>{GH.cbs.push(cb);const g=ghGet();setTimeout(()=>cb(g&&g.t?{email:g.o+'/'+g.r}:null),0);return ()=>{}};
+onAuthStateChanged=(a,cb)=>{
+  GH.cbs.push(cb);const g=ghGet();
+  if(g&&g.t){setTimeout(()=>cb({email:g.o+'/'+g.r}),0);return ()=>{}}
+  const s0=faGet();
+  if(!s0||!s0.rt){setTimeout(()=>cb(null),0);return ()=>{}}
+  (async()=>{let u=null;try{const x=await faSecrets();if(x&&x.t&&x.o&&x.r){GH_MEM={o:x.o,r:x.r,t:x.t,dir:x.dir,br:'main'};GH.base=null;GH.ready=ghLoadAll();u={email:x.o+'/'+x.r}}}catch(e){}cb(u)})();
+  return ()=>{};
+};
 signInWithEmailAndPassword=async()=>{throw new Error('Вход по паролю больше не используется')};
-signOut=async()=>{try{localStorage.removeItem('ms_gh')}catch(e){}GH.base=null;GH.cbs.forEach(cb=>{try{cb(null)}catch(e){}})};
-async function ghLoginDo(o,r,tk,dir,msg){
+signOut=async()=>{try{localStorage.removeItem('ms_gh');localStorage.removeItem('ms_fa')}catch(e){}GH_MEM=null;FA_TOK=null;GH.base=null;GH.cbs.forEach(cb=>{try{cb(null)}catch(e){}})};
+async function ghLoginDo(o,r,tk,dir,msg,mem){
   msg('Проверяю доступ к GitHub…');
   let j;
   try{
@@ -518,7 +568,9 @@ async function ghLoginDo(o,r,tk,dir,msg){
     if(rr.status===404){msg('Репозиторий '+o+'/'+r+' не найден, либо у токена нет доступа к нему.');return false}
     if(!rr.ok){msg('Ошибка GitHub: '+(j.message||rr.status));return false}
   }catch(e){msg('Нет связи с GitHub. Проверьте интернет.');return false}
-  try{localStorage.setItem('ms_gh',JSON.stringify({o,r,t:tk,dir,br:j.default_branch||'main'}));localStorage.setItem('ms_owner','1')}catch(e){msg('Браузер не дал сохранить вход (режим инкогнито?).');return false}
+  const rec={o,r,t:tk,dir,br:j.default_branch||'main'};
+  if(mem){GH_MEM=rec;try{localStorage.removeItem('ms_gh');localStorage.setItem('ms_owner','1')}catch(e){}}
+  else{try{localStorage.setItem('ms_gh',JSON.stringify(rec));localStorage.setItem('ms_owner','1')}catch(e){msg('Браузер не дал сохранить вход (режим инкогнито?).');return false}}
   GH.base=null;GH.ready=ghLoadAll();await GH.ready;
   const u={email:o+'/'+r};GH.cbs.forEach(cb=>{try{cb(u)}catch(e){}});
   return true;
@@ -1579,7 +1631,15 @@ const ghDef=()=>{const g=ghGet();if(g)return {o:g.o,r:g.r,d:g.dir==null?'docs':g
 function viewAdmin(){
   if(!CONFIGURED)return `<h1 style="margin-top:16px">Управление магазином</h1><div class="note">Firebase ещё не подключён. Откройте index.html и вставьте apiKey и appId в блок FIREBASE_CONFIG в начале скрипта.</div>`;
   if(!isAdmin())return `<h1 style="margin-top:16px">Управление магазином</h1>
-    <form class="form" data-form="login">
+    <form class="form" data-form="plogin" style="margin-bottom:14px">
+      <div class="note">Вход владельца по почте и паролю.</div>
+      <div><label for="pem">Почта</label><input id="pem" name="pem" type="email" value="${esc((faGet()||{}).email||'')}" autocomplete="username" autocapitalize="none" required></div>
+      <div><label for="ppw">Пароль</label><input id="ppw" name="ppw" type="password" autocomplete="current-password" required></div>
+      <button class="btn gold block" type="submit">Войти</button>
+      <div id="ploginmsg" class="note" style="display:none"></div>
+    </form>
+    <details style="margin-bottom:14px"><summary>Войти по токену GitHub (запасной способ)</summary>
+    <form class="form" data-form="login" style="margin-top:10px">
       <div class="note">Вход через GitHub. Токен вводится один раз и хранится только на этом телефоне.</div>
       <div><label for="own">Аккаунт GitHub</label><input id="own" name="own" value="${esc(ghDef().o)}" autocapitalize="none" required></div>
       <div><label for="repo">Репозиторий</label><input id="repo" name="repo" value="${esc(ghDef().r)}" autocapitalize="none" required></div>
@@ -1587,7 +1647,7 @@ function viewAdmin(){
       <div><label for="dir">Папка сайта (docs, либо пусто для корня)</label><input id="dir" name="dir" value="${esc(ghDef().d)}" autocapitalize="none"></div>
       <button class="btn gold block" type="submit">Войти</button>
       <div id="loginmsg" class="note" style="display:none"></div>
-    </form>`;
+    </form></details>`;
   anKick();
   return `<h1 style="margin-top:16px">Управление магазином</h1>
   <div id="anbar" class="note" style="margin-bottom:12px">${anBarInner()}</div>
@@ -1735,6 +1795,7 @@ function adminList(){
   <button class="btn line block" data-act="acats" style="margin-bottom:12px">Категории (${DB.cats.length})</button>
   <button class="btn line block" data-act="astats" style="margin-bottom:12px">📊 Товары и посещения</button>
   <button class="btn line block" data-act="gh-publish" style="margin-bottom:12px">🔍 Опубликовать и обновить страницы для поиска</button>
+  ${faPanel()}
   ${ntPanel()}
   ${tgPanel()}
   <details style="margin-bottom:14px"><summary class="btn sm line block" style="list-style:none;text-align:center;cursor:pointer">⚙ Инструменты: копия, восстановление, перевод</summary><div style="margin-top:10px">
@@ -1993,6 +2054,7 @@ document.addEventListener('click',e=>{
     case 'tg-fmt':tgSet('fmt',id);break;
     case 'tg-cap':tgSet('cap',id);break;
     case 'tg-save':tgSave();break;
+    case 'fa-link':faLink();break;
     case 'nt-save':ntSave();break;
     case 'nt-test':ntTest();break;
     case 'nt-off':ntOff();break;
@@ -2088,6 +2150,19 @@ async function handleForm2(f){
     const lines=cartLines(),total=lines.reduce((s,l)=>s+l.p.price*l.q,0);
     const txt='Заказ MUSLIM SHOP\n\n'+lines.map((l,i)=>(i+1)+'. '+l.p.name.ru+' — '+l.q+' шт. × '+money(l.p.price)+' = '+money(l.p.price*l.q)+'\n   '+prodUrl(l.p)).join('\n')+'\n\nИтого: '+money(total)+'\n\nИмя: '+name+'\nТелефон: '+tel+(fd.get('c')?'\nКомментарий: '+fd.get('c'):'');
     ymGoal('order_whatsapp');try{statEv('o')}catch(e){}window.open('https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(txt),'_blank','noopener');return;
+  }
+  if(kind==='plogin'){
+    const msg=m=>{const b=$('#ploginmsg');if(b){b.style.display='block';b.textContent=m}toast(m)};
+    const em=String(fd.get('pem')||'').trim(),pw=String(fd.get('ppw')||'');
+    if(!em||!pw){msg('Введите почту и пароль');return}
+    msg('Вхожу…');
+    try{await faSignIn(em,pw)}catch(e){msg(String(e&&e.message||e));return}
+    let x=null;try{x=await faSecrets()}catch(e){msg(String(e&&e.message||e));return}
+    if(!x||!x.t||!x.o||!x.r){msg('Пароль принят, но доступ к GitHub ещё не привязан. Один раз войдите по токену GitHub (ниже) и в управлении нажмите «Привязать».');return}
+    const ok=await ghLoginDo(x.o,x.r,x.t,x.dir==null?'docs':x.dir,msg,true);
+    if(ok){msg('Вы вошли. Открываю управление…');await loadData();render();ghBar()}
+    else{try{localStorage.removeItem('ms_fa')}catch(e){}FA_TOK=null}
+    return;
   }
   if(kind==='login'){
     const msg=m=>{const b=$('#loginmsg');if(b){b.style.display='block';b.textContent=m}toast(m)};
@@ -3048,8 +3123,13 @@ function adminStats(){
 /* ============ Уведомления владельцу в Telegram: новый посетитель и добавление в корзину ============ */
 /* Настройки (токен бота и чат владельца) лежат в analytics_daily/_notify и вводятся в управлении. Заходы владельца и ботов не отправляются (anIgnored). */
 const NT_DOC=()=>anBase()+'/analytics_daily/_notify';
+/* Адрес своего посредника Cloudflare Worker. Токен бота хранится там, а не на сайте. Пусто = уведомления выключены. */
+const NT_RELAY='';
 let NT_P=null;
 function ntCfg(){
+  return Promise.resolve(NT_RELAY?{t:'relay',c:'relay',on:true}:{});
+}
+function ntCfgOld(){
   if(NT_P)return NT_P;
   NT_P=(async()=>{
     try{const c=sessionStorage.getItem('ms_nt');if(c)return JSON.parse(c)}catch(e){}
@@ -3068,9 +3148,8 @@ const ntDev=()=>{const u=navigator.userAgent||'';return /iPhone|iPad/i.test(u)?'
 async function ntSend(text,force){
   try{
     if(!force&&(!anOn()||anIgnored()))return;
-    const c=await ntCfg();
-    if(!c||!c.t||!c.c||(c.on===false&&!force))return;
-    await fetch('https://api.telegram.org/bot'+c.t+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:c.c,text,disable_web_page_preview:true}),keepalive:true});
+    if(!NT_RELAY)return;
+    await fetch(NT_RELAY,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({text}),keepalive:true});
   }catch(e){}
 }
 function ntPageName(path){
@@ -3096,7 +3175,8 @@ async function ntWrite(fields){
   if(!r.ok)throw new Error('не удалось сохранить настройки ('+r.status+')');
   NT_P=null;try{sessionStorage.removeItem('ms_nt')}catch(e){}
 }
-async function ntSave(){
+async function ntSave(){toast('Уведомления теперь настраиваются в Cloudflare Worker (см. инструкцию).')}
+async function ntSaveOld(){
   const tk=(($('#nt-token')||{}).value||'').trim();
   if(!tk){toast('Вставьте токен бота от @BotFather');return}
   toast('Проверяю бота…');
@@ -3114,19 +3194,40 @@ async function ntSave(){
     ntSt('включены');
   }catch(e){toast('Telegram: '+(e&&e.message||e))}
 }
-async function ntTest(){await ntSend('🔔 Тестовое уведомление MUSLIM SHOP, '+ntTime(),true);toast('Тест отправлен')}
-async function ntOff(){
+async function ntTest(){if(!NT_RELAY){toast('Уведомления не подключены: адрес посредника не указан');return}await ntSend('🔔 Тестовое уведомление MUSLIM SHOP, '+ntTime(),true);toast('Тест отправлен')}
+async function ntOff(){toast('Включить или выключить уведомления можно в Cloudflare Worker.')}
+async function ntOffOld(){
   try{const c=await ntCfg();await ntWrite({on:!(c&&c.on!==false)});const off=(c&&c.on!==false);toast(off?'Уведомления выключены':'Уведомления включены');ntSt(off?'выключены':'включены');}catch(e){toast(String(e&&e.message||e))}
+}
+function faPanel(){
+  const on=!!GH_MEM;
+  return `<details class="note" style="margin-bottom:14px"><summary><b>🔐 Вход по паролю</b> · ${on?'включён':'не привязан'}</summary><div style="margin-top:10px;display:grid;gap:8px">
+  <div style="font-size:15px">${on?'Вы вошли по паролю. Токен GitHub хранится в базе под паролем, на телефоне его нет. Чтобы сменить токен: войдите по токену GitHub и привяжите снова.':'Введите почту и пароль владельца (созданные в Firebase) и нажмите «Привязать». После этого входите по паролю, а токен GitHub уберётся с телефона.'}</div>
+  ${on?'':`<div><label for="fa-em">Почта</label><input id="fa-em" type="email" autocomplete="username" autocapitalize="none" style="width:100%"></div>
+  <div><label for="fa-pw">Пароль</label><input id="fa-pw" type="password" autocomplete="current-password" style="width:100%"></div>
+  <button type="button" class="btn sm gold block" data-act="fa-link">Привязать</button>`}</div></details>`;
+}
+async function faLink(){
+  const em=(($('#fa-em')||{}).value||'').trim(),pw=(($('#fa-pw')||{}).value||'');
+  const g=ghGet();if(!g||!g.t){toast('Сначала войдите в управление');return}
+  if(!em||!pw){toast('Введите почту и пароль');return}
+  try{
+    toast('Проверяю пароль…');
+    await faSignIn(em,pw);
+    await faSaveSecrets(g);
+    const x=await faSecrets();
+    if(!x||x.t!==g.t)throw new Error('не удалось проверить сохранение');
+    GH_MEM=Object.assign({},g);try{localStorage.removeItem('ms_gh')}catch(e){}
+    render();toast('Готово. Теперь входите по почте и паролю ✓');
+  }catch(e){toast('Пароль: '+(e&&e.message||e))}
 }
 let NT_ADM=null;
 function ntSt(v){NT_ADM=v;const el=document.getElementById('nt-st');if(el)el.textContent=v}
 function ntPanel(){
   if(!NT_ADM){NT_ADM='…';ntCfg().then(c=>{NT_ADM=c&&c.t&&c.c?(c.on===false?'выключены':'включены'):'не подключены';const el=document.getElementById('nt-st');if(el)el.textContent=NT_ADM})}
   return `<details class="note" style="margin-bottom:14px"><summary><b>🔔 Уведомления о посетителях</b> · <span id="nt-st">${esc(NT_ADM)}</span></summary><div style="margin-top:10px;display:grid;gap:8px">
-  <div style="font-size:15px">1. В @BotFather создайте бота и скопируйте токен. 2. Откройте своего бота и нажмите «Старт». 3. Вставьте токен сюда и нажмите «Подключить».</div>
-  <div><label for="nt-token">Токен бота</label><input id="nt-token" type="password" autocomplete="off" autocapitalize="none" placeholder="вставьте токен от @BotFather" style="width:100%"></div>
-  <button type="button" class="btn sm gold block" data-act="nt-save">Подключить</button>
-  <div class="two"><button type="button" class="btn sm line" data-act="nt-test">Тест</button><button type="button" class="btn sm line" data-act="nt-off">Вкл / выкл</button></div>
+  <div style="font-size:15px">Токен бота теперь хранится в вашем посреднике Cloudflare Worker, а не на сайте и не в базе. Посетители его не видят.</div>
+  <button type="button" class="btn sm line block" data-act="nt-test">Тест</button>
   <div style="font-size:14px">Приходит: новый посетитель (один раз за визит) и каждое добавление в корзину. Ваши собственные заходы не отправляются.</div></div></details>`;
 }
 
