@@ -3124,7 +3124,7 @@ function adminStats(){
 /* Настройки (токен бота и чат владельца) лежат в analytics_daily/_notify и вводятся в управлении. Заходы владельца и ботов не отправляются (anIgnored). */
 const NT_DOC=()=>anBase()+'/analytics_daily/_notify';
 /* Адрес своего посредника Cloudflare Worker. Токен бота хранится там, а не на сайте. Пусто = уведомления выключены. */
-const NT_RELAY='';
+const NT_RELAY='https://muslimshop.kair7877.workers.dev';
 let NT_P=null;
 function ntCfg(){
   return Promise.resolve(NT_RELAY?{t:'relay',c:'relay',on:true}:{});
