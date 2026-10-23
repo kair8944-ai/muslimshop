@@ -379,6 +379,21 @@ html,body{overflow-x:clip;max-width:100%}
 .need svg{width:34px;height:34px;stroke:var(--gold-dark);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;display:block;margin:0 auto 8px}
 .need span{font-size:14px;font-weight:700;line-height:1.25;display:block}
 @media(min-width:640px){.hero2 h1{font-size:42px}.needs{display:grid;grid-template-columns:repeat(5,1fr);overflow:visible}.need{flex:none}}
+
+/* ===== адаптация под телефоны: ничего не выходит за край экрана ===== */
+html,body{max-width:100%;overflow-x:hidden}
+img,video,canvas,svg,iframe{max-width:100%}
+.pp{grid-template-columns:minmax(0,1fr)}
+.pp>*,.two>*,.li-b,.form>*,.filters>*,.actions>*{min-width:0}
+h1,h2,h3,.cn,.desc,.cat,.soc b,.about,.contacts,table.specs td,.li-b,.note,.crumbs{overflow-wrap:anywhere}
+.pp h1{font-size:clamp(22px,6.4vw,30px);line-height:1.2;hyphens:auto}
+h1{overflow-wrap:break-word}
+table.specs{table-layout:fixed}
+.sticky-buy{max-width:100vw;box-sizing:border-box}
+.sticky-buy .price{font-size:clamp(24px,7vw,34px)}
+@media(min-width:640px){.pp{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.ph .tag{top:auto;bottom:8px;font-size:13px;padding:2px 8px;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+@media(min-width:640px){.ph .tag{font-size:14px}}
 </style>
 </head>
 <body>
