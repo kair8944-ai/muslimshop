@@ -321,6 +321,15 @@ h2::after{content:"";position:absolute;left:0;bottom:0;width:60px;height:3px;bac
 .card .ph{aspect-ratio:9/16;background:#E9E7E2}
 .card .ph img,.line-item .ph img{object-fit:contain}
 
+/* стиль Kaspi: белые карточки, красная кнопка «В корзину» */
+.card{background:#fff;border:1px solid #ECEDEF;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.card .ph,.pp .ph{background:#fff}
+.card .price{font-size:24px;color:#1A1A1A}
+.card .old{color:#9AA0A6}
+.btn[data-act="add"],.btn[data-act="padd"]{background:#F14635;border-color:#F14635;color:#fff;box-shadow:none}
+.btn[data-act="add"]:hover,.btn[data-act="padd"]:hover{background:#D93A2B;border-color:#D93A2B}
+.btn[data-act="add"]:disabled,.btn[data-act="padd"]:disabled{background:#E3E5E8;border-color:#E3E5E8;color:#80868B}
+
 #ver{position:fixed;left:6px;bottom:3px;font-size:11px;color:#777;opacity:.7;z-index:1;pointer-events:none}
 
 /* окно результата сохранения */
