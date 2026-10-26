@@ -1818,6 +1818,7 @@ function admRows(){const arr=admFiltered();return arr.map(p=>`<div class="adm-ro
       <button class="btn sm line" data-act="tg-send" data-id="${esc(p.id)}">${tgSent()[p.id]?'✓ В канале':'✈ В Telegram'}</button>
       <button class="btn sm line" data-act="story" data-id="${esc(p.id)}">🎬 Сторис</button>
       <button class="btn sm line" data-act="reel" data-id="${esc(p.id)}">🎞 Рилс</button>
+      <button class="btn sm gold" data-act="video" data-id="${esc(p.id)}">🎥 Видео</button>
       <a class="btn sm line" href="#/product/${esc(p.id)}">Открыть</a></div></div>`).join('')||'<div class="empty">'+(DB.products.length?'Ничего не найдено. Измените категорию или поиск.':'Товаров пока нет. Нажмите «Добавить товар».')+'</div>'}
 const admCountTxt=()=>'Показано: '+admFiltered().length+' из '+DB.products.length;
 function admChips(){
@@ -2093,6 +2094,7 @@ document.addEventListener('click',e=>{
     case 'tg-send':tgOne(id);break;
     case 'story':storyOpen(id);break;
     case 'reel':reelOpen(id);break;
+    case 'video':videoOpen(id);break;
     case 'tg-fmt':tgSet('fmt',id);break;
     case 'tg-cap':tgSet('cap',id);break;
     case 'tg-save':tgSave();break;
@@ -2819,6 +2821,289 @@ async function reelOpen(id){
     RL.price=LS.get('ms_story_price',1)!==0;RL.si=Math.min(Math.max(Number(LS.get('ms_story_style',SG_STYLES.length-1))||0,0),SG_STYLES.length-1);
     rlModalOpen();await rlRender();
   }catch(e){toast('Рилс: '+(e&&e.message||e))}
+}
+
+/* ============ 🎥 Видео для статуса и Reels: анимация рисуется и записывается прямо в телефоне (ничего никуда не отправляется) ============ */
+const VD={p:null,id:'',tpl:'new',lang:'ru',price:true,pts:['','',''],run:0,rec:null,A:null,blob:null,ext:'mp4',busy:false};
+const VD_TPL=[{k:'new',n:'✨ Новинка'},{k:'hit',n:'🔥 Хит недели'},{k:'sale',n:'🏷 Акция'},{k:'set',n:'🛍 Подборка из 3'}];
+const VD_PAL={
+  new:{bg:['#0f5a43','#05261c'],txt:'#ffffff',sub:'#e3cd98',acc:'#e6c27a',accTxt:'#08301f',glow:'rgba(230,194,122,.30)'},
+  hit:{bg:['#2a2b31','#111214'],txt:'#ffffff',sub:'#e3cd98',acc:'#f0c66e',accTxt:'#1c1d21',glow:'rgba(255,190,90,.34)'},
+  sale:{bg:['#c41a22','#5a0a0f'],txt:'#ffffff',sub:'#ffe1b0',acc:'#ffd166',accTxt:'#7a0d12',glow:'rgba(255,220,140,.30)'},
+  set:{bg:['#fbf4e6','#e8d6b4'],txt:'#1c1d21',sub:'#7a6035',acc:'#1c1d21',accTxt:'#f0d08a',glow:'rgba(255,255,255,.75)'}
+};
+const VD_T={
+  ru:{new:'НОВИНКА',hit:'ХИТ НЕДЕЛИ',sale:'АКЦИЯ',set:'ПОДБОРКА',order:'Заказать в WhatsApp',addr:'Атырау • Рынок Дина • Бутик 24',site:'Наш сайт:',def:['Оригинальная продукция','Бутик в Атырау','Заказ в WhatsApp']},
+  kk:{new:'ЖАҢА ТАУАР',hit:'АПТА ХИТІ',sale:'АКЦИЯ',set:'ІРІКТЕМЕ',order:'WhatsApp арқылы тапсырыс',addr:'Атырау • Дина базары • 24 бутик',site:'Біздің сайт:',def:['Түпнұсқа өнім','Атыраудағы бутик','WhatsApp арқылы тапсырыс']}
+};
+const vdCl=x=>x<0?0:x>1?1:x,vdPr=(t,a,b)=>vdCl((t-a)/(b-a)),vdEo=x=>1-Math.pow(1-x,3),vdEb=x=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)};
+const vdName=(p,lang)=>String((lang==='kk'&&p.name.kk)||p.name.ru||p.name.kk||'');
+/* три коротких пункта из описания товара (владелец может их поправить перед записью) */
+function vdPoints(p,lang){
+  let s=String((p.desc&&(p.desc[lang]||p.desc.ru))||'').replace(/<[^>]+>/g,' ').replace(/([.!?])\s+/g,'$1\n');
+  const out=[],seen=new Set();
+  for(let x of s.split(/\n+/)){
+    x=x.replace(/^[\s\-–—•·*✔✅☑️✓▪►➤🔹🔸\d.)]+/u,'').replace(/[.;:,!]+$/,'').trim();
+    if(x.length<8||x.length>64||/:$/.test(x)||/https?:|\+7|₸/.test(x))continue;
+    const k=x.toLowerCase();if(seen.has(k))continue;seen.add(k);out.push(x);if(out.length>=3)break;
+  }
+  const d=VD_T[lang].def;let i=0;while(out.length<3)out.push(d[i++]);
+  return out;
+}
+/* вырезаем товар с белого фона: заливка от краёв, белое внутри упаковки не трогаем. Не белый фон — вернёт null */
+const VD_CUT={};
+function vdCut(im){
+  const key=im.src;if(key&&VD_CUT[key]!==undefined)return VD_CUT[key];
+  let res=null;
+  try{
+    const k=Math.min(1,900/Math.max(im.width,im.height)),w=Math.max(2,Math.round(im.width*k)),h=Math.max(2,Math.round(im.height*k));
+    const cv=document.createElement('canvas');cv.width=w;cv.height=h;const x=cv.getContext('2d',{willReadFrequently:true});
+    x.imageSmoothingQuality='high';x.drawImage(sgScale(im,w,h),0,0,w,h);
+    const id=x.getImageData(0,0,w,h),d=id.data,N=w*h,vis=new Uint8Array(N),st=new Int32Array(N);let sp=0,rm=0;
+    const wh=i=>{const r=d[i*4],g=d[i*4+1],b=d[i*4+2];return r>228&&g>228&&b>228&&Math.max(r,g,b)-Math.min(r,g,b)<22};
+    const push=i=>{if(!vis[i]&&wh(i)){vis[i]=1;st[sp++]=i}};
+    for(let i=0;i<w;i++){push(i);push(N-w+i)}for(let j=0;j<h;j++){push(j*w);push(j*w+w-1)}
+    while(sp){const i=st[--sp];rm++;const cx=i%w;if(cx>0)push(i-1);if(cx<w-1)push(i+1);if(i>=w)push(i-w);if(i<N-w)push(i+w)}
+    if(rm/N>0.12&&rm/N<0.96){
+      let x0=w,y0=h,x1=0,y1=0;
+      for(let i=0;i<N;i++){
+        if(vis[i]){d[i*4+3]=0;continue}
+        const cx=i%w,cy=(i/w)|0;
+        if((cx>0&&vis[i-1])||(cx<w-1&&vis[i+1])||(i>=w&&vis[i-w])||(i<N-w&&vis[i+w])){const m=Math.min(d[i*4],d[i*4+1],d[i*4+2]);if(m>190)d[i*4+3]=Math.round(255*(1-(m-190)/65*.85))}
+        if(cx<x0)x0=cx;if(cx>x1)x1=cx;if(cy<y0)y0=cy;if(cy>y1)y1=cy;
+      }
+      x.putImageData(id,0,0);
+      if(x1>x0+10&&y1>y0+10){const o=document.createElement('canvas');o.width=x1-x0+1;o.height=y1-y0+1;o.getContext('2d').drawImage(cv,x0,y0,o.width,o.height,0,0,o.width,o.height);res=o}
+    }
+  }catch(e){res=null}
+  if(key)VD_CUT[key]=res;return res;
+}
+/* спрайт товара с тенью, рисуется один раз (тени каждый кадр тормозят телефон) */
+function vdSprite(im,bw,bh,pal){
+  const cut=vdCut(im),src=cut||im,sc=Math.min(bw/src.width,bh/src.height),dw=Math.round(src.width*sc),dh=Math.round(src.height*sc);
+  const pad=70,cv=document.createElement('canvas');cv.width=dw+pad*2;cv.height=dh+pad*2+40;const c=cv.getContext('2d');c.imageSmoothingQuality='high';
+  if(cut){
+    c.save();c.fillStyle='rgba(0,0,0,.30)';c.filter='blur(18px)';c.beginPath();c.ellipse(cv.width/2,pad+dh+12,dw*.42,26,0,0,Math.PI*2);c.fill();c.restore();
+    c.save();c.shadowColor='rgba(0,0,0,.28)';c.shadowBlur=30;c.shadowOffsetY=14;c.drawImage(sgScale(src,dw,dh),pad,pad,dw,dh);c.restore();
+  }else{
+    c.save();c.shadowColor='rgba(0,0,0,.38)';c.shadowBlur=40;c.shadowOffsetY=14;c.fillStyle='#fff';sgRR(c,pad,pad,dw,dh,34);c.fill();c.restore();
+    c.save();sgRR(c,pad,pad,dw,dh,34);c.clip();c.drawImage(sgScale(src,dw,dh),pad,pad,dw,dh);c.restore();
+    c.strokeStyle=pal.acc;c.lineWidth=5;sgRR(c,pad,pad,dw,dh,34);c.stroke();
+  }
+  return {cv,dw,dh,pad};
+}
+async function vdAssets(){
+  await sgFonts();
+  const p=VD.p,tpl=VD.tpl,lang=VD.lang,pal=VD_PAL[tpl];
+  const logo=await sgLogo().catch(()=>null);
+  const main=await sgLoad(((p.images&&p.images[0])||p.img));
+  const items=[{p,spr:vdSprite(main,tpl==='set'?820:780,tpl==='set'?820:700,pal)}];
+  if(tpl==='set'){
+    const pool=DB.products.filter(q=>q.id!==p.id&&q.status==='in'&&q.img&&q.cat===p.cat);
+    const more=DB.products.filter(q=>q.id!==p.id&&q.status==='in'&&q.img&&q.cat!==p.cat&&(q.popular||q.featured));
+    const pick=pool.sort((a,b)=>(b.popular+b.featured)-(a.popular+a.featured)||Math.random()-.5).concat(more.sort(()=>Math.random()-.5));
+    for(const q of pick){if(items.length>=3)break;try{const im=await sgLoad(q.img);items.push({p:q,spr:vdSprite(im,820,820,pal)})}catch(e){}}
+  }
+  const rnd=(s=>()=>(s=(s*16807)%2147483647)/2147483647)(7);
+  const parts=Array.from({length:22},()=>({x:rnd()*1080,y:120+rnd()*1500,r:8+rnd()*16,ph:rnd()*6.28,sp:.6+rnd()*1.4}));
+  const old=p.old>p.price&&p.price>0;
+  const dur=tpl==='set'?3*2.6+3.2:11.5;
+  return {p,tpl,lang,pal,logo,items,parts,old,dur,end:dur-3,pts:VD.pts.map(x=>String(x||'').trim()).filter(Boolean).slice(0,3),showPrice:VD.price&&p.price>0,T:VD_T[lang],
+    cat:(()=>{const o=(DB.cats.find(x=>x.id===p.cat)||{}).name;return o?String((lang==='kk'&&o.kk)||o.ru||o.kk||'').toUpperCase():''})()};
+}
+const VD_SERIF='"Playfair Display",Georgia,"Times New Roman",serif',VD_SANS='"PT Sans","Segoe UI",Arial,sans-serif';
+function vdBg(c,A,t){
+  const P=A.pal,g=c.createLinearGradient(0,0,540,1920);g.addColorStop(0,P.bg[0]);g.addColorStop(1,P.bg[1]);c.fillStyle=g;c.fillRect(0,0,1080,1920);
+  const cy=A.tpl==='set'?760:640,rg=c.createRadialGradient(540,cy,40,540,cy,620);rg.addColorStop(0,P.glow);rg.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=rg;c.fillRect(0,0,1080,1920);
+  c.save();
+  if(A.tpl==='hit'){
+    c.translate(540,cy);c.rotate(t*.22);c.fillStyle='rgba(255,210,120,.07)';
+    for(let i=0;i<16;i++){c.rotate(Math.PI/8);c.beginPath();c.moveTo(0,0);c.lineTo(-90,-1400);c.lineTo(90,-1400);c.closePath();c.fill()}
+  }else if(A.tpl==='sale'){
+    c.fillStyle='rgba(255,255,255,.05)';const o=(t*60)%160;
+    for(let x=-1920;x<1080;x+=160){c.beginPath();c.moveTo(x+o,0);c.lineTo(x+o+70,0);c.lineTo(x+o+70+1920,1920);c.lineTo(x+o+1920,1920);c.closePath();c.fill()}
+  }else if(A.tpl==='new'){
+    for(const q of A.parts){const a=.25+.75*Math.max(0,Math.sin(t*q.sp*2+q.ph));c.globalAlpha=a*.85;c.fillStyle=A.pal.acc;const r=q.r*(0.6+a*.5),x=q.x,y=q.y-((t*14*q.sp)%60);
+      c.beginPath();c.moveTo(x,y-r);c.quadraticCurveTo(x,y,x+r,y);c.quadraticCurveTo(x,y,x,y+r);c.quadraticCurveTo(x,y,x-r,y);c.quadraticCurveTo(x,y,x,y-r);c.fill()}
+  }else{
+    for(const q of A.parts.slice(0,9)){c.globalAlpha=.35;c.fillStyle='#ffffff';c.beginPath();c.arc((q.x+t*20*q.sp)%1180-50,q.y,q.r*6,0,Math.PI*2);c.fill()}
+  }
+  c.restore();c.globalAlpha=1;
+  c.strokeStyle=A.pal.acc;c.globalAlpha=.45;c.lineWidth=3;sgRR(c,22,22,1036,1876,48);c.stroke();c.globalAlpha=1;
+}
+function vdPill(c,text,cx,y,font,bg,fg,padX,h){c.font=font;const w=c.measureText(text).width+padX*2;c.fillStyle=bg;sgRR(c,cx-w/2,y,w,h,h/2);c.fill();c.fillStyle=fg;c.textAlign='center';c.fillText(text,cx,y+h*.68);return w}
+function vdNameLines(c,nm,maxW,fs0){let f=fs0,l=[];for(;f>=44;f-=4){c.font='700 '+f+'px '+VD_SERIF;l=sgWrap(c,nm,maxW,2);if(!/…$/.test(l[l.length-1]))break}c.font='700 '+f+'px '+VD_SERIF;return {f,l:sgWrap(c,nm,maxW,2)}}
+function vdDrawSpr(c,s,cx,cy,sc,a){if(a<=0)return;c.globalAlpha=a;const w=s.cv.width*sc,h=s.cv.height*sc;c.drawImage(s.cv,cx-w/2,cy-h/2+20*sc,w,h);c.globalAlpha=1}
+function vdPrice(c,A,p,t,t0,cy){
+  if(!A.showPrice)return;
+  const P=A.pal;c.textAlign='center';
+  if(A.old&&A.tpl==='sale'){
+    const k=vdPr(t,t0,t0+.4);if(k>0){c.globalAlpha=k;c.font='400 50px '+VD_SANS;c.fillStyle=P.sub;const s=money(p.old),w=c.measureText(s).width,y=cy-26;c.fillText(s,540,y);
+      const l=vdEo(vdPr(t,t0+.3,t0+.7));c.strokeStyle=P.acc;c.lineWidth=6;c.beginPath();c.moveTo(540-w/2-8,y-16);c.lineTo(540-w/2-8+(w+16)*l,y-16);c.stroke();c.globalAlpha=1}
+    t0+=.75;cy+=10;
+  }
+  const k=vdPr(t,t0,t0+.5);if(k<=0)return;
+  const sc=vdEb(k)*(1+.035*Math.sin(Math.max(0,t-t0-.6)*5));
+  c.save();c.translate(540,cy+60);c.scale(sc,sc);vdPill(c,money(p.price),0,-60,'700 88px '+VD_SANS,P.acc,P.accTxt,70,128);c.restore();
+}
+function vdEnd(c,A,t){
+  const k=vdPr(t,A.end,A.end+.55);if(k<=0)return;
+  c.save();c.beginPath();c.arc(540,1920,vdEo(k)*2300,0,Math.PI*2);c.clip();
+  const g=c.createLinearGradient(0,0,0,1920);g.addColorStop(0,'#fffaf0');g.addColorStop(1,'#f1e3c6');c.fillStyle=g;c.fillRect(0,0,1080,1920);c.restore();
+  const a=vdPr(t,A.end+.4,A.end+.9);if(a<=0)return;
+  c.globalAlpha=a;c.textAlign='center';const dy=(1-vdEo(a))*60;
+  if(A.logo){const ls=230;c.drawImage(A.logo,540-ls/2,250+dy,ls,ls)}
+  c.fillStyle='#1c1d21';c.font='700 74px '+VD_SERIF;c.fillText('MUSLIM SHOP',540,580+dy);
+  c.fillStyle='#8a6a32';c.font='700 32px '+VD_SANS;c.fillText(A.T.addr.toUpperCase(),540,640+dy);
+  const s=A.items[0].spr,sc=Math.min(520/s.cv.width,560/s.cv.height);vdDrawSpr(c,s,540,960+dy,sc,a);
+  const bw=820,bh=190,by=1270+dy,pu=1+.03*Math.sin((t-A.end)*6);
+  c.save();c.translate(540,by+bh/2);c.scale(pu,pu);c.fillStyle='#25D366';sgRR(c,-bw/2,-bh/2,bw,bh,bh/2);c.fill();
+  c.fillStyle='#03200f';c.font='700 44px '+VD_SANS;c.fillText(A.T.order,0,-14);c.font='700 66px '+VD_SANS;c.fillText(CONTACT.phone,0,62);c.restore();
+  c.font='400 42px '+VD_SANS;c.fillStyle='#6b5a3a';c.fillText(A.T.site+' muslimshop.kz',540,1580+dy);
+  c.globalAlpha=1;
+}
+function vdFrame(c,A,t){
+  vdBg(c,A,t);const P=A.pal;c.textAlign='center';c.textBaseline='alphabetic';
+  if(A.tpl==='set'){
+    const kb=vdPr(t,.1,.6);c.globalAlpha=kb;vdPill(c,'🛍 '+A.T.set+(A.cat?' • '+A.cat:''),540,150-(1-vdEb(kb))*200,'700 40px '+VD_SANS,P.acc,P.accTxt,44,84);c.globalAlpha=1;
+    A.items.forEach((it,i)=>{
+      const s0=.3+i*2.6,kin=vdEo(vdPr(t,s0,s0+.55)),kout=i===A.items.length-1?0:vdEo(vdPr(t,s0+2.15,s0+2.6));
+      if(kin<=0||kout>=1)return;const ox=(1-kin)*1100-kout*1100;
+      c.save();c.translate(ox,0);
+      vdDrawSpr(c,it.spr,540,760+Math.sin(t*2)*8,1,1);
+      c.fillStyle=P.txt;const N=vdNameLines(c,vdName(it.p,A.lang),860,62);N.l.forEach((l,j)=>c.fillText(l,540,1290+j*N.f*1.18));
+      if(A.showPrice&&it.p.price>0)vdPill(c,money(it.p.price),540,1290+N.l.length*N.f*1.18+10,'700 76px '+VD_SANS,P.acc,P.accTxt,60,116);
+      c.fillStyle=P.sub;c.font='700 34px '+VD_SANS;c.fillText((i+1)+' / '+A.items.length,540,1700);
+      c.restore();
+    });
+    vdEnd(c,A,t);return;
+  }
+  const kb=vdPr(t,.15,.75);
+  if(kb>0){c.globalAlpha=kb;vdPill(c,A.tpl==='new'?'✨ '+A.T.new:A.tpl==='hit'?'🔥 '+A.T.hit:'🏷 '+A.T.sale,540,170-(1-vdEb(kb))*260,'700 46px '+VD_SANS,P.acc,P.accTxt,50,92);c.globalAlpha=1}
+  const kp=vdPr(t,.35,1.25),sc=(.55+.45*vdEb(kp))*(1+.03*t/A.dur);
+  vdDrawSpr(c,A.items[0].spr,540,650+(1-vdEo(kp))*260+Math.sin(t*2)*9*kp,sc,vdCl(kp*1.6));
+  if(A.tpl==='sale'&&A.old){
+    const kd=vdPr(t,1.2,1.7);if(kd>0){c.save();c.translate(860,340);c.rotate((1-vdEb(kd))*-1.2+Math.sin(t*3)*.05);c.scale(vdEb(kd),vdEb(kd));
+      c.fillStyle=P.acc;c.beginPath();for(let i=0;i<24;i++){const r=i%2?118:136,an=i*Math.PI/12;c.lineTo(Math.cos(an)*r,Math.sin(an)*r)}c.closePath();c.fill();
+      c.fillStyle=P.accTxt;c.font='700 70px '+VD_SANS;c.textAlign='center';c.fillText('-'+Math.round((A.p.old-A.p.price)*100/A.p.old)+'%',0,24);c.restore()}
+  }
+  const kn=vdPr(t,1.25,1.9);
+  if(kn>0){c.globalAlpha=kn;c.fillStyle=P.txt;const N=vdNameLines(c,vdName(A.p,A.lang),900,64),y0=1100+(1-vdEo(kn))*40;N.l.forEach((l,j)=>c.fillText(l,540,y0+j*N.f*1.16));c.globalAlpha=1}
+  A.pts.forEach((s,i)=>{
+    const k=vdPr(t,2.2+i*.55,2.7+i*.55);if(k<=0)return;const e=vdEo(k);c.globalAlpha=e;
+    c.font='700 40px '+VD_SANS;const L=sgWrap(c,s,780,1)[0],w=c.measureText(L).width+130,x=540-w/2-(1-e)*160,y=1250+i*96;
+    c.fillStyle='rgba(255,255,255,'+(A.tpl==='set'?.7:.13)+')';sgRR(c,x,y,w,78,39);c.fill();
+    c.fillStyle=P.acc;c.beginPath();c.arc(x+44,y+39,22,0,Math.PI*2);c.fill();c.fillStyle=P.accTxt;c.font='700 30px '+VD_SANS;c.textAlign='center';c.fillText('✓',x+44,y+50);
+    c.fillStyle=P.txt;c.font='700 40px '+VD_SANS;c.textAlign='left';c.fillText(L,x+84,y+53);c.textAlign='center';c.globalAlpha=1;
+  });
+  vdPrice(c,A,A.p,t,4.2,1600);
+  vdEnd(c,A,t);
+}
+/* окно */
+const VD_W=720,VD_H=1280;
+function vdClose(){VD.run++;try{VD.rec&&VD.rec.state!=='inactive'&&VD.rec.stop()}catch(e){}VD.rec=null;const m=document.getElementById('vdmodal');if(m)m.remove()}
+function vdUI(){
+  const m=document.getElementById('vdmodal');if(!m)return;
+  m.querySelectorAll('[data-vd="tpl"]').forEach(b=>b.className='btn sm '+(b.dataset.v===VD.tpl?'gold':'line'));
+  m.querySelectorAll('[data-vd="lang"]').forEach(b=>b.className='btn sm '+(b.dataset.v===VD.lang?'gold':'line'));
+  m.querySelectorAll('[data-vd="price"]').forEach(b=>b.className='btn sm '+((b.dataset.v==='1')===VD.price?'gold':'line'));
+  const pw=m.querySelector('#vdpts');if(pw)pw.style.display=VD.tpl==='set'?'none':'flex';
+  m.querySelectorAll('[data-vdp]').forEach(i=>{i.value=VD.pts[+i.dataset.vdp]||''});
+}
+async function vdRebuild(){
+  const run=++VD.run,cv=document.getElementById('vdcv');if(!cv)return;
+  VD.blob=null;vdShowResult();
+  const c=cv.getContext('2d');c.fillStyle='#222';c.fillRect(0,0,VD_W,VD_H);
+  try{
+    const A=await vdAssets();if(run!==VD.run)return;VD.A=A;
+    const t0=performance.now();
+    const loop=()=>{if(run!==VD.run||!document.getElementById('vdcv'))return;const t=((performance.now()-t0)/1000)%(A.dur+.6);
+      c.setTransform(VD_W/1080,0,0,VD_H/1920,0,0);vdFrame(c,A,Math.min(t,A.dur));requestAnimationFrame(loop)};
+    requestAnimationFrame(loop);
+  }catch(e){if(run===VD.run)toast('Видео: '+(e&&e.message||e))}
+}
+function vdMime(){
+  const L=['video/mp4;codecs=avc1.42E01F','video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
+  try{for(const m of L)if(window.MediaRecorder&&MediaRecorder.isTypeSupported(m))return m}catch(e){}
+  return '';
+}
+function vdShowResult(){
+  const r=document.getElementById('vdres');if(!r)return;
+  if(!VD.blob){r.innerHTML='';return}
+  const u=URL.createObjectURL(VD.blob);
+  r.innerHTML='<div style="color:#9fe0b0;font-weight:700;text-align:center">✓ Видео готово</div><video src="'+u+'" controls playsinline loop style="width:min(74vw,330px);border-radius:14px;background:#000"></video>'
+   +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button type="button" class="btn sm gold" data-vd="share">Поделиться</button><button type="button" class="btn sm line" data-vd="dl">Скачать</button></div>'
+   +(VD.ext==='webm'?'<div style="color:#f3c27a;font-size:12px;text-align:center;max-width:330px">Этот браузер записал видео в формате WebM. Если WhatsApp его не примет, обновите Chrome или откройте админку в Safari.</div>':'');
+}
+async function vdRecord(){
+  if(VD.busy)return;
+  const cv=document.getElementById('vdcv'),mime=vdMime();
+  if(!cv||!cv.captureStream||!mime){toast('Этот браузер не умеет записывать видео. Откройте админку в Chrome или Safari.');return}
+  VD.busy=true;const btn=document.querySelector('#vdmodal [data-vd="rec"]');
+  try{
+    const run=++VD.run;const A=VD.A||await vdAssets();VD.A=A;
+    const c=cv.getContext('2d'),stream=cv.captureStream(30),chunks=[];
+    const rec=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000});VD.rec=rec;
+    rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+    const done=new Promise(res=>{rec.onstop=res});
+    c.setTransform(VD_W/1080,0,0,VD_H/1920,0,0);vdFrame(c,A,0);
+    rec.start(500);const t0=performance.now();
+    await new Promise(res=>{const loop=()=>{if(run!==VD.run){res();return}const t=(performance.now()-t0)/1000;
+      c.setTransform(VD_W/1080,0,0,VD_H/1920,0,0);vdFrame(c,A,Math.min(t,A.dur));
+      if(btn)btn.textContent='● Запись… '+Math.max(0,Math.ceil(A.dur+.4-t))+' с';
+      if(t>=A.dur+.4){res();return}requestAnimationFrame(loop)};requestAnimationFrame(loop)});
+    if(rec.state!=='inactive')rec.stop();await done;stream.getTracks().forEach(x=>x.stop());
+    if(run!==VD.run||!document.getElementById('vdmodal'))return;
+    VD.ext=/mp4/.test(mime)?'mp4':'webm';VD.blob=new Blob(chunks,{type:mime.split(';')[0]});vdShowResult();
+    const r=document.getElementById('vdres');if(r)r.scrollIntoView({behavior:'smooth',block:'center'});
+  }catch(e){toast('Не удалось записать: '+(e&&e.message||e))}
+  finally{VD.busy=false;if(btn)btn.textContent='🎥 Создать видео'}
+}
+async function vdShare(){
+  if(!VD.blob)return;
+  const f=new File([VD.blob],'muslimshop-'+VD.id+'.'+VD.ext,{type:VD.blob.type});
+  try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f]});return}}catch(e){if(e&&e.name==='AbortError')return}
+  rlSave(VD.blob,f.name);toast('Видео сохранено');
+}
+function vdOpen0(){
+  vdClose();
+  const m=document.createElement('div');m.id='vdmodal';
+  m.style.cssText='position:fixed;inset:0;z-index:300;background:rgba(10,10,12,.95);overflow:auto;padding:16px 12px 40px;display:flex;flex-direction:column;align-items:center;gap:12px';
+  const inp=i=>'<input data-vdp="'+i+'" maxlength="64" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #444;background:#1b1b1f;color:#fff;font-size:15px">';
+  m.innerHTML='<div style="color:#fff;font-weight:700;text-align:center;max-width:420px">🎥 Видео: '+esc(VD.p.name.ru||VD.p.name.kk)+'</div>'
+   +'<div style="display:flex;gap:8px;overflow-x:auto;max-width:100%;padding-bottom:4px">'+VD_TPL.map(s=>'<button type="button" class="btn sm line" data-vd="tpl" data-v="'+s.k+'" style="white-space:nowrap">'+s.n+'</button>').join('')+'</div>'
+   +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button type="button" class="btn sm line" data-vd="lang" data-v="ru">Русский</button><button type="button" class="btn sm line" data-vd="lang" data-v="kk">Қазақша</button><button type="button" class="btn sm line" data-vd="price" data-v="1">С ценой</button><button type="button" class="btn sm line" data-vd="price" data-v="0">Без цены</button></div>'
+   +'<canvas id="vdcv" width="'+VD_W+'" height="'+VD_H+'" style="width:min(74vw,330px);aspect-ratio:9/16;border-radius:14px;background:#222"></canvas>'
+   +'<div id="vdpts" style="flex-direction:column;gap:6px;width:min(92vw,360px)"><div style="color:#bbb;font-size:13px">Три пункта в видео (можно исправить):</div>'+inp(0)+inp(1)+inp(2)+'</div>'
+   +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button type="button" class="btn sm gold" data-vd="rec">🎥 Создать видео</button><button type="button" class="btn sm line" data-vd="close">Закрыть</button></div>'
+   +'<div id="vdres" style="display:flex;flex-direction:column;align-items:center;gap:10px"></div>'
+   +'<div style="color:#bbb;font-size:13px;text-align:center;max-width:340px">Видео 9:16, около 11 секунд. Во время записи не сворачивайте браузер. Музыку можно добавить в WhatsApp, Instagram или TikTok при публикации.</div>';
+  m.addEventListener('click',e=>{
+    const b=e.target.closest('[data-vd]');if(!b||VD.busy&&b.dataset.vd!=='close')return;
+    const a=b.dataset.vd;
+    if(a==='close')vdClose();
+    else if(a==='tpl'){VD.tpl=b.dataset.v;LS.set('ms_vd_tpl',VD.tpl);vdUI();vdRebuild()}
+    else if(a==='lang'){VD.lang=b.dataset.v;LS.set('ms_vd_lang',VD.lang);VD.pts=vdPoints(VD.p,VD.lang);vdUI();vdRebuild()}
+    else if(a==='price'){VD.price=b.dataset.v==='1';vdUI();vdRebuild()}
+    else if(a==='rec')vdRecord();
+    else if(a==='share')vdShare();
+    else if(a==='dl'&&VD.blob){rlSave(VD.blob,'muslimshop-'+VD.id+'.'+VD.ext);toast('Видео сохранено')}
+  });
+  let pt;m.addEventListener('input',e=>{const i=e.target.closest('[data-vdp]');if(!i)return;VD.pts[+i.dataset.vdp]=i.value;clearTimeout(pt);pt=setTimeout(()=>{if(!VD.busy)vdRebuild()},600)});
+  document.body.appendChild(m);vdUI();
+}
+async function videoOpen(id){
+  try{
+    toast('Готовлю…');
+    const p=await getFull(id);if(!p)throw new Error('Товар не найден');
+    if(!((p.images&&p.images[0])||p.img))throw new Error('У товара нет фото');
+    VD.p=p;VD.id=String(id).replace(/[^\w-]/g,'');
+    VD.lang=LS.get('ms_vd_lang','ru')==='kk'?'kk':'ru';
+    VD.tpl=String(LS.get('ms_vd_tpl',''))||((p.old>p.price&&p.price>0)?'sale':p.isNew?'new':'hit');
+    if(!VD_TPL.some(x=>x.k===VD.tpl))VD.tpl='new';
+    VD.price=p.price>0;VD.pts=vdPoints(p,VD.lang);
+    vdOpen0();await vdRebuild();
+  }catch(e){toast('Видео: '+(e&&e.message||e))}
 }
 
 /* ============ Публикация товара в Telegram-канал (токен хранится только в этом браузере, в коде его нет) ============ */
