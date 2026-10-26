@@ -489,7 +489,7 @@ const ghStamp=()=>({seconds:Math.floor(Date.now()/1000),nanoseconds:0});
 const ghClean=v=>{if(v&&v.__ts)return ghStamp();if(Array.isArray(v))return v.map(ghClean);if(v&&typeof v==='object'){const o={};for(const k in v)o[k]=ghClean(v[k]);return o}return v};
 const ghClone=v=>JSON.parse(JSON.stringify(v));
 function ghFromJson(j){
-  const P={},C={};
+  const P={},C={};GH.thumbs=(j&&Array.isArray(j.thumbs))?j.thumbs.slice():[];
   if(j&&j.v===4){
     (j.products||[]).forEach(d=>{const x=Object.assign({},d);delete x.id;P[d.id]=x});
     (j.categories||[]).forEach(d=>{const x=Object.assign({},d);delete x.id;C[d.id]=x});
@@ -536,7 +536,7 @@ async function ghFetchCatalog(){
   if(!r.ok)throw new Error('Не найден файл catalog.json рядом с index.html (код '+r.status+'). Загрузите catalog.json в ту же папку на GitHub, где лежит index.html.');
   return r.json();
 }
-async function ghLoadAll(){GH.err='';try{ghFromJson(await ghFetchCatalog())}catch(e){GH.err=String(e&&e.message||e)}}
+async function ghLoadAll(){GH.err='';try{ghFromJson(await ghFetchCatalog());const hv=new Set(GH.thumbs||[]);let n=0;Object.keys(GH.cols.products).forEach(id=>{const im=(GH.cols.products[id].images||[])[0];const tr=thRel(im);if(tr&&!hv.has(tr))n++});GH.thNeed=n;try{ghBar()}catch(e){}}catch(e){GH.err=String(e&&e.message||e)}}
 GH.ready=ghLoadAll();
 /* --- мини-замена Firestore: те же функции, но данные в памяти --- */
 const ghCol=n=>({k:'col',n});
@@ -609,12 +609,12 @@ function ghBar(){
     b.innerHTML='<span id="ghtxt" style="flex:1;line-height:1.3"></span><button id="ghbtn" class="btn gold sm" type="button" data-act="gh-publish">Опубликовать</button>';
     document.body.appendChild(b);
   }
-  const show=!!authUser&&(GH.dirty>0||GH.publishing||!!GH.msg);
+  const show=!!authUser&&(GH.dirty>0||GH.publishing||!!GH.msg||GH.thNeed>0);
   b.style.display=show?'flex':'none';
   document.body.style.paddingBottom=show?'76px':'';
   const t=document.getElementById('ghtxt'),bt=document.getElementById('ghbtn');
-  if(t)t.textContent=GH.publishing?(GH.msg||'Публикую…'):GH.dirty>0?('Есть неопубликованные изменения: '+GH.dirty+'. Покупатели их пока не видят.'):GH.msg;
-  if(bt)bt.style.display=(GH.dirty>0&&!GH.publishing)?'':'none';
+  if(t)t.textContent=GH.publishing?(GH.msg||'Публикую…'):GH.dirty>0?('Есть неопубликованные изменения: '+GH.dirty+'. Покупатели их пока не видят.'):GH.thNeed>0?('Нужно один раз сделать лёгкие фото для карточек ('+GH.thNeed+' шт.). Нажмите «Опубликовать», лучше по Wi-Fi.'):GH.msg;
+  if(bt)bt.style.display=((GH.dirty>0||GH.thNeed>0)&&!GH.publishing)?'':'none';
 }
 function ghCatalogObj(imgPath){
   const prods=Object.keys(GH.cols.products).map(id=>{
@@ -623,8 +623,10 @@ function ghCatalogObj(imgPath){
     return d;
   });
   const cats=Object.keys(GH.cols.categories).map(id=>Object.assign({id},ghClone(GH.cols.categories[id])));
-  return {v:4,updated:new Date().toISOString(),categories:cats,products:prods};
+  return {v:4,updated:new Date().toISOString(),thumbs:(GH.thumbs||[]),categories:cats,products:prods};
 }
+function thRel(rel){const m=/^img\/([^\/]+)\.(jpe?g|png|webp|gif)$/i.exec(String(rel||''));return m?'img/t/'+m[1]+'.jpg':''}
+const makeTh=src=>new Promise(res=>{const im=new Image();let done=false;const f=v=>{if(!done){done=true;res(v)}};im.onload=()=>{try{const W=360,sc=W/im.naturalWidth,H=Math.round(im.naturalHeight*sc);const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,W,H);x.imageSmoothingQuality='high';x.drawImage(im,0,0,W,H);f(c.toDataURL('image/jpeg',0.82).split(',')[1])}catch(e){f(null)}};im.onerror=()=>f(null);setTimeout(()=>f(null),20000);im.src=src});
 const imgOk=src=>new Promise(res=>{if(!src||typeof src!=='string'){res(false);return}const im=new Image();let done=false;const f=v=>{if(!done){done=true;res(v)}};im.onload=()=>f(im.naturalWidth>0);im.onerror=()=>f(false);setTimeout(()=>f(false),12000);im.src=src});
 async function ghDataFile(s){
   const m=/^data:([^;,]+)([^,]*),([\s\S]*)$/.exec(s);if(!m)return null;
@@ -724,6 +726,20 @@ async function ghPublish(){
           if(!GH.up[rel]&&!seen[rel]){seen[rel]=1;todo.push({rel,path:b.dir+rel,b64:f.b64})}
         }else if(typeof s==='string'&&s.startsWith('data:')&&map[s]===''){bad.push(id)}
       }
+    }
+    {
+      const have=new Set(GH.thumbs||[]),need=[],nseen={};
+      for(const id of Object.keys(GH.cols.products)){
+        for(const s0 of (GH.cols.products[id].images||[]).slice(0,1)){
+          const rel=(typeof s0==='string'&&s0.startsWith('data:'))?map[s0]:s0;
+          const tr=thRel(rel);if(!tr||have.has(tr)||nseen[tr])continue;
+          nseen[tr]=1;need.push({tr,src:(typeof s0==='string'&&s0.startsWith('data:'))?s0:rel});
+        }
+      }
+      let k=0,done=0;const okTh=[];
+      const mk=async()=>{while(k<need.length){const it=need[k++];const b64=await makeTh(it.src);done++;if(b64){todo.push({rel:it.tr,path:b.dir+it.tr,b64});okTh.push(it.tr)}GH.msg='Делаю лёгкие фото для карточек: '+done+' из '+need.length+'…';ghBar()}};
+      if(need.length)await Promise.all([mk(),mk(),mk(),mk()]);
+      GH.thumbs=[...have,...okTh];GH.thNeed=0;
     }
     const text=JSON.stringify(ghCatalogObj((id,s)=>(s in map)?map[s]:s));
     const tree=[];
@@ -1128,13 +1144,14 @@ function addToCart(id,q=1){
 const cartLines=()=>cart.map(i=>({p:prodById(i.id),q:i.q})).filter(x=>x.p&&x.p.status!=='hidden');
 
 /* ============ Shared view bits ============ */
-const imgBox=(p,cls='ph')=>`<span class="${cls}">${p.img?`<img src="${esc(p.img)}" alt="${esc(L(p.name))}" loading="lazy">`:`<span class="noimg">${esc((L(p.name)||'M').charAt(0).toUpperCase())}</span>`}${p.isNew&&cls==='ph'?`<span class="tag">${t('new_')}</span>`:''}${p.old>p.price&&cls==='ph'?`<span class="tag disc">−${Math.round((1-p.price/p.old)*100)}%</span>`:''}</span>`;
+const thSrc=p=>{const tr=thRel(p.img);return tr&&GH.thumbs&&GH.thumbs.indexOf(tr)>=0?tr:p.img};
+const imgBox=(p,cls='ph',sm)=>`<span class="${cls}">${p.img?`<img src="${esc(sm?thSrc(p):p.img)}" alt="${esc(L(p.name))}" loading="lazy" decoding="async">`:`<span class="noimg">${esc((L(p.name)||'M').charAt(0).toUpperCase())}</span>`}${p.isNew&&cls==='ph'?`<span class="tag">${t('new_')}</span>`:''}${p.old>p.price&&cls==='ph'?`<span class="tag disc">−${Math.round((1-p.price/p.old)*100)}%</span>`:''}</span>`;
 const stockHtml=p=>p.status==='in'?`<div class="stock in">${t('in')}</div>`:`<div class="stock out">${t('out')}</div>`;
 const priceHtml=p=>`<div class="price">${money(p.price)}${p.old>p.price?`<span class="old">${money(p.old)}</span>`:''}</div>`;
 const cleanName=s=>String(s||'').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu,'').replace(/\s{2,}/g,' ').trim()||String(s||'');
 function card(p){
   return `<article class="card">
-    <a href="#/product/${esc(p.slug)}" aria-label="${esc(L(p.name))}">${imgBox(p)}</a>
+    <a href="#/product/${esc(p.slug)}" aria-label="${esc(L(p.name))}">${imgBox(p,'ph',1)}</a>
     <div class="cb">
       <a class="cn" href="#/product/${esc(p.slug)}">${esc(cleanName(L(p.name)))}</a>
       ${priceHtml(p)}${stockHtml(p)}
@@ -1792,7 +1809,7 @@ function catForm(c){
 }
 let adminQ='',adminCat='';
 const admFiltered=()=>{const base=DB.products.filter(p=>!adminCat||p.cat===adminCat);return adminQ.trim()?searchRank(base,adminQ,{noDesc:true}).list:base};
-function admRows(){const arr=admFiltered();return arr.map(p=>`<div class="adm-row">${imgBox(p,'ph')}
+function admRows(){const arr=admFiltered();return arr.map(p=>`<div class="adm-row">${imgBox(p,'ph',1)}
     <div><label class="checks" style="display:flex;min-height:44px"><input type="checkbox" data-sel="${esc(p.id)}" ${SEL.has(p.id)?'checked':''} style="width:24px;height:24px"> <b>${esc(L(p.name))}</b></label>${p.status==='hidden'?'<span class="hidden-badge">скрыт</span>':''}${isDemo(p)?'<span class="hidden-badge">демо</span>':''}<br>${money(p.price)} · ${p.status==='out'?'нет в наличии':p.status==='hidden'?'скрыт':'в наличии'} · ${esc(catName(p.cat))}</div>
     <div class="adm-btns">
       <button class="btn sm line" data-act="aedit" data-id="${esc(p.id)}">Редактировать</button>
