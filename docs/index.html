@@ -313,13 +313,14 @@ h2::after{content:"";position:absolute;left:0;bottom:0;width:60px;height:3px;bac
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.card,.btn{transition:none}}
 
 /* карточка товара: фото в формате 9:16 целиком */
-.pp .ph{aspect-ratio:9/16;background:#E9E7E2}
-.pp .ph img{object-fit:contain}
+.pp .ph{aspect-ratio:3/4;background:#fff}
+.pp .ph img{object-fit:cover;object-position:center}
 @media(min-width:720px){.pp .ph{max-width:420px;margin:0 auto;width:100%}}
 
-/* карточки в списках: фото 9:16 целиком */
-.card .ph{aspect-ratio:9/16;background:#E9E7E2}
-.card .ph img,.line-item .ph img{object-fit:contain}
+/* карточки: формат 3:4, как Wildberries */
+.card .ph{aspect-ratio:3/4;background:#fff}
+.card .ph img{object-fit:cover;object-position:center}
+.line-item .ph img{object-fit:contain}
 
 /* стиль Kaspi: белые карточки, красная кнопка «В корзину» */
 .card{background:#fff;border:1px solid #ECEDEF;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
