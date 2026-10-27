@@ -1973,7 +1973,9 @@ function adminList(){
   </div></details>
   ${LOAD_ERR?`<div class="note" style="margin-bottom:12px">Не удалось прочитать товары: ${esc(LOAD_ERR)}</div>`:''}
   <div style="margin:6px 0 12px"><input id="admq" type="search" placeholder="Поиск по названию или артикулу…" value="${esc(adminQ)}" autocomplete="off" style="width:100%;margin-bottom:8px"><select id="admcat" style="width:100%;margin-bottom:8px">${admSelect()}</select><div id="admchips" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:6px">${admChips()}</div><div id="admcount" class="note" style="margin-top:6px">${admCountTxt()}</div></div>
-  <div class="two" style="margin-bottom:12px"><button class="btn sm line" data-act="asel-demo">Отметить демо-товары</button><button class="btn sm line" data-act="asel-none">Снять все отметки</button></div>
+  <div class="two" style="margin-bottom:8px"><button class="btn sm line" data-act="asel-all">✓ Отметить все</button><button class="btn sm line" data-act="asel-none">Снять все отметки</button></div>
+  <div class="two" style="margin-bottom:8px"><button class="btn sm line" data-act="asel-dup">🧹 Отметить дубликаты</button><button class="btn sm line" data-act="asel-demo">Отметить демо-товары</button></div>
+  <button class="btn sm gold block" data-act="tg-bulk" style="margin-bottom:8px">✈ Отправить отмеченные в Telegram</button>
   <button class="btn sm block" id="delsel" data-act="adel-sel" style="margin-bottom:14px">${selLabel()}</button>
   <div id="admlist">${admRows()}</div>`;
 }
@@ -2287,6 +2289,8 @@ document.addEventListener('click',e=>{
     case 'ahide':setHidden(id).catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'asel-demo':DB.products.filter(isDemo).forEach(p=>SEL.add(p.id));render();toast('Отмечено демо-товаров: '+DB.products.filter(isDemo).length);break;
     case 'asel-none':SEL.clear();render();break;
+    case 'asel-all':{const a=admFiltered();a.forEach(p=>SEL.add(p.id));render();toast('Отмечено: '+SEL.size+(adminCat||adminQ.trim()?' (по фильтру)':''));break}
+    case 'asel-dup':{const a=DUP_IDS.filter(id=>prodById(id));a.forEach(id=>SEL.add(id));render();toast(a.length?'Отмечено дубликатов: '+a.length+'. Теперь нажмите «Удалить отмеченные».':'Дубликатов не найдено');break}
     case 'adel-sel':removeSelected().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'adel':removeProduct(id).catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'rmimg':EDIT_DIRTY=true;editing.images.splice(Number(id),1);editing.img=editing.images[0]||'';refreshImgs();break;
@@ -3498,21 +3502,62 @@ async function tgOne(id){
   catch(e){toast('Telegram: '+tgErr(e))}
   tgBusy=false;
 }
+/* копии товаров, которые уже есть в каталоге отдельной карточкой (оригинал остаётся) */
+const DUP_IDS=['prod-2','prod-1789586167313','prod-7','prod-1789643893951','prod-1789644075623','prod-1790242012611','prod-1790594314810','prod-3','prod-1792703387007'];
+/* окно с кнопками вместо confirm(): работает и там, где браузер блокирует стандартные окна */
+function tgAsk(html,btns){
+  return new Promise(res=>{
+    const w=document.createElement('div');
+    w.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+    w.innerHTML='<div style="background:#FAF8F4;color:#1A1A1A;border-radius:16px;padding:18px;max-width:380px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)"><div style="font-size:16px;line-height:1.45;margin-bottom:14px">'+html+'</div><div style="display:flex;flex-direction:column;gap:8px">'+btns.map(b=>'<button type="button" data-k="'+b[0]+'" style="min-height:48px;border-radius:999px;font-size:16px;font-weight:600;cursor:pointer;'+(b[2]?'background:#1A1A1A;color:#fff;border:1.5px solid #1A1A1A':'background:#fff;color:#1A1A1A;border:1.5px solid #CFC8BC')+'">'+b[1]+'</button>').join('')+'</div></div>';
+    w.addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(!b)return;w.remove();res(b.dataset.k)});
+    document.body.appendChild(w);
+  });
+}
+let tgStop=false;
+function tgBar(txt){
+  let b=document.getElementById('tgbar');
+  if(txt===null){if(b)b.remove();return}
+  if(!b){b=document.createElement('div');b.id='tgbar';b.style.cssText='position:fixed;left:12px;right:12px;bottom:12px;z-index:9998;background:#1A1A1A;color:#fff;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 6px 24px rgba(0,0,0,.3)';b.innerHTML='<span id="tgbartxt" style="flex:1;font-size:15px"></span><button type="button" id="tgbarstop" style="min-height:40px;padding:0 14px;border-radius:999px;border:1px solid #fff;background:transparent;color:#fff;font-weight:600">Остановить</button>';b.querySelector('#tgbarstop').onclick=()=>{tgStop=true;b.querySelector('#tgbartxt').textContent='Останавливаю после текущего товара…'};document.body.appendChild(b)}
+  b.querySelector('#tgbartxt').textContent=txt;
+}
 async function tgBulk(){
   if(tgBusy)return;
-  const ids=Array.from(SEL);
-  if(!ids.length){toast('Отметьте товары галочками в списке');return}
-  if(!confirm('Отправить в канал товаров: '+ids.length+'?'))return;
-  tgBusy=true;let ok=0;
+  if(!tgCfg().t){toast('Сначала сохраните токен бота в блоке «Telegram-канал».');return}
+  const all=Array.from(SEL).map(id=>prodById(id)).filter(Boolean);
+  if(!all.length){toast('Отметьте товары галочками или нажмите «Отметить все»');return}
+  const hid=all.filter(p=>p.status==='hidden'),ids=all.filter(p=>p.status!=='hidden').map(p=>p.id);
+  const was=ids.filter(id=>tgSent()[id]).length;
+  if(!ids.length){toast('Все отмеченные товары скрыты на сайте');return}
+  const go=await tgAsk('<b>Отправить в канал: '+ids.length+'</b>'+(was?'<br>Из них уже были в канале: '+was+'. По каждому такому я спрошу, пропустить или отправить.':'')+(hid.length?'<br>Скрытые товары пропущу: '+hid.length+'.':'')+'<br><span style="color:#5F5A52;font-size:14px">Между постами пауза 3–4 секунды, чтобы Telegram не заблокировал бота.</span>',[['go','Начать',1],['no','Отмена']]);
+  if(go!=='go')return;
+  tgBusy=true;tgStop=false;let ok=0,skip=0,skipAll=false,sendAll=false,err=0;
   try{
-    for(const id of ids){
-      toast('Отправляю '+(ok+1)+' из '+ids.length+'…');
-      await tgSend(id);ok++;
-      if(ok<ids.length)await new Promise(r=>setTimeout(r,3500));
+    for(let i=0;i<ids.length;i++){
+      if(tgStop)break;
+      const id=ids[i],p=prodById(id),nm=p?L(p.name):id;
+      const t=tgSent()[id];
+      if(t&&!sendAll){
+        if(skipAll){skip++;continue}
+        tgBar('Жду ваш ответ… ('+(i+1)+' из '+ids.length+')');
+        const k=await tgAsk('⚠️ <b>Этот товар уже есть в канале</b><br>'+esc(nm)+'<br><span style="color:#5F5A52;font-size:14px">Отправлен '+new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+'</span>',[['skip','Пропустить этот товар',1],['send','Отправить ещё раз'],['skipall','Пропускать все уже отправленные'],['sendall','Отправлять все повторно'],['stop','Остановить']]);
+        if(k==='stop')break;
+        if(k==='skip'){skip++;continue}
+        if(k==='skipall'){skipAll=true;skip++;continue}
+        if(k==='sendall')sendAll=true;
+      }
+      tgBar('Отправляю '+(i+1)+' из '+ids.length+': '+nm);
+      try{await tgSend(id);ok++}
+      catch(e){
+        err++;
+        const k=await tgAsk('Не получилось отправить<br><b>'+esc(nm)+'</b><br><span style="color:#5F5A52;font-size:14px">'+esc(tgErr(e))+'</span>',[['next','Пропустить и продолжить',1],['stop','Остановить']]);
+        if(k==='stop')break;
+        continue;
+      }
+      if(i<ids.length-1&&!tgStop)await new Promise(r=>setTimeout(r,3500));
     }
-    toast('Отправлено в канал: '+ok+' ✓');
-  }catch(e){toast('Отправлено '+ok+' из '+ids.length+'. Ошибка: '+tgErr(e))}
-  tgBusy=false;try{admRefresh()}catch(e){}
+  }finally{tgBusy=false;tgBar(null);try{admRefresh()}catch(e){}}
+  await tgAsk('<b>Готово</b><br>Отправлено: '+ok+(skip?'<br>Пропущено (уже были в канале): '+skip:'')+(err?'<br>С ошибкой: '+err:'')+(tgStop?'<br>Остановлено вами.':''),[['ok','Хорошо',1]]);
 }
 async function tgMenu(){
   if(tgBusy)return;
