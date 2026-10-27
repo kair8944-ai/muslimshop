@@ -2824,7 +2824,7 @@ async function reelOpen(id){
 }
 
 /* ============ 🎥 Видео для статуса и Reels: анимация рисуется и записывается прямо в телефоне (ничего никуда не отправляется) ============ */
-const VD={p:null,id:'',tpl:'new',lang:'ru',price:true,pts:['','',''],badge:'',col:'auto',dur:12,music:false,run:0,rec:null,A:null,blob:null,ext:'mp4',busy:false};
+const VD={opt:{badge:1,disc:1,pts:1,end:1,logo:0},pi:0,p:null,id:'',tpl:'new',lang:'ru',price:true,pts:['','',''],badge:'',col:'auto',dur:12,music:false,run:0,rec:null,A:null,blob:null,ext:'mp4',busy:false};
 const VD_TPL=[{k:'new',n:'✨ Новинка'},{k:'hit',n:'🔥 Хит недели'},{k:'sale',n:'🏷 Акция'},{k:'lux',n:'💎 Премиум'},{k:'clean',n:'🤍 Белый'},{k:'slide',n:'📸 Все фото'},{k:'set',n:'🛍 Подборка из 3'}];
 const VD_PALS={
   emerald:{n:'Изумруд',bg:['#0f5a43','#05261c'],txt:'#ffffff',sub:'#e3cd98',acc:'#e6c27a',accTxt:'#08301f',glow:'rgba(230,194,122,.30)'},
@@ -2907,13 +2907,13 @@ async function vdAssets(){
   const p=VD.p,tpl=VD.tpl,lang=VD.lang;
   const logo=await sgLogo().catch(()=>null);
   const srcs=((p.images&&p.images.length)?p.images:[p.img]).filter(x=>typeof x==='string'&&x);
-  const main=await sgLoad(srcs[0]);
+  const main=await sgLoad(srcs[Math.min(VD.pi||0,srcs.length-1)]||srcs[0]);
   const base=VD_PALS[VD_TPLPAL[tpl]]||VD_PALS.emerald;
   const pal=VD.col==='auto'?vdAutoPal(main,base):VD.col==='tpl'?base:(VD_PALS[VD.col]||base);
   const box=tpl==='set'?VD_CARD.set:VD_CARD.single;
   const items=[{p,spr:vdSprite(main,box,pal)}];
   const slides=[items[0].spr];
-  if(tpl==='slide'){for(const s of srcs.slice(1,5)){try{slides.push(vdSprite(await sgLoad(s),box,pal))}catch(e){}}}
+  if(tpl==='slide'){for(const s of srcs.filter((x,i)=>i!==(VD.pi||0)).slice(0,4)){try{slides.push(vdSprite(await sgLoad(s),box,pal))}catch(e){}}}
   if(tpl==='set'){
     const pool=DB.products.filter(q=>q.id!==p.id&&q.status==='in'&&q.img&&q.cat===p.cat);
     const more=DB.products.filter(q=>q.id!==p.id&&q.status==='in'&&q.img&&q.cat!==p.cat&&(q.popular||q.featured));
@@ -2926,7 +2926,7 @@ async function vdAssets(){
   let dur=tpl==='set'?3*2.6+3.2:Math.max(8,Math.min(15,VD.dur||12));
   if(tpl==='slide')dur=Math.max(dur,Math.min(15,1.3+slides.length*2.2+5));
   const T=VD_T[lang],badge=(String(VD.badge||'').trim()||T[tpl]).toUpperCase();
-  return {p,tpl,lang,pal,logo,items,slides,parts,old,dur,end:dur-3,pts:VD.pts.map(x=>String(x||'').trim()).filter(Boolean).slice(0,3),showPrice:VD.price&&p.price>0,T,badge:VD_EMO[tpl]+' '+badge,
+  return {o:Object.assign({},VD.opt),p,tpl,lang,pal,logo,items,slides,parts,old,dur,end:dur-3,pts:VD.pts.map(x=>String(x||'').trim()).filter(Boolean).slice(0,3),showPrice:VD.price&&p.price>0,T,badge:VD_EMO[tpl]+' '+badge,
     cat:(()=>{const o=(DB.cats.find(x=>x.id===p.cat)||{}).name;return o?String((lang==='kk'&&o.kk)||o.ru||o.kk||'').toUpperCase():''})()};
 }
 const VD_SERIF='"Playfair Display",Georgia,"Times New Roman",serif',VD_SANS='"PT Sans","Segoe UI",Arial,sans-serif';
@@ -2981,6 +2981,7 @@ function vdPrice(c,A,p,t,t0,cy){
   c.save();c.translate(540,cy+60);c.scale(sc,sc);vdPill(c,money(p.price),0,-60,'700 88px '+VD_SANS,P.acc,P.accTxt,70,128);c.restore();
 }
 function vdEnd(c,A,t){
+  if(!A.o.end)return;
   const k=vdPr(t,A.end,A.end+.55);if(k<=0)return;
   c.save();c.beginPath();c.arc(540,1920,vdEo(k)*2300,0,Math.PI*2);c.clip();
   const g=c.createLinearGradient(0,0,0,1920);g.addColorStop(0,'#fffaf0');g.addColorStop(1,'#f1e3c6');c.fillStyle=g;c.fillRect(0,0,1080,1920);c.restore();
@@ -2996,10 +2997,11 @@ function vdEnd(c,A,t){
   c.font='400 42px '+VD_SANS;c.fillStyle='#6b5a3a';c.fillText(A.T.site+' muslimshop.kz',540,1580+dy);
   c.globalAlpha=1;
 }
+function vdLogo(c,A,t){if(!A.o.logo||!A.logo)return;const k=vdPr(t,.2,.8);if(k<=0)return;c.globalAlpha=k*.95;c.save();c.beginPath();c.arc(118,118,62,0,Math.PI*2);c.fillStyle='#fff';c.fill();c.clip();c.drawImage(A.logo,60,60,116,116);c.restore();c.globalAlpha=1}
 function vdFrame(c,A,t){
-  vdBg(c,A,t);const P=A.pal;c.textAlign='center';c.textBaseline='alphabetic';
+  vdBg(c,A,t);vdLogo(c,A,t);const P=A.pal;c.textAlign='center';c.textBaseline='alphabetic';
   if(A.tpl==='set'){
-    const kb=vdPr(t,.1,.6);c.globalAlpha=kb;vdPill(c,A.badge+(A.cat?' • '+A.cat:''),540,150-(1-vdEb(kb))*200,'700 40px '+VD_SANS,P.acc,P.accTxt,44,84);c.globalAlpha=1;
+    const kb=A.o.badge?vdPr(t,.1,.6):0;c.globalAlpha=kb;if(kb>0)vdPill(c,A.badge+(A.cat?' • '+A.cat:''),540,150-(1-vdEb(kb))*200,'700 40px '+VD_SANS,P.acc,P.accTxt,44,84);c.globalAlpha=1;
     A.items.forEach((it,i)=>{
       const s0=.3+i*2.6,kin=vdEo(vdPr(t,s0,s0+.55)),kout=i===A.items.length-1?0:vdEo(vdPr(t,s0+2.15,s0+2.6));
       if(kin<=0||kout>=1)return;const ox=(1-kin)*1100-kout*1100;
@@ -3012,7 +3014,7 @@ function vdFrame(c,A,t){
     });
     vdEnd(c,A,t);return;
   }
-  const kb=vdPr(t,.15,.75);
+  const kb=A.o.badge?vdPr(t,.15,.75):0;
   if(kb>0){c.globalAlpha=kb;vdPill(c,A.badge,540,150-(1-vdEb(kb))*260,'700 46px '+VD_SANS,P.acc,P.accTxt,50,92);c.globalAlpha=1}
   const kp=vdPr(t,.35,1.25),sc=(.55+.45*vdEb(kp))*(1+.03*t/A.dur),cy=660+(1-vdEo(kp))*260+Math.sin(t*2)*9*kp;
   if(A.tpl==='slide'&&A.slides.length>1){
@@ -3022,14 +3024,14 @@ function vdFrame(c,A,t){
     c.fillStyle=P.sub;c.font='700 30px '+VD_SANS;c.globalAlpha=vdCl(kp);
     for(let j=0;j<n;j++){c.beginPath();c.arc(540+(j-(n-1)/2)*34,1072,j===i?9:6,0,Math.PI*2);c.fill()}c.globalAlpha=1;
   }else vdDrawSpr(c,A.items[0].spr,540,cy,sc,vdCl(kp*1.6),t);
-  if(A.old&&A.tpl!=='set'){
+  if(A.o.disc&&A.old&&A.tpl!=='set'){
     const kd=vdPr(t,1.2,1.7);if(kd>0){c.save();c.translate(880,385);c.rotate((1-vdEb(kd))*-1.2+Math.sin(t*3)*.05);c.scale(vdEb(kd),vdEb(kd));
       c.fillStyle=P.acc;c.beginPath();for(let i=0;i<24;i++){const r=i%2?118:136,an=i*Math.PI/12;c.lineTo(Math.cos(an)*r,Math.sin(an)*r)}c.closePath();c.fill();
       c.fillStyle=P.accTxt;c.font='700 70px '+VD_SANS;c.textAlign='center';c.fillText('-'+Math.round((A.p.old-A.p.price)*100/A.p.old)+'%',0,24);c.restore()}
   }
   const kn=vdPr(t,1.25,1.9);
   if(kn>0){c.globalAlpha=kn;c.fillStyle=P.txt;const N=vdNameLines(c,vdName(A.p,A.lang),900,60),y0=1140+(1-vdEo(kn))*40;N.l.forEach((l,j)=>c.fillText(l,540,y0+j*N.f*1.16));c.globalAlpha=1}
-  A.pts.forEach((s,i)=>{
+  (A.o.pts?A.pts:[]).forEach((s,i)=>{
     const k=vdPr(t,2.2+i*.55,2.7+i*.55);if(k<=0)return;const e=vdEo(k);c.globalAlpha=e;
     c.font='700 36px '+VD_SANS;const L=sgWrap(c,s,820,1)[0],w=c.measureText(L).width+124,x=540-w/2-(1-e)*160,y=1262+i*88;
     c.fillStyle=P.light?'rgba(0,0,0,.06)':'rgba(255,255,255,.13)';sgRR(c,x,y,w,72,36);c.fill();
@@ -3056,6 +3058,8 @@ function vdUI(){
   const m=document.getElementById('vdmodal');if(!m)return;
   const on=(sel,f)=>m.querySelectorAll(sel).forEach(b=>b.className='btn sm '+(f(b)?'gold':'line'));
   on('[data-vd="tpl"]',b=>b.dataset.v===VD.tpl);on('[data-vd="lang"]',b=>b.dataset.v===VD.lang);on('[data-vd="price"]',b=>(b.dataset.v==='1')===VD.price);
+  on('[data-vd="opt"]',b=>!!VD.opt[b.dataset.v]);on('[data-vd="pi"]',b=>+b.dataset.v===VD.pi);
+  m.querySelectorAll('[data-vd="pi"]').forEach(b=>{b.style.outline=+b.dataset.v===VD.pi?'3px solid #f0c66e':'none'});
   on('[data-vd="dur"]',b=>+b.dataset.v===VD.dur);on('[data-vd="music"]',b=>(b.dataset.v==='1')===VD.music);
   m.querySelectorAll('[data-vd="col"]').forEach(b=>{b.style.outline=b.dataset.v===VD.col?'3px solid #f0c66e':'none';b.style.outlineOffset='2px'});
   const pw=m.querySelector('#vdpts');if(pw)pw.style.display=VD.tpl==='set'?'none':'flex';
@@ -3124,6 +3128,23 @@ async function vdShare(){
   try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f]});return}}catch(e){if(e&&e.name==='AbortError')return}
   rlSave(VD.blob,f.name);toast('Видео сохранено');
 }
+/* 📝 готовый текст к посту (RU/KZ) с хэштегами */
+function vdCaption(){
+  const p=VD.p,kk=VD.lang==='kk',T=VD_T[VD.lang],nm=vdName(p,VD.lang);
+  const cat=(()=>{const o=(DB.cats.find(x=>x.id===p.cat)||{}).name;return o?String((kk&&o.kk)||o.ru||''):''})();
+  const tag=x=>'#'+String(x).replace(/[^\p{L}\p{N}]+/gu,'');
+  const L=[(VD_EMO[VD.tpl]||'✨')+' '+(String(VD.badge||'').trim()||T[VD.tpl]).toUpperCase(),'',nm,''];
+  VD.pts.filter(Boolean).forEach(x=>L.push('✅ '+x));
+  if(p.price>0)L.push('',(kk?'💰 Бағасы: ':'💰 Цена: ')+money(p.price)+(p.old>p.price?(kk?' (бұрын '+money(p.old)+')':' (было '+money(p.old)+')'):''));
+  L.push('','📍 '+T.addr,'📲 WhatsApp: '+CONTACT.phone,'🌐 https://muslimshop.kz/p/'+VD.id+'.html','',
+    [tag('MuslimShop'),tag('Атырау'),kk?tag('Атыраудүкен'):tag('ДинаБазар'),cat?tag(cat):'',kk?tag('түпнұсқа'):tag('оригинал')].filter(Boolean).join(' '));
+  return L.join('\n');
+}
+async function vdCopyCap(){
+  const txt=vdCaption();
+  try{await navigator.clipboard.writeText(txt);toast('Текст скопирован — вставьте в пост');}
+  catch(e){const r=document.getElementById('vdcap');if(r){r.style.display='block';r.value=txt;r.select()}toast('Выделите текст и скопируйте')}
+}
 /* 🎲 подобрать за меня: шаблон, цвета и пункты под этот товар; каждое нажатие — новый вариант */
 function vdAuto(){
   const p=VD.p,n=((p.images&&p.images.length)||1);
@@ -3139,7 +3160,7 @@ function vdOpen0(){
   const m=document.createElement('div');m.id='vdmodal';
   m.style.cssText='position:fixed;inset:0;z-index:9999;background:#0d0d10;overflow:auto;padding:16px 12px 40px;display:flex;flex-direction:column;align-items:center;gap:12px';
   const inp=i=>'<input data-vdp="'+i+'" maxlength="58" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #444;background:#1b1b1f;color:#fff;font-size:15px">';
-  const row='display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:440px';
+  const imgs=((VD.p.images&&VD.p.images.length)?VD.p.images:[VD.p.img]).filter(x=>typeof x==='string'&&x);const row='display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:440px';
   const sw=(k,bg,label)=>'<button type="button" data-vd="col" data-v="'+k+'" title="'+label+'" style="width:40px;height:40px;border-radius:50%;border:2px solid #555;background:'+bg+';color:#fff;font-size:11px;font-weight:700;cursor:pointer;flex:0 0 auto">'+(k==='auto'?'АВТО':k==='tpl'?'⟲':'')+'</button>';
   m.innerHTML='<div style="color:#fff;font-weight:700;text-align:center;max-width:420px">🎥 Видео: '+esc(VD.p.name.ru||VD.p.name.kk)+'</div>'
    +'<button type="button" class="btn sm gold" data-vd="auto" style="font-size:15px">🎲 Подобрать автоматически</button>'
@@ -3149,10 +3170,14 @@ function vdOpen0(){
      +Object.keys(VD_PALS).map(k=>sw(k,'linear-gradient(135deg,'+VD_PALS[k].bg[0]+' 55%,'+VD_PALS[k].acc+' 55%)',VD_PALS[k].n)).join('')+'</div>'
    +'<div style="'+row+'"><button type="button" class="btn sm line" data-vd="lang" data-v="ru">Русский</button><button type="button" class="btn sm line" data-vd="lang" data-v="kk">Қазақша</button><button type="button" class="btn sm line" data-vd="price" data-v="1">С ценой</button><button type="button" class="btn sm line" data-vd="price" data-v="0">Без цены</button></div>'
    +'<div id="vddur" style="'+row+'"><button type="button" class="btn sm line" data-vd="dur" data-v="8">8 с</button><button type="button" class="btn sm line" data-vd="dur" data-v="12">12 с</button><button type="button" class="btn sm line" data-vd="dur" data-v="15">15 с</button><button type="button" class="btn sm line" data-vd="music" data-v="1">🎵 С музыкой</button><button type="button" class="btn sm line" data-vd="music" data-v="0">🔇 Без музыки</button></div>'
+   +'<div style="'+row+'"><span style="color:#bbb;font-size:13px;width:100%;text-align:center">Показывать в видео (нажмите, чтобы убрать или вернуть):</span>'
+     +[['badge','🏷 Значок'],['disc','％ Скидка'],['pts','✓ Пункты'],['end','📲 Концовка'],['logo','🕌 Логотип']].map(x=>'<button type="button" class="btn sm line" data-vd="opt" data-v="'+x[0]+'">'+x[1]+'</button>').join('')+'</div>'
+   +(imgs.length>1?'<div style="'+row+'"><span style="color:#bbb;font-size:13px;width:100%;text-align:center">Главное фото:</span>'+imgs.slice(0,6).map((u,i)=>'<button type="button" data-vd="pi" data-v="'+i+'" style="width:54px;height:72px;border-radius:8px;border:1px solid #555;background:#fff url(&quot;'+esc(u)+'&quot;) center/cover;cursor:pointer;flex:0 0 auto"></button>').join('')+'</div>':'')
    +'<canvas id="vdcv" width="'+VD_W+'" height="'+VD_H+'" style="width:min(74vw,330px);aspect-ratio:9/16;border-radius:14px;background:#222"></canvas>'
    +'<div style="width:min(92vw,360px)"><input id="vdbadge" maxlength="24" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #444;background:#1b1b1f;color:#fff;font-size:15px"></div>'
    +'<div id="vdpts" style="flex-direction:column;gap:6px;width:min(92vw,360px)"><div style="color:#bbb;font-size:13px">Три пункта в видео (можно исправить):</div>'+inp(0)+inp(1)+inp(2)+'</div>'
-   +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button type="button" class="btn sm gold" data-vd="rec">🎥 Создать видео</button><button type="button" class="btn sm line" data-vd="close">Закрыть</button></div>'
+   +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button type="button" class="btn sm gold" data-vd="rec">🎥 Создать видео</button><button type="button" class="btn sm line" data-vd="close">Закрыть</button><button type="button" class="btn sm line" data-vd="cap">📝 Текст для поста</button></div>'
+   +'<textarea id="vdcap" readonly style="display:none;width:min(92vw,360px);height:180px;border-radius:10px;background:#1b1b1f;color:#fff;border:1px solid #444;padding:10px"></textarea>'
    +'<div id="vdres" style="display:flex;flex-direction:column;align-items:center;gap:10px"></div>'
    +'<div id="vdhint" style="color:#bbb;font-size:13px;text-align:center;max-width:340px"></div>';
   m.addEventListener('click',e=>{
@@ -3160,6 +3185,9 @@ function vdOpen0(){
     const a=b.dataset.vd;
     if(a==='close')vdClose();
     else if(a==='auto')vdAuto();
+    else if(a==='opt'){const k=b.dataset.v;VD.opt[k]=VD.opt[k]?0:1;LS.set('ms_vd_opt',VD.opt);vdUI();vdRebuild()}
+    else if(a==='pi'){VD.pi=+b.dataset.v;vdUI();vdRebuild()}
+    else if(a==='cap')vdCopyCap();
     else if(a==='tpl'){VD.tpl=b.dataset.v;LS.set('ms_vd_tpl',VD.tpl);vdUI();vdRebuild()}
     else if(a==='col'){VD.col=b.dataset.v;LS.set('ms_vd_col',VD.col);vdUI();vdRebuild()}
     else if(a==='lang'){VD.lang=b.dataset.v;LS.set('ms_vd_lang',VD.lang);VD.pts=vdPoints(VD.p,VD.lang);vdUI();vdRebuild()}
@@ -3187,7 +3215,7 @@ async function videoOpen(id){
     if(!VD_TPL.some(x=>x.k===VD.tpl))VD.tpl='new';
     VD.col=String(LS.get('ms_vd_col','auto'));if(VD.col!=='auto'&&VD.col!=='tpl'&&!VD_PALS[VD.col])VD.col='auto';
     VD.dur=[8,12,15].includes(+LS.get('ms_vd_dur',12))?+LS.get('ms_vd_dur',12):12;VD.music=LS.get('ms_vd_music',0)===1;
-    VD.badge='';VD.price=p.price>0;VD.pts=vdPoints(p,VD.lang);
+    VD.opt=Object.assign({badge:1,disc:1,pts:1,end:1,logo:0},LS.get('ms_vd_opt',null)||{});VD.pi=0;VD.badge='';VD.price=p.price>0;VD.pts=vdPoints(p,VD.lang);
     vdOpen0();await vdRebuild();
   }catch(e){toast('Видео: '+(e&&e.message||e))}
 }
