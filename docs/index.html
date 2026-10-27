@@ -2824,7 +2824,7 @@ async function reelOpen(id){
 }
 
 /* ============ 🎥 Видео для статуса и Reels: анимация рисуется и записывается прямо в телефоне (ничего никуда не отправляется) ============ */
-const VD={opt:{badge:1,disc:1,pts:1,end:1,logo:0},pi:0,p:null,id:'',tpl:'new',lang:'ru',price:true,pts:['','',''],badge:'',col:'auto',dur:12,music:false,run:0,rec:null,A:null,blob:null,ext:'mp4',busy:false};
+const VD={opt:{badge:1,disc:1,pts:1,end:1,logo:0},pi:0,sel:null,capc:1,p:null,id:'',tpl:'new',lang:'ru',price:true,pts:['','',''],badge:'',col:'auto',dur:12,music:false,run:0,rec:null,A:null,blob:null,ext:'mp4',busy:false};
 const VD_TPL=[{k:'new',n:'✨ Новинка'},{k:'hit',n:'🔥 Хит недели'},{k:'sale',n:'🏷 Акция'},{k:'lux',n:'💎 Премиум'},{k:'clean',n:'🤍 Белый'},{k:'slide',n:'📸 Все фото'},{k:'set',n:'🛍 Подборка из 3'}];
 const VD_PALS={
   emerald:{n:'Изумруд',bg:['#0f5a43','#05261c'],txt:'#ffffff',sub:'#e3cd98',acc:'#e6c27a',accTxt:'#08301f',glow:'rgba(230,194,122,.30)'},
@@ -2907,13 +2907,14 @@ async function vdAssets(){
   const p=VD.p,tpl=VD.tpl,lang=VD.lang;
   const logo=await sgLogo().catch(()=>null);
   const srcs=((p.images&&p.images.length)?p.images:[p.img]).filter(x=>typeof x==='string'&&x);
-  const main=await sgLoad(srcs[Math.min(VD.pi||0,srcs.length-1)]||srcs[0]);
+  let sel=(Array.isArray(VD.sel)?VD.sel:[]).filter(i=>i<srcs.length);if(!sel.length)sel=[0];if(tpl==='slide'&&sel.length<2)sel=srcs.map((x,i)=>i).slice(0,5);
+  const main=await sgLoad(srcs[sel[0]]||srcs[0]);
   const base=VD_PALS[VD_TPLPAL[tpl]]||VD_PALS.emerald;
   const pal=VD.col==='auto'?vdAutoPal(main,base):VD.col==='tpl'?base:(VD_PALS[VD.col]||base);
   const box=tpl==='set'?VD_CARD.set:VD_CARD.single;
   const items=[{p,spr:vdSprite(main,box,pal)}];
   const slides=[items[0].spr];
-  if(tpl==='slide'){for(const s of srcs.filter((x,i)=>i!==(VD.pi||0)).slice(0,4)){try{slides.push(vdSprite(await sgLoad(s),box,pal))}catch(e){}}}
+  if(tpl!=='set'){for(const i of sel.slice(1,5)){try{slides.push(vdSprite(await sgLoad(srcs[i]),box,pal))}catch(e){}}}
   if(tpl==='set'){
     const pool=DB.products.filter(q=>q.id!==p.id&&q.status==='in'&&q.img&&q.cat===p.cat);
     const more=DB.products.filter(q=>q.id!==p.id&&q.status==='in'&&q.img&&q.cat!==p.cat&&(q.popular||q.featured));
@@ -2924,7 +2925,7 @@ async function vdAssets(){
   const parts=Array.from({length:26},()=>({x:rnd()*1080,y:120+rnd()*1600,r:8+rnd()*16,ph:rnd()*6.28,sp:.6+rnd()*1.4}));
   const old=p.old>p.price&&p.price>0;
   let dur=tpl==='set'?3*2.6+3.2:Math.max(8,Math.min(15,VD.dur||12));
-  if(tpl==='slide')dur=Math.max(dur,Math.min(15,1.3+slides.length*2.2+5));
+  if(tpl!=='set'&&slides.length>1)dur=Math.max(dur,Math.min(15,1.3+slides.length*2.2+5));
   const T=VD_T[lang],badge=(String(VD.badge||'').trim()||T[tpl]).toUpperCase();
   return {o:Object.assign({},VD.opt),p,tpl,lang,pal,logo,items,slides,parts,old,dur,end:dur-3,pts:VD.pts.map(x=>String(x||'').trim()).filter(Boolean).slice(0,3),showPrice:VD.price&&p.price>0,T,badge:VD_EMO[tpl]+' '+badge,
     cat:(()=>{const o=(DB.cats.find(x=>x.id===p.cat)||{}).name;return o?String((lang==='kk'&&o.kk)||o.ru||o.kk||'').toUpperCase():''})()};
@@ -3017,10 +3018,10 @@ function vdFrame(c,A,t){
   const kb=A.o.badge?vdPr(t,.15,.75):0;
   if(kb>0){c.globalAlpha=kb;vdPill(c,A.badge,540,150-(1-vdEb(kb))*260,'700 46px '+VD_SANS,P.acc,P.accTxt,50,92);c.globalAlpha=1}
   const kp=vdPr(t,.35,1.25),sc=(.55+.45*vdEb(kp))*(1+.03*t/A.dur),cy=660+(1-vdEo(kp))*260+Math.sin(t*2)*9*kp;
-  if(A.tpl==='slide'&&A.slides.length>1){
-    const seg=2.2,n=A.slides.length,u=Math.max(0,t-1.3),i=Math.min(n-1,Math.floor(u/seg)),f=u-i*seg,sw=i<n-1?vdEo(vdPr(f,seg-.45,seg)):0;
+  if(A.tpl!=='set'&&A.slides.length>1){
+    const seg=2.4,n=A.slides.length,u=Math.max(0,Math.min(t,A.end-.2)-1.3),k=Math.floor(u/seg),i=k%n,f=u-k*seg,sw=(k+1)*seg+1.3<A.end?vdEo(vdPr(f,seg-.45,seg)):0;
     vdDrawSpr(c,A.slides[i],540-sw*1100,cy,sc,vdCl(kp*1.6),t);
-    if(sw>0)vdDrawSpr(c,A.slides[i+1],540+(1-sw)*1100,cy,sc,1,t);
+    if(sw>0)vdDrawSpr(c,A.slides[(i+1)%n],540+(1-sw)*1100,cy,sc,1,t);
     c.fillStyle=P.sub;c.font='700 30px '+VD_SANS;c.globalAlpha=vdCl(kp);
     for(let j=0;j<n;j++){c.beginPath();c.arc(540+(j-(n-1)/2)*34,1072,j===i?9:6,0,Math.PI*2);c.fill()}c.globalAlpha=1;
   }else vdDrawSpr(c,A.items[0].spr,540,cy,sc,vdCl(kp*1.6),t);
@@ -3058,8 +3059,8 @@ function vdUI(){
   const m=document.getElementById('vdmodal');if(!m)return;
   const on=(sel,f)=>m.querySelectorAll(sel).forEach(b=>b.className='btn sm '+(f(b)?'gold':'line'));
   on('[data-vd="tpl"]',b=>b.dataset.v===VD.tpl);on('[data-vd="lang"]',b=>b.dataset.v===VD.lang);on('[data-vd="price"]',b=>(b.dataset.v==='1')===VD.price);
-  on('[data-vd="opt"]',b=>!!VD.opt[b.dataset.v]);on('[data-vd="pi"]',b=>+b.dataset.v===VD.pi);
-  m.querySelectorAll('[data-vd="pi"]').forEach(b=>{b.style.outline=+b.dataset.v===VD.pi?'3px solid #f0c66e':'none'});
+  on('[data-vd="opt"]',b=>!!VD.opt[b.dataset.v]);m.querySelectorAll('[data-vd="pi"]').forEach(b=>{const k=(VD.sel||[]).indexOf(+b.dataset.v);b.style.outline=k>=0?'3px solid #f0c66e':'none';b.style.opacity=k>=0?'1':'.45';b.textContent=k>=0?String(k+1):'';b.style.color='#111';b.style.fontWeight='800';b.style.fontSize='18px';b.style.textShadow='0 0 4px #fff'});
+  on('[data-vd="capc"]',b=>!!VD.capc);
   on('[data-vd="dur"]',b=>+b.dataset.v===VD.dur);on('[data-vd="music"]',b=>(b.dataset.v==='1')===VD.music);
   m.querySelectorAll('[data-vd="col"]').forEach(b=>{b.style.outline=b.dataset.v===VD.col?'3px solid #f0c66e':'none';b.style.outlineOffset='2px'});
   const pw=m.querySelector('#vdpts');if(pw)pw.style.display=VD.tpl==='set'?'none':'flex';
@@ -3174,7 +3175,8 @@ function vdCaption(){
   const L=[(VD_EMO[VD.tpl]||'✨')+' '+(String(VD.badge||'').trim()||T[VD.tpl]).toUpperCase(),'',nm,''];
   VD.pts.filter(Boolean).forEach(x=>L.push('✅ '+x));
   if(p.price>0)L.push('',(kk?'💰 Бағасы: ':'💰 Цена: ')+money(p.price)+(p.old>p.price?(kk?' (бұрын '+money(p.old)+')':' (было '+money(p.old)+')'):''));
-  L.push('','📍 '+T.addr,'📲 WhatsApp: '+CONTACT.phone,'🌐 https://muslimshop.kz/p/'+VD.id+'.html','',
+  if(VD.capc)L.push('','📍 '+T.addr,'📲 WhatsApp: '+CONTACT.phone,'🌐 https://muslimshop.kz/p/'+VD.id+'.html');
+  L.push('',
     [tag('MuslimShop'),tag('Атырау'),kk?tag('Атыраудүкен'):tag('ДинаБазар'),cat?tag(cat):'',kk?tag('түпнұсқа'):tag('оригинал')].filter(Boolean).join(' '));
   return L.join('\n');
 }
@@ -3210,11 +3212,11 @@ function vdOpen0(){
    +'<div id="vddur" style="'+row+'"><button type="button" class="btn sm line" data-vd="dur" data-v="8">8 с</button><button type="button" class="btn sm line" data-vd="dur" data-v="12">12 с</button><button type="button" class="btn sm line" data-vd="dur" data-v="15">15 с</button><button type="button" class="btn sm line" data-vd="music" data-v="1">🎵 С музыкой</button><button type="button" class="btn sm line" data-vd="music" data-v="0">🔇 Без музыки</button></div>'
    +'<div style="'+row+'"><span style="color:#bbb;font-size:13px;width:100%;text-align:center">Показывать в видео (нажмите, чтобы убрать или вернуть):</span>'
      +[['badge','🏷 Значок'],['disc','％ Скидка'],['pts','✓ Пункты'],['end','📲 Концовка'],['logo','🕌 Логотип']].map(x=>'<button type="button" class="btn sm line" data-vd="opt" data-v="'+x[0]+'">'+x[1]+'</button>').join('')+'</div>'
-   +(imgs.length>1?'<div style="'+row+'"><span style="color:#bbb;font-size:13px;width:100%;text-align:center">Главное фото:</span>'+imgs.slice(0,6).map((u,i)=>'<button type="button" data-vd="pi" data-v="'+i+'" style="width:54px;height:72px;border-radius:8px;border:1px solid #555;background:#fff url(&quot;'+esc(u)+'&quot;) center/cover;cursor:pointer;flex:0 0 auto"></button>').join('')+'</div>':'')
+   +(imgs.length>1?'<div style="'+row+'"><span style="color:#bbb;font-size:13px;width:100%;text-align:center">Фото в видео — можно выбрать несколько, они будут сменяться:</span>'+imgs.slice(0,6).map((u,i)=>'<button type="button" data-vd="pi" data-v="'+i+'" style="width:54px;height:72px;border-radius:8px;border:1px solid #555;background:#fff url(&quot;'+esc(u)+'&quot;) center/cover;cursor:pointer;flex:0 0 auto"></button>').join('')+'</div>':'')
    +'<canvas id="vdcv" width="'+VD_W+'" height="'+VD_H+'" style="width:min(74vw,330px);aspect-ratio:9/16;border-radius:14px;background:#222"></canvas>'
    +'<div style="width:min(92vw,360px)"><input id="vdbadge" maxlength="24" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #444;background:#1b1b1f;color:#fff;font-size:15px"></div>'
    +'<div id="vdpts" style="flex-direction:column;gap:6px;width:min(92vw,360px)"><div style="color:#bbb;font-size:13px">Три пункта в видео (можно исправить):</div>'+inp(0)+inp(1)+inp(2)+'</div>'
-   +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button type="button" class="btn sm gold" data-vd="rec">🎥 Создать видео</button><button type="button" class="btn sm line" data-vd="close">Закрыть</button><button type="button" class="btn sm line" data-vd="cap">📝 Текст для поста</button></div>'
+   +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button type="button" class="btn sm gold" data-vd="rec">🎥 Создать видео</button><button type="button" class="btn sm line" data-vd="close">Закрыть</button><button type="button" class="btn sm line" data-vd="cap">📝 Текст для поста</button><button type="button" class="btn sm line" data-vd="capc">📍 Адрес и телефон в тексте</button></div>'
    +'<textarea id="vdcap" readonly style="display:none;width:min(92vw,360px);height:180px;border-radius:10px;background:#1b1b1f;color:#fff;border:1px solid #444;padding:10px"></textarea>'
    +'<div id="vdres" style="display:flex;flex-direction:column;align-items:center;gap:10px"></div>'
    +'<div id="vdhint" style="color:#bbb;font-size:13px;text-align:center;max-width:340px"></div>';
@@ -3224,7 +3226,8 @@ function vdOpen0(){
     if(a==='close')vdClose();
     else if(a==='auto')vdAuto();
     else if(a==='opt'){const k=b.dataset.v;VD.opt[k]=VD.opt[k]?0:1;LS.set('ms_vd_opt',VD.opt);vdUI();vdRebuild()}
-    else if(a==='pi'){VD.pi=+b.dataset.v;vdUI();vdRebuild()}
+    else if(a==='pi'){const v=+b.dataset.v,S=VD.sel||(VD.sel=[0]),k=S.indexOf(v);if(k>=0){if(S.length>1)S.splice(k,1)}else S.push(v);vdUI();vdRebuild()}
+    else if(a==='capc'){VD.capc=VD.capc?0:1;LS.set('ms_vd_capc',VD.capc);vdUI();const r=document.getElementById('vdcap');if(r&&r.style.display==='block')r.value=vdCaption()}
     else if(a==='cap')vdCopyCap();
     else if(a==='tpl'){VD.tpl=b.dataset.v;LS.set('ms_vd_tpl',VD.tpl);vdUI();vdRebuild()}
     else if(a==='col'){VD.col=b.dataset.v;LS.set('ms_vd_col',VD.col);vdUI();vdRebuild()}
@@ -3253,7 +3256,7 @@ async function videoOpen(id){
     if(!VD_TPL.some(x=>x.k===VD.tpl))VD.tpl='new';
     VD.col=String(LS.get('ms_vd_col','auto'));if(VD.col!=='auto'&&VD.col!=='tpl'&&!VD_PALS[VD.col])VD.col='auto';
     VD.dur=[8,12,15].includes(+LS.get('ms_vd_dur',12))?+LS.get('ms_vd_dur',12):12;VD.music=LS.get('ms_vd_music',0)===1;
-    VD.opt=Object.assign({badge:1,disc:1,pts:1,end:1,logo:0},LS.get('ms_vd_opt',null)||{});VD.pi=0;VD.badge='';VD.price=p.price>0;VD.pts=vdPoints(p,VD.lang);
+    VD.opt=Object.assign({badge:1,disc:1,pts:1,end:1,logo:0},LS.get('ms_vd_opt',null)||{});VD.pi=0;VD.capc=LS.get('ms_vd_capc',1)===0?0:1;{const n=((p.images&&p.images.length)?p.images:[p.img]).filter(Boolean).length;VD.sel=Array.from({length:Math.min(5,Math.max(1,n))},(x,i)=>i)}VD.badge='';VD.price=p.price>0;VD.pts=vdPoints(p,VD.lang);
     vdOpen0();await vdRebuild();
   }catch(e){toast('Видео: '+(e&&e.message||e))}
 }
