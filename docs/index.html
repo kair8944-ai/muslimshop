@@ -3094,6 +3094,44 @@ function vdShowResult(){
    +'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button type="button" class="btn sm gold" data-vd="share">Поделиться</button><button type="button" class="btn sm line" data-vd="dl">Скачать</button></div>'
    +(VD.ext==='webm'?'<div style="color:#f3c27a;font-size:12px;text-align:center;max-width:330px">Этот браузер записал видео в формате WebM. Если WhatsApp его не примет, обновите Chrome или откройте админку в Safari.</div>':'');
 }
+/* Исправление длительности: Chrome на Android пишет файл без длины (галерея/WhatsApp видят 2–3 с) */
+async function vdFixDur(blob,sec){
+  try{
+    const b=new Uint8Array(await blob.arrayBuffer()),dv=new DataView(b.buffer);
+    if(b[4]===0x66&&b[5]===0x74&&b[6]===0x79&&b[7]===0x70){ /* MP4: прописываем длину в mvhd/tkhd/mdhd/mehd */
+      const T=(o)=>String.fromCharCode(b[o+4],b[o+5],b[o+6],b[o+7]);
+      const W=(o,v1,val)=>{if(v1){dv.setUint32(o,Math.floor(val/4294967296));dv.setUint32(o+4,val>>>0)}else dv.setUint32(o,Math.min(val,4294967295)>>>0)};
+      let mts=1000;
+      const walk=(st,en,mt)=>{let o=st;while(o+8<=en){let sz=dv.getUint32(o),h=8;if(sz===1){sz=dv.getUint32(o+8)*4294967296+dv.getUint32(o+12);h=16}else if(sz===0)sz=en-o;if(sz<8)break;const t=T(o),v1=b[o+h]===1,f=o+h+4;
+        if(t==='moov'||t==='trak'||t==='mdia'||t==='mvex')walk(o+h,o+sz,mt);
+        else if(t==='mvhd'){mts=dv.getUint32(v1?f+16:f+8);W(v1?f+20:f+12,v1,Math.round(sec*mts))}
+        else if(t==='tkhd')W(v1?f+24:f+16,v1,Math.round(sec*mts));
+        else if(t==='mdhd'){const ts=dv.getUint32(v1?f+16:f+8);W(v1?f+20:f+12,v1,Math.round(sec*ts))}
+        else if(t==='mehd')W(f,v1,Math.round(sec*mts));
+        o+=sz}};
+      walk(0,b.length);return new Blob([b],{type:blob.type});
+    }
+    if(dv.getUint32(0)===0x1A45DFA3){ /* WebM: добавляем Duration в Info */
+      const vl=(o)=>{const x=b[o];let n=1,m=0x80;while(n<=8&&!(x&m)){n++;m>>=1}let v=x&(m-1),unk=v===m-1;for(let i=1;i<n;i++){v=v*256+b[o+i];if(b[o+i]!==255)unk=false}return {n,v,unk}};
+      const il=(o)=>{const x=b[o];return x&0x80?1:x&0x40?2:x&0x20?3:4};
+      const id=(o,n)=>{let v=0;for(let i=0;i<n;i++)v=v*256+b[o+i];return v};
+      let o=0;{const n=il(o),s=vl(o+n);o+=n+s.n+s.v}
+      if(id(o,4)!==0x18538067)return blob;
+      const segSz=vl(o+4),segStart=o+4+segSz.n;let q=segStart;
+      while(q<b.length){const n=il(q),i=id(q,n),s=vl(q+n),cs=q+n+s.n;
+        if(i===0x1549A966){let scale=1e6,r=cs,dur=-1;/* -1 = нет */const ce=cs+s.v;
+          while(r<ce){const n2=il(r),i2=id(r,n2),s2=vl(r+n2),c2=r+n2+s2.n;if(i2===0x2AD7B1){scale=0;for(let k=0;k<s2.v;k++)scale=scale*256+b[c2+k]}if(i2===0x4489)dur=s2.v===4?-(c2+1):c2;r=c2+s2.v}
+          const val=sec*1e9/scale;
+          if(dur!==-1){if(dur<0)dv.setFloat32(-dur-1,val);else dv.setFloat64(dur,val);return new Blob([b],{type:blob.type})}
+          const add=new Uint8Array(11);add[0]=0x44;add[1]=0x89;add[2]=0x88;new DataView(add.buffer).setFloat64(3,val);
+          const ns=s.v+11,hdr=new Uint8Array(8);hdr[0]=1;let t=ns;for(let k=7;k>=1;k--){hdr[k]=t&255;t=Math.floor(t/256)}
+          return new Blob([b.subarray(0,q+n),hdr,b.subarray(cs,ce),add,b.subarray(ce)],{type:blob.type});
+        }
+        if(s.unk)break;q=cs+s.v}
+    }
+  }catch(e){console.warn('vdFixDur',e)}
+  return blob;
+}
 async function vdRecord(){
   if(VD.busy)return;
   let actx=null,adest=null;
@@ -3110,14 +3148,14 @@ async function vdRecord(){
     const done=new Promise(res=>{rec.onstop=res});
     c.setTransform(VD_W/1080,0,0,VD_H/1920,0,0);vdFrame(c,A,0);
     if(actx){try{await actx.resume()}catch(e){}const sp=actx.createGain();sp.gain.value=.6;sp.connect(actx.destination);const bus=actx.createGain();bus.connect(adest);bus.connect(sp);vdMusic(actx,bus,A.dur+.4)}
-    rec.start(500);const t0=performance.now();
+    rec.start();const t0=performance.now();
     await new Promise(res=>{const loop=()=>{if(run!==VD.run){res();return}const t=(performance.now()-t0)/1000;
       c.setTransform(VD_W/1080,0,0,VD_H/1920,0,0);vdFrame(c,A,Math.min(t,A.dur));
       if(btn)btn.textContent='● Запись… '+Math.max(0,Math.ceil(A.dur+.4-t))+' с';
       if(t>=A.dur+.4){res();return}requestAnimationFrame(loop)};requestAnimationFrame(loop)});
     if(rec.state!=='inactive')rec.stop();await done;stream.getTracks().forEach(x=>x.stop());
     if(run!==VD.run||!document.getElementById('vdmodal'))return;
-    VD.ext=/mp4/.test(mime)?'mp4':'webm';VD.blob=new Blob(chunks,{type:mime.split(';')[0]});vdShowResult();
+    VD.ext=/mp4/.test(mime)?'mp4':'webm';VD.blob=await vdFixDur(new Blob(chunks,{type:mime.split(';')[0]}),A.dur+.4);vdShowResult();
     const r=document.getElementById('vdres');if(r)r.scrollIntoView({behavior:'smooth',block:'center'});
   }catch(e){toast('Не удалось записать: '+(e&&e.message||e))}
   finally{VD.busy=false;if(btn)btn.textContent='🎥 Создать видео';if(actx)try{actx.close()}catch(e){}}
