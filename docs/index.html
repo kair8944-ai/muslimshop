@@ -627,6 +627,15 @@ body:has(#contacts) footer .fg>div:nth-child(1),
 body:has(#contacts) footer .fg>div:nth-child(3){display:none}
 body footer h3{font-weight:700}
 /* ===== конец части 3 ===== */
+/* ===== КРУПНО И ПОНЯТНО, часть 4: фото магазина на главной вместо прежней картинки =====
+   Нужен файл hero-shop.jpg рядом с index.html. Если его нет — остаётся прежняя картинка. */
+body .hero2 .himg{position:relative;overflow:hidden}
+body .hero2 .himg::before{content:"";position:absolute;inset:0;background:url(hero-shop.jpg) center/cover no-repeat}
+@media(max-width:719px){
+  body .hero2 .himg{margin:0 -14px;aspect-ratio:2/1}
+}
+/* ===== конец части 4 ===== */
+
 
 
 </style>
