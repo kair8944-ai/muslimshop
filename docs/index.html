@@ -677,6 +677,31 @@ body #allcatsbtn{min-height:68px;font-size:21px;border:2px solid #111}
 /* 3. фото в карточках ниже (5:4 вместо квадрата), меньше пустого места */
 body .card .ph{aspect-ratio:5/4}
 /* ===== конец части 7 ===== */
+/* ===== КРУПНО И ПОНЯТНО, часть 8: «Избранное» и четыре подписи под поиском ===== */
+/* четыре подписи под поиском (Бутик, Заказ, Цены, Оплата) — сеткой 2x2 */
+body .trust{grid-template-columns:repeat(2,minmax(0,1fr))}
+body .trust div{border-bottom:1px solid #E7E2D9}
+/* сердечко на карточке товара */
+body .card{position:relative}
+body .favbtn{position:absolute;top:10px;right:10px;z-index:3;width:56px;height:56px;border-radius:50%;background:#fff;border:2px solid #111;color:#111;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;-webkit-text-stroke:0}
+body .favbtn svg,body .hbtn .hico svg,body .favp svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}
+body .favbtn.on{background:#D6342A;border-color:#D6342A;color:#fff}
+body .favbtn.on svg,body .favp.on svg,body #favbtn.on .hico svg{fill:currentColor}
+/* кнопка на странице товара */
+body .favp{gap:10px}
+body .favp.on{background:#D6342A;border-color:#D6342A;color:#fff}
+body .favp svg{width:28px;height:28px}
+/* сердечко в шапке */
+body #favbtn.on{color:#D6342A}
+body #favbtn .hico{display:inline-flex}
+@media(max-width:560px){
+  body #admbtn{display:none !important}   /* шестерёнка владельца на телефоне — в меню «⚙️ Админка» */
+  body .hbar{gap:6px}
+  body .hbtn{min-width:52px;padding:0 8px}
+  body .langsw button{min-width:50px;padding:0 8px}
+}
+/* ===== конец части 8 ===== */
+
 
 
 
@@ -710,6 +735,7 @@ body .card .ph{aspect-ratio:5/4}
       <button data-act="lang" data-id="ru">RU</button><button data-act="lang" data-id="kk">KZ</button>
     </div>
     <a class="hbtn" href="#/admin" aria-label="Админка" id="admbtn" style="display:none" title="Админка">⚙️</a><script>try{if(localStorage.getItem('ms_owner')||localStorage.getItem('ms_gh')||localStorage.getItem('ms_fa'))document.getElementById('admbtn').style.display=''}catch(e){}</script>
+    <a class="hbtn" href="#/favorites" aria-label="Избранное" id="favbtn"><span aria-hidden="true" class="hico"></span><span class="badge" id="favcount" style="display:none">0</span></a>
     <a class="hbtn" href="#/cart" aria-label="Корзина" id="cartbtn"><span aria-hidden="true">🛒</span><span class="badge" id="cartcount" style="display:none">0</span></a>
   </div>
 </header>
@@ -1121,7 +1147,7 @@ function ymGoal(n){if(ymOn&&!ymOwner()){try{window.ym(YM_ID,'reachGoal',n)}catch
 
 /* ============ i18n ============ */
 const T={
- ru:{menu:'Меню',search_ph:'Поиск товаров',find:'Найти',cats:'Категории',allcats:'ВСЕ КАТЕГОРИИ',hidecats:'СВЕРНУТЬ',popular:'Популярные товары',news:'Новинки',featured:'Рекомендуемые товары',all_items:'Все товары',
+ ru:{fav:'Избранное',fav_add:'В избранное',fav_in:'В избранном',fav_added:'Добавлено в избранное',fav_removed:'Убрано из избранного',fav_empty:'Здесь пока пусто. Нажмите сердечко на товаре, чтобы сохранить его.',menu:'Меню',search_ph:'Поиск товаров',find:'Найти',cats:'Категории',allcats:'ВСЕ КАТЕГОРИИ',hidecats:'СВЕРНУТЬ',popular:'Популярные товары',news:'Новинки',featured:'Рекомендуемые товары',all_items:'Все товары',
   about:'О магазине',about_txt:'MUSLIM SHOP — магазин в Атырау на рынке Дина, бутик 24. Оригинальные халяль-витамины и БАДы (в том числе iHerb), натуральный мёд, средства для мужского, женского и детского здоровья, исламские товары и парфюмерия. Закажите на сайте через WhatsApp, приходите в бутик или оформите доставку по Атырау и Казахстану. Работаем ежедневно с 10:00 до 19:00.',
   social:'Мы в соцсетях',contacts:'Контакты',catalog:'КАТАЛОГ',home:'Главная',cart:'Корзина',phone:'Телефон',addr:'Адрес',
   more:'ПОДРОБНЕЕ',tocart:'В КОРЗИНУ',order:'ЗАКАЗАТЬ',wa1:'⚡ ЗАКАЗАТЬ В 1 КЛИК (WhatsApp)',share:'ПОДЕЛИТЬСЯ',copy:'🔗 СКОПИРОВАТЬ ССЫЛКУ',in:'В наличии',out:'Нет в наличии',
@@ -1135,8 +1161,8 @@ const T={
   fill:'Укажите имя и телефон',copied:'Ссылка скопирована',added:'Добавлено в корзину',notfound:'Товар не найден или скрыт.',back:'← В каталог',
   qty_unit:'шт.',menu_nav:'Навигация',err_load:'Не удалось загрузить товары. Попробуйте обновить страницу.',addr_txt:'пр. Султана Бейбарыса, 45а/5, Атырау, Казахстан',
   hero_h:'Оригинальные халяль-витамины iHerb в Атырау',hero_kick:'Атырау · Доставка по Казахстану',hero_hl:'Натуральное. Халяльное. <em>Проверенное.</em>',hero_sub2:'БАДы, мёд и масло чёрного тмина. Доставка по всему Казахстану',btn_wa:'WhatsApp',needs_t:'Что вас беспокоит?',hero_sub:'Халяль-витамины, БАДы, мёд и товары для здоровья в Атырау. Доставка по Казахстану',itemsn:'Товаров:',
-  trust:[['Бутик 24','Рынок Дина, Атырау'],['Заказ','через WhatsApp'],['Цены','в тенге ₸']]},
- kk:{menu:'Мәзір',search_ph:'Тауар іздеу',find:'Іздеу',cats:'Санаттар',allcats:'БАРЛЫҚ САНАТТАР',hidecats:'ЖИНАУ',popular:'Танымал тауарлар',news:'Жаңалықтар',featured:'Ұсынылатын тауарлар',all_items:'Барлық тауарлар',
+  trust:[['Бутик 24','Рынок Дина, Атырау'],['Заказ','через WhatsApp'],['Цены','в тенге ₸'],['Оплата','Kaspi, удалённо']]},
+ kk:{fav:'Таңдаулылар',fav_add:'Таңдаулыға қосу',fav_in:'Таңдаулыда',fav_added:'Таңдаулыға қосылды',fav_removed:'Таңдаулыдан алынды',fav_empty:'Мұнда әзірге бос. Тауарды сақтау үшін жүрекшені басыңыз.',menu:'Мәзір',search_ph:'Тауар іздеу',find:'Іздеу',cats:'Санаттар',allcats:'БАРЛЫҚ САНАТТАР',hidecats:'ЖИНАУ',popular:'Танымал тауарлар',news:'Жаңалықтар',featured:'Ұсынылатын тауарлар',all_items:'Барлық тауарлар',
   about:'Дүкен туралы',about_txt:'MUSLIM SHOP — Атыраудағы Дина базарындағы 24-бутик. Түпнұсқа адал дәрумендер мен БАД (iHerb қоса), табиғи бал, ерлер, әйелдер және балалар денсаулығына арналған құралдар, исламдық тауарлар және парфюмерия. WhatsApp арқылы тапсырыс беріңіз, бутикке келіңіз немесе Атырау мен Қазақстан бойынша жеткізуді рәсімдеңіз. Күн сайын 10:00–19:00 жұмыс істейміз.',
   social:'Әлеуметтік желілерде',contacts:'Байланыс',catalog:'КАТАЛОГ',home:'Басты бет',cart:'Себет',phone:'Телефон',addr:'Мекенжай',
   more:'ТОЛЫҒЫРАҚ',tocart:'СЕБЕТКЕ',order:'ТАПСЫРЫС БЕРУ',wa1:'⚡ 1 БАСУМЕН ТАПСЫРЫС (WhatsApp)',share:'БӨЛІСУ',copy:'🔗 СІЛТЕМЕНІ КӨШІРУ',in:'Бар',out:'Жоқ',
@@ -1150,7 +1176,7 @@ const T={
   fill:'Аты мен телефонды көрсетіңіз',copied:'Сілтеме көшірілді',added:'Себетке қосылды',notfound:'Тауар табылмады немесе жасырылған.',back:'← Каталогқа',
   qty_unit:'дана',menu_nav:'Бөлімдер',err_load:'Тауарларды жүктеу мүмкін болмады. Бетті жаңартып көріңіз.',addr_txt:'Сұлтан Бейбарыс даңғылы, 45а/5, Атырау, Қазақстан',
   hero_h:'Атыраудағы түпнұсқа адал iHerb дәрумендері',hero_kick:'Атырау · Қазақстан бойынша жеткізу',hero_hl:'Табиғи. Адал. <em>Сенімді.</em>',hero_sub2:'БАД, бал және қара зире майы. Бүкіл Қазақстан бойынша жеткізу',btn_wa:'WhatsApp',needs_t:'Сізді не мазалайды?',hero_sub:'Атырауда адал дәрумендер, БАД, бал және денсаулыққа арналған тауарлар. Қазақстан бойынша жеткізу',itemsn:'Тауар:',
-  trust:[['24-бутик','Дина базары, Атырау'],['Тапсырыс','WhatsApp арқылы'],['Бағасы','теңгемен ₸']]}
+  trust:[['24-бутик','Дина базары, Атырау'],['Тапсырыс','WhatsApp арқылы'],['Бағасы','теңгемен ₸'],['Төлем','Kaspi, қашықтан']]}
 };
 let lang=LS.get('ms_lang','ru'); if(lang!=='kk')lang='ru';
 const t=k=>(T[lang][k]??T.ru[k]??k);
@@ -1424,8 +1450,26 @@ let PENDING=false;
 
 /* ============ Cart ============ */
 let cart=LS.get('ms_cart',[]);
+/* избранное: список id товаров хранится на телефоне покупателя (localStorage, ключ ms_fav) */
+let FAV=LS.get('ms_fav',[]);if(!Array.isArray(FAV))FAV=[];
+const HEART='<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" focusable="false"><path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3 5.5 6.3 5.5c2 0 3.7 1.1 5.7 3.3 2-2.2 3.7-3.3 5.7-3.3 3.3 0 5.1 3.1 3.8 6.3C19.5 16.4 12 21 12 21z"/></svg>';
+const favHas=id=>FAV.includes(String(id));
+const favLabel=on=>HEART+'<span>'+(on?t('fav_in'):t('fav_add'))+'</span>';
+function favBadge(){
+  try{
+    const n=FAV.length,b=document.getElementById('favcount'),h=document.getElementById('favbtn');
+    if(b){b.textContent=n;b.style.display=n?'flex':'none'}
+    if(h){const ic=h.querySelector('.hico');if(ic&&!ic.innerHTML)ic.innerHTML=HEART;h.classList.toggle('on',n>0)}
+  }catch(e){}
+}
+function viewFav(){
+  document.title=t('fav')+' — MUSLIM SHOP';
+  const arr=FAV.map(id=>prodById(id)).filter(p=>p&&(p.status!=='hidden'||isAdmin()));
+  return `<h1 style="margin-top:16px">${t('fav')}</h1>`+(arr.length?`<div class="grid">${arr.map(card).join('')}</div>`:`<div class="empty">${t('fav_empty')}<p style="margin-top:14px"><a class="btn" href="#/catalog">${t('catalog')}</a></p></div>`);
+}
 function saveCart(){LS.set('ms_cart',cart);updateBadge()}
 function updateBadge(){
+  favBadge();
   const n=cart.reduce((s,i)=>s+i.q,0),b=$('#cartcount');
   b.textContent=n;b.style.display=n?'flex':'none';
 }
@@ -1445,6 +1489,7 @@ const priceHtml=p=>`<div class="price">${money(p.price)}${p.old>p.price?`<span c
 const cleanName=s=>String(s||'').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu,'').replace(/\s{2,}/g,' ').trim()||String(s||'');
 function card(p){
   return `<article class="card">
+    <button type="button" class="favbtn${favHas(p.id)?' on':''}" data-act="fav" data-id="${esc(p.id)}" aria-label="${t('fav_add')}" aria-pressed="${favHas(p.id)}">${HEART}</button>
     <a href="#/product/${esc(p.slug)}" aria-label="${esc(L(p.name))}">${imgBox(p,'ph',1)}</a>
     <div class="cb">
       <a class="cn" href="#/product/${esc(p.slug)}">${esc(cleanName(L(p.name)))}</a>
@@ -1743,6 +1788,7 @@ function viewProduct(slug){
         <button class="btn" data-act="padd" data-id="${esc(p.id)}" ${p.status!=='in'?'disabled':''}>${t('tocart')}</button>
         <button class="btn gold" data-act="pbuy" data-id="${esc(p.id)}" ${p.status!=='in'?'disabled':''}>${t('order')}</button>
         <button class="btn wa" data-act="wa1" data-id="${esc(p.id)}" ${p.status!=='in'?'disabled':''}>${t('wa1')}</button>
+        <button class="btn line favp${favHas(p.id)?' on':''}" data-act="fav" data-id="${esc(p.id)}" aria-pressed="${favHas(p.id)}">${favLabel(favHas(p.id))}</button>
         <button class="btn line" data-act="share" data-id="${esc(p.id)}">${t('share')}</button>
         <button class="btn line" data-act="copy" data-id="${esc(p.id)}">${t('copy')}</button>
       </div>
@@ -2280,11 +2326,12 @@ function renderInner(){
   document.title='MUSLIM SHOP — Атырау';
   let html='',after=null;
   const keep=KEEP;KEEP=false;
-  if(!DB.loaded&&(path==='/catalog'||path.startsWith('/product/')||path==='/cart'))html='<div class="note" style="margin-top:20px">Загрузка…</div>';
+  if(!DB.loaded&&(path==='/catalog'||path.startsWith('/product/')||path==='/cart'||path==='/favorites'))html='<div class="note" style="margin-top:20px">Загрузка…</div>';
   else if(path==='/'||path==='')html=viewHome();
   else if(path==='/catalog'){html=viewCatalog(q);after=updateCatalog}
   else if(path.startsWith('/product/'))html=viewProduct(safeDec(path.slice(9)));
   else if(path==='/cart')html=viewCart();
+  else if(path==='/favorites')html=viewFav();
   else if(path==='/podbor'){html=DB.loaded?viewQuiz():'<div class="note" style="margin-top:20px">Загрузка…</div>';document.title=(lang==='kk'?'Дәрумендерді таңдау':'Подбор витаминов')+' — MUSLIM SHOP'}
   else if(path==='/admin'){html=viewAdmin();if(GH.src==='pub'&&!GH.dirty&&!GH.reload){const g=ghGet();if(g&&g.t){GH.reload=1;const gp=ghLoadAll();GH.ready=gp;gp.then(()=>{GH.reload=0;return loadData()}).then(()=>render()).catch(()=>{GH.reload=0})}}}
   else html=viewHome();
@@ -2303,7 +2350,8 @@ function renderChrome(){
   document.querySelectorAll('.langsw button').forEach(b=>b.classList.toggle('on',b.dataset.id===lang));
   $('.m-t').textContent=t('menu');
   $('#drawernav').innerHTML=`<div class="dh">${t('menu_nav')}</div>
-    <a href="#/" data-act="closemenu">${t('home')}</a><a href="#/catalog" data-act="closemenu">${t('catalog')}</a><a href="#/cart" data-act="closemenu">${t('cart')}</a>
+    <a href="#/" data-act="closemenu">${t('home')}</a><a href="#/catalog" data-act="closemenu">${t('catalog')}</a><a href="#/cart" data-act="closemenu">${t('cart')}</a><a href="#/favorites" data-act="closemenu">♡ ${t('fav')}</a>
+    ${(()=>{try{return (localStorage.getItem('ms_owner')||localStorage.getItem('ms_gh')||localStorage.getItem('ms_fa'))?'<a href="#/admin" data-act="closemenu">⚙️ Админка</a>':''}catch(e){return ''}})()}
     <div class="dh" style="margin-top:10px">${t('cats')}</div>
     ${DB.cats.map(c=>`<a href="#/catalog?cat=${esc(c.id)}" data-act="closemenu">${esc(L(c.name))}</a>`).join('')}
     <div class="dh" style="margin-top:10px"> </div><a href="#/contacts-go" data-act="goto" data-id="contacts">${t('contacts')}</a>`;
@@ -2351,6 +2399,12 @@ document.addEventListener('click',e=>{
     case 'goto':e.preventDefault();closeMenu();if(location.hash!=='#/'&&location.hash!==''){location.hash='#/';setTimeout(()=>{const el=document.getElementById(id);el&&el.scrollIntoView()},60)}else{const el=document.getElementById(id);el&&el.scrollIntoView()}break;
     case 'lang':lang=id;LS.set('ms_lang',lang);render();break;
     case 'allcats':{const x=$('#catsx');x.classList.toggle('open');b.textContent=x.classList.contains('open')?t('hidecats'):t('allcats');break}
+    case 'fav':{e.preventDefault();const sid=String(id),i=FAV.indexOf(sid);if(i>=0)FAV.splice(i,1);else FAV.push(sid);LS.set('ms_fav',FAV);favBadge();
+      const on=FAV.includes(sid);
+      document.querySelectorAll('[data-act="fav"]').forEach(x=>{if(x.dataset.id!==sid)return;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on?'true':'false');if(x.classList.contains('favp'))x.innerHTML=favLabel(on)});
+      toast(on?t('fav_added'):t('fav_removed'));
+      if(!on&&/^#\/favorites/.test(location.hash)){KEEP=true;render()}
+      break}
     case 'add':addToCart(id,1);break;
     case 'qz':{const k=b.dataset.k,v=b.dataset.v;QZ[k]=k==='bud'?Number(v):v;if(k==='who')QZ.goal='';QZ.step=k==='who'?1:k==='goal'?2:3;if(QZ.step===3)ymGoal('quiz_done');render();break}
     case 'qzback':QZ.step=Math.max(0,QZ.step-1);render();break;
