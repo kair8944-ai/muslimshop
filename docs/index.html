@@ -615,6 +615,19 @@ body footer{font-size:20px}
 body footer a{padding:10px 0;font-size:20px}
 body footer h3{font-size:21px}
 /* ===== конец части 2 ===== */
+/* ===== КРУПНО И ПОНЯТНО, часть 3: один обычный шрифт, без повторов внизу ===== */
+/* везде обычный читаемый шрифт (PT Sans), цифры ровные, не «старинные» */
+:root{--serif:"PT Sans",Arial,sans-serif;--sans:"PT Sans",Arial,sans-serif}
+body,body button,body input,body select,body textarea{font-family:"PT Sans",Arial,sans-serif}
+body h1,body h2,body h3,body .hl,body .logo,body .price,body .old,body .cn,body .need span,body .cat span,body .donecard h2{font-family:"PT Sans",Arial,sans-serif}
+body .price,body .old,body .bundle .price,body .pp .price{font-variant-numeric:lining-nums tabular-nums;font-feature-settings:"lnum" 1;font-weight:700;letter-spacing:0}
+body .hero2 .hl em{font-style:normal}
+/* внизу: если выше уже есть блок «Контакты» — адрес, телефон и соцсети в подвале не повторяем */
+body:has(#contacts) footer .fg>div:nth-child(1),
+body:has(#contacts) footer .fg>div:nth-child(3){display:none}
+body footer h3{font-weight:700}
+/* ===== конец части 3 ===== */
+
 
 </style>
 <style id="vd-light">
