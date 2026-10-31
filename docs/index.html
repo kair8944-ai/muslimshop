@@ -513,6 +513,63 @@ footer a:hover{color:var(--acc)}
   @supports(animation-timeline:view()){#app section,#app .card{animation:msUp linear both;animation-timeline:view();animation-range:entry 0% entry 35%}}
 }
 @keyframes msUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+
+/* ===== КРУПНО И ПОНЯТНО (режим для всех, в том числе для пожилых) =====
+   Один блок в самом конце стилей. Чтобы вернуть как было — удалить его целиком. */
+body{font-size:20px;line-height:1.55;color:#111}
+body .wrap{padding:0 14px}
+/* шапка */
+body .hbtn{min-height:56px;min-width:56px;font-size:18px}
+body .langsw button{min-height:56px;font-size:18px;padding:0 12px}
+/* кнопки: большие, текст крупный */
+body .btn{min-height:64px;font-size:21px;font-weight:700;border-radius:14px;padding:0 22px}
+body .btn.sm{min-height:62px;font-size:20px}
+body .card .row .btn{width:100%}
+body .btn[data-act="add"],body .btn[data-act="padd"]{background:#1E8E3E;border-color:#1E8E3E;color:#fff}
+body .btn[data-act="add"]:hover,body .btn[data-act="padd"]:hover{background:#17722F;border-color:#17722F}
+body .btn[data-act="add"]:disabled,body .btn[data-act="padd"]:disabled{background:#E3E5E8;border-color:#E3E5E8;color:#555}
+/* поиск */
+body .search input,body .hero .search input{height:64px;font-size:21px;border:2px solid #111;border-radius:14px}
+body .search button,body .hero .search button{height:64px;font-size:20px;border-radius:14px;padding:0 24px}
+/* заголовки */
+body h1{font-size:32px;line-height:1.2}
+body h2{font-size:30px;line-height:1.2;margin-bottom:16px}
+/* плитки «что нужно» и категории */
+body .need{flex:0 0 150px;padding:18px 10px}
+body .need svg{width:44px;height:44px}
+body .need span{font-size:19px;line-height:1.25}
+body .cat{min-height:100px;font-size:21px;padding:18px 16px;border-width:2px}
+body .cat small{font-size:17px;color:#444}
+/* карточки товаров: по одной в ряд на телефоне, всё видно целиком */
+@media(max-width:699px){
+  body .grid:not(.rail){grid-template-columns:minmax(0,1fr);gap:18px}
+  body .grid.rail .card{flex-basis:78%}
+}
+body .card{border:2px solid #E3E0D8;border-radius:18px;box-shadow:none}
+body .card .ph{aspect-ratio:1/1;background:#fff}
+body .card .ph img{object-fit:contain}
+body .card:hover .ph img{transform:none}
+body .cb{padding:16px;gap:10px}
+body .cn{font-size:22px;line-height:1.3;font-weight:700;min-height:0;-webkit-line-clamp:4}
+body .card .price{font-size:32px;font-weight:800;color:#111}
+body .card .old{font-size:20px;color:#666;text-decoration:line-through}
+body .stock{font-size:19px;font-weight:700}
+body .stock.in{color:#1E7A38}
+body .stock.out{color:#B3261E}
+/* страница товара */
+body .pp .price{font-size:44px;font-weight:800}
+body .pp .old{font-size:24px}
+body .pp h1{font-size:clamp(26px,7vw,34px);line-height:1.25}
+body .desc,body .about,body .note{font-size:20px;line-height:1.65}
+body table.specs td{font-size:19px;padding:10px 6px}
+/* без «выплывающих» анимаций — страница сразу вся на месте */
+body #app section,body #app .card{animation:none !important;opacity:1 !important;transform:none !important}
+/* кнопка WhatsApp крупнее */
+body #wafab{width:68px;height:68px}
+body #wafab svg{width:38px;height:38px}
+/* мелкий вспомогательный текст не мельче 15px */
+body .crumbs,body .bc,body small{font-size:16px}
+/* ===== конец блока ===== */
 </style>
 <style id="vd-light">
 /* окно «Видео» в светлых тонах: хорошо видно все кнопки и надписи */
