@@ -659,6 +659,26 @@ body .need svg{stroke:var(--gold-text)}
 body{-webkit-text-stroke:.25px}
 body .btn,body .hbtn,body .langsw button{-webkit-text-stroke:0}
 /* ===== конец части 5 ===== */
+/* ===== КРУПНО И ПОНЯТНО, часть 6: две мелкие правки по скриншотам ===== */
+/* «Написать в WhatsApp» в блоке «Наш магазин» — зелёная сплошная, как остальные WhatsApp-кнопки */
+body .shopbtns .btn.line{background:#25D366;border-color:#25D366;color:#06351A;font-weight:800}
+body .shopbtns .btn.line:hover{background:#1EBE5A;color:#06351A}
+/* «Начать подбор»: тёмное золото и белый текст, читается лучше */
+body .qzcta em{background:#7A5A1E;color:#fff;border-radius:12px;padding:12px 18px;-webkit-text-stroke:0}
+/* ===== конец части 6 ===== */
+/* ===== КРУПНО И ПОНЯТНО, часть 7: короче главная, без повторов, ниже фото в карточках ===== */
+/* 1. на главной в каждой ленте (Популярные, Новинки, Рекомендуемые) по 3 товара; в каталоге ничего не меняется */
+@media(max-width:699px){
+  body #app:has(.hero2) .grid .card:nth-child(n+4){display:none}
+}
+/* 2. плитки «Категории» свёрнуты за кнопкой «ВСЕ КАТЕГОРИИ»; сверху остаётся «Что вас беспокоит?» */
+body #cats:has(#allcatsbtn):not(:has(#catsx.open)) > .cats:not(.cats-extra){display:none}
+body #allcatsbtn{min-height:68px;font-size:21px;border:2px solid #111}
+/* 3. фото в карточках ниже (5:4 вместо квадрата), меньше пустого места */
+body .card .ph{aspect-ratio:5/4}
+/* ===== конец части 7 ===== */
+
+
 
 
 
