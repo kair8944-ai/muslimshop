@@ -570,6 +570,52 @@ body #wafab svg{width:38px;height:38px}
 /* мелкий вспомогательный текст не мельче 15px */
 body .crumbs,body .bc,body small{font-size:16px}
 /* ===== конец блока ===== */
+/* ===== КРУПНО И ПОНЯТНО, часть 2 (по скриншотам с телефона) ===== */
+/* заголовки: плотный жирный шрифт вместо тонкого «книжного» */
+body h1,body h2,body .hero2 .hl,body .hero2 h1.hsub{font-family:var(--sans);font-weight:800;color:#111;letter-spacing:0}
+body h2{font-size:clamp(28px,7.4vw,34px);padding-bottom:12px}
+body .hero2 .hl{font-size:clamp(38px,10.5vw,64px);line-height:1.08}
+body .hero2 .kick{font-size:15px;font-weight:700;color:#444}
+body .hero2 h1.hsub{font-size:21px;font-weight:700}
+body .hero2 p{font-size:20px;color:#222}
+body .hero2 .hacts .btn{font-size:20px;min-height:60px}
+/* три подписи под поиском: «Бутик 24 / Заказ / Цены» */
+body .trust div{font-size:18px;color:#222;padding:14px 6px}
+body .trust b{font-size:19px;color:#111}
+/* «Что вас беспокоит?»: все плитки сразу на экране, без бокового свайпа */
+body .needs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible;gap:12px}
+body .need{flex:none;padding:18px 10px;border:2px solid #E3E0D8;border-radius:16px}
+body .need span{font-size:20px;color:#111}
+/* «Начать подбор» */
+body .qzcta b{font-size:24px}
+body .qzcta span{font-size:19px}
+body .qzcta em{font-size:21px;font-style:normal;font-weight:800}
+/* категории */
+body .cat{border:2px solid #E3E0D8;border-radius:16px}
+body .cat span{font-size:21px;font-weight:800;color:#111}
+body .cat small{font-size:17px;color:#333}
+/* ленты «Новинки / Рекомендуемые»: не листать вбок, а читать вниз (первые 4) */
+@media(max-width:699px){
+  body .grid.rail{display:grid;grid-template-columns:minmax(0,1fr);overflow:visible;gap:18px;padding:0}
+  body .grid.rail .card{flex:none;max-width:100%}
+  body .grid.rail .card:nth-child(n+5){display:none}
+}
+/* готовые наборы: читаемое описание */
+body .bundle{border:2px solid #E3E0D8;border-radius:18px;padding:16px}
+body .bt{font-size:23px;font-weight:800;color:#111;display:block;margin:8px 0 4px}
+body .bs{font-size:19px;line-height:1.4;color:#222;white-space:normal;overflow:visible;text-overflow:clip;margin-bottom:6px}
+body .bundle .price{font-size:32px;font-weight:800}
+body .bundle .btn{width:100%}
+/* «Наш магазин», контакты, подвал */
+body .shopinfo{font-size:21px;line-height:1.5;color:#111}
+body .shopbtns .btn,body .shopcard .btn{min-height:64px;font-size:21px}
+body .btn.wa,body .hero2 .btn.wa{background:#25D366;border-color:#25D366;color:#06351A;font-weight:800}
+body .about,body .contacts{font-size:21px;line-height:1.6;color:#111}
+body footer{font-size:20px}
+body footer a{padding:10px 0;font-size:20px}
+body footer h3{font-size:21px}
+/* ===== конец части 2 ===== */
+
 </style>
 <style id="vd-light">
 /* окно «Видео» в светлых тонах: хорошо видно все кнопки и надписи */
