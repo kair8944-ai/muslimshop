@@ -635,6 +635,31 @@ body .hero2 .himg::before{content:"";position:absolute;inset:0;background:url(he
   body .hero2 .himg{margin:0 -14px;aspect-ratio:2/1}
 }
 /* ===== конец части 4 ===== */
+/* ===== КРУПНО И ПОНЯТНО, часть 5: шапка и золотые заголовки/цены ===== */
+/* шапка на телефоне: «Меню» — «RU | KZ» — корзина, логотип (был обрезан до MUSLI) убран */
+@media(max-width:560px){
+  body .logo{display:none}
+  body .hbar{justify-content:space-between;gap:8px}
+  body .m-t{display:inline !important;font-size:19px;font-weight:800}
+}
+body .hbtn{background:#fff;border:2px solid #111;border-radius:14px;color:#111}
+body .hbtn[aria-label="Корзина"] span[aria-hidden]{font-size:28px;line-height:1}
+body .langsw{border:2px solid #111;border-radius:14px;background:#fff;overflow:hidden}
+body .langsw button{min-width:54px;min-height:52px;font-size:20px;font-weight:800;color:#111;background:#fff;padding:0 10px}
+body .langsw button.on{background:#111;color:#fff}
+/* название магазина теперь над первой строкой на главной */
+body .hero2 .kick::before{content:"MUSLIM SHOP";display:block;font-size:26px;font-weight:800;letter-spacing:.12em;color:#7A5A1E;margin-bottom:8px}
+/* золотой цвет там, где он читается: заголовки и цены (тёмное золото, контраст около 6:1) */
+:root{--gold-text:#7A5A1E}
+body h1,body h2,body .price,body .pp .price,body .bundle .price,body .hero2 .hl em,body footer h3{color:var(--gold-text)}
+body .hero2 .hl{color:#111}
+body h2{border-bottom:3px solid #B08D57}
+body .need svg{stroke:var(--gold-text)}
+/* чуть толще весь текст */
+body{-webkit-text-stroke:.25px}
+body .btn,body .hbtn,body .langsw button{-webkit-text-stroke:0}
+/* ===== конец части 5 ===== */
+
 
 
 
