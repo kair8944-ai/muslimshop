@@ -714,6 +714,21 @@ body .hero2 .hl{font-size:clamp(30px,9vw,64px)}
 body .card .ph{aspect-ratio:3/4}
 body .card .ph img{object-fit:contain}
 /* ===== конец части 10 ===== */
+/* ===== КРУПНО И ПОНЯТНО, часть 11: «Позвонить», «Спросить в WhatsApp» и страница для соцсетей #/go ===== */
+body .btn.call{background:#fff;border:2px solid #111;color:#111;display:inline-flex;align-items:center;justify-content:center;gap:10px;text-decoration:none}
+body .btn.call.block{display:flex;width:100%;margin-top:10px}
+body .btn.call svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+body .go{padding-top:22px;text-align:center}
+body .go .kick{font-size:15px;font-weight:700;letter-spacing:.12em;color:#444}
+body .go h1{font-size:clamp(34px,10vw,52px);color:#7A5A1E;margin:6px 0 8px}
+body .go p{font-size:22px;margin:0 0 18px}
+body .gobtns{display:grid;gap:14px}
+body .gobtn{min-height:86px;font-size:clamp(22px,6.4vw,28px);border-radius:18px;width:100%}
+body .gobtn.hits{background:#7A5A1E;border-color:#7A5A1E;color:#fff}
+body .gobtn.call{font-size:clamp(19px,5.4vw,24px)}
+body .go .gonote{margin-top:22px;font-size:18px;color:#333}
+/* ===== конец части 11 ===== */
+
 
 
 
@@ -1166,7 +1181,7 @@ function ymGoal(n){if(ymOn&&!ymOwner()){try{window.ym(YM_ID,'reachGoal',n)}catch
 
 /* ============ i18n ============ */
 const T={
- ru:{fav:'Избранное',fav_add:'В избранное',fav_in:'В избранном',fav_added:'Добавлено в избранное',fav_removed:'Убрано из избранного',fav_empty:'Здесь пока пусто. Нажмите сердечко на товаре, чтобы сохранить его.',menu:'Меню',search_ph:'Поиск товаров',find:'Найти',cats:'Категории',allcats:'ВСЕ КАТЕГОРИИ',hidecats:'СВЕРНУТЬ',popular:'Популярные товары',news:'Новинки',featured:'Рекомендуемые товары',all_items:'Все товары',
+ ru:{call:'Позвонить',ask:'Спросить про этот товар',go_cat:'Каталог',go_hits:'Хиты продаж',go_wa:'Написать в WhatsApp',go_hello:'Что хотите посмотреть?',fav:'Избранное',fav_add:'В избранное',fav_in:'В избранном',fav_added:'Добавлено в избранное',fav_removed:'Убрано из избранного',fav_empty:'Здесь пока пусто. Нажмите сердечко на товаре, чтобы сохранить его.',menu:'Меню',search_ph:'Поиск товаров',find:'Найти',cats:'Категории',allcats:'ВСЕ КАТЕГОРИИ',hidecats:'СВЕРНУТЬ',popular:'Популярные товары',news:'Новинки',featured:'Рекомендуемые товары',all_items:'Все товары',
   about:'О магазине',about_txt:'MUSLIM SHOP — магазин в Атырау на рынке Дина, бутик 24. Оригинальные халяль-витамины и БАДы (в том числе iHerb), натуральный мёд, средства для мужского, женского и детского здоровья, исламские товары и парфюмерия. Закажите на сайте через WhatsApp, приходите в бутик или оформите доставку по Атырау и Казахстану. Работаем ежедневно с 10:00 до 19:00.',
   social:'Мы в соцсетях',contacts:'Контакты',catalog:'КАТАЛОГ',home:'Главная',cart:'Корзина',phone:'Телефон',addr:'Адрес',
   more:'ПОДРОБНЕЕ',tocart:'В КОРЗИНУ',order:'ЗАКАЗАТЬ',wa1:'⚡ ЗАКАЗАТЬ В 1 КЛИК (WhatsApp)',share:'ПОДЕЛИТЬСЯ',copy:'🔗 СКОПИРОВАТЬ ССЫЛКУ',in:'В наличии',out:'Нет в наличии',
@@ -1181,7 +1196,7 @@ const T={
   qty_unit:'шт.',menu_nav:'Навигация',err_load:'Не удалось загрузить товары. Попробуйте обновить страницу.',addr_txt:'пр. Султана Бейбарыса, 45а/5, Атырау, Казахстан',
   hero_h:'Оригинальные халяль-витамины iHerb в Атырау',hero_kick:'Атырау · Доставка по Казахстану',hero_hl:'Натуральное. Халяльное. <em>Проверенное.</em>',hero_sub2:'БАДы, мёд и масло чёрного тмина. Доставка по всему Казахстану',btn_wa:'WhatsApp',needs_t:'Что вас беспокоит?',hero_sub:'Халяль-витамины, БАДы, мёд и товары для здоровья в Атырау. Доставка по Казахстану',itemsn:'Товаров:',
   trust:[['Бутик 24','Рынок Дина, Атырау'],['Заказ','через WhatsApp'],['Цены','в тенге ₸'],['Оплата','Kaspi, удалённо']]},
- kk:{fav:'Таңдаулылар',fav_add:'Таңдаулыға қосу',fav_in:'Таңдаулыда',fav_added:'Таңдаулыға қосылды',fav_removed:'Таңдаулыдан алынды',fav_empty:'Мұнда әзірге бос. Тауарды сақтау үшін жүрекшені басыңыз.',menu:'Мәзір',search_ph:'Тауар іздеу',find:'Іздеу',cats:'Санаттар',allcats:'БАРЛЫҚ САНАТТАР',hidecats:'ЖИНАУ',popular:'Танымал тауарлар',news:'Жаңалықтар',featured:'Ұсынылатын тауарлар',all_items:'Барлық тауарлар',
+ kk:{call:'Қоңырау шалу',ask:'Осы тауар туралы сұрау',go_cat:'Каталог',go_hits:'Үздік тауарлар',go_wa:'WhatsApp-қа жазу',go_hello:'Нені көргіңіз келеді?',fav:'Таңдаулылар',fav_add:'Таңдаулыға қосу',fav_in:'Таңдаулыда',fav_added:'Таңдаулыға қосылды',fav_removed:'Таңдаулыдан алынды',fav_empty:'Мұнда әзірге бос. Тауарды сақтау үшін жүрекшені басыңыз.',menu:'Мәзір',search_ph:'Тауар іздеу',find:'Іздеу',cats:'Санаттар',allcats:'БАРЛЫҚ САНАТТАР',hidecats:'ЖИНАУ',popular:'Танымал тауарлар',news:'Жаңалықтар',featured:'Ұсынылатын тауарлар',all_items:'Барлық тауарлар',
   about:'Дүкен туралы',about_txt:'MUSLIM SHOP — Атыраудағы Дина базарындағы 24-бутик. Түпнұсқа адал дәрумендер мен БАД (iHerb қоса), табиғи бал, ерлер, әйелдер және балалар денсаулығына арналған құралдар, исламдық тауарлар және парфюмерия. WhatsApp арқылы тапсырыс беріңіз, бутикке келіңіз немесе Атырау мен Қазақстан бойынша жеткізуді рәсімдеңіз. Күн сайын 10:00–19:00 жұмыс істейміз.',
   social:'Әлеуметтік желілерде',contacts:'Байланыс',catalog:'КАТАЛОГ',home:'Басты бет',cart:'Себет',phone:'Телефон',addr:'Мекенжай',
   more:'ТОЛЫҒЫРАҚ',tocart:'СЕБЕТКЕ',order:'ТАПСЫРЫС БЕРУ',wa1:'⚡ 1 БАСУМЕН ТАПСЫРЫС (WhatsApp)',share:'БӨЛІСУ',copy:'🔗 СІЛТЕМЕНІ КӨШІРУ',in:'Бар',out:'Жоқ',
@@ -1472,6 +1487,7 @@ let cart=LS.get('ms_cart',[]);
 /* избранное: список id товаров хранится на телефоне покупателя (localStorage, ключ ms_fav) */
 let FAV=LS.get('ms_fav',[]);if(!Array.isArray(FAV))FAV=[];
 const HEART='<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" focusable="false"><path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3 5.5 6.3 5.5c2 0 3.7 1.1 5.7 3.3 2-2.2 3.7-3.3 5.7-3.3 3.3 0 5.1 3.1 3.8 6.3C19.5 16.4 12 21 12 21z"/></svg>';
+const PH='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>';
 const favHas=id=>FAV.includes(String(id));
 const favLabel=on=>HEART+'<span>'+(on?t('fav_in'):t('fav_add'))+'</span>';
 function favBadge(){
@@ -1480,6 +1496,17 @@ function favBadge(){
     if(b){b.textContent=n;b.style.display=n?'flex':'none'}
     if(h){const ic=h.querySelector('.hico');if(ic&&!ic.innerHTML)ic.innerHTML=HEART;h.classList.toggle('on',n>0)}
   }catch(e){}
+}
+function viewGo(){
+  const kk=lang==='kk';
+  return `<section class="go"><div class="kick">${kk?'АТЫРАУ · ҚАЗАҚСТАН БОЙЫНША ЖЕТКІЗУ':'АТЫРАУ · ДОСТАВКА ПО КАЗАХСТАНУ'}</div><h1>MUSLIM SHOP</h1><p>${t('go_hello')}</p>
+  <div class="gobtns">
+    <a class="btn gobtn gold" href="#/catalog">${t('go_cat')}</a>
+    <a class="btn gobtn hits" href="#/catalog?pop=1">${t('go_hits')}</a>
+    <a class="btn gobtn wa" target="_blank" rel="noopener" href="https://wa.me/${CONTACT.wa}">${t('go_wa')}</a>
+    <a class="btn gobtn call" href="tel:+77781754241">${PH}${t('call')} ${CONTACT.phone}</a>
+  </div>
+  <p class="gonote">${kk?'Атырау, Дина базары, 24-бутик':'Атырау, Рынок Дина, Бутик 24'} · ${kk?'Күн сайын 10:00–19:00':'Ежедневно 10:00–19:00'}</p></section>`;
 }
 function viewFav(){
   document.title=t('fav')+' — MUSLIM SHOP';
@@ -1635,7 +1662,7 @@ function viewHome(){
   const pop=pick(p=>p.popular,6),neu=pick(p=>p.isNew,10),fea=pick(p=>p.featured,10);
   const sec=(title,arr,rail)=>arr.length?`<section><h2>${title}</h2><div class="grid${rail?' rail':''}">${arr.map(card).join('')}</div></section>`:'';
   const tile=c=>`<a class="cat" href="#/catalog?cat=${esc(c.id)}"><span>${esc(L(c.name))}</span><small>${t('itemsn')} ${vis.filter(p=>p.cat===c.id).length}</small></a>`;
-  return `<div class="hero hero2"><div class="himg" role="img" aria-label="MUSLIM SHOP"></div><div class="htxt"><div class="kick">${t('hero_kick')}</div><div class="hl">${t('hero_hl')}</div><h1 class="hsub">${t('hero_h')}</h1><p>${t('hero_sub2')}</p><div class="hacts"><a class="btn gold" href="#/catalog">${t('catalog')}</a><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/${CONTACT.wa}">${t('btn_wa')}</a></div>${searchBox()}
+  return `<div class="hero hero2"><div class="himg" role="img" aria-label="MUSLIM SHOP"></div><div class="htxt"><div class="kick">${t('hero_kick')}</div><div class="hl">${t('hero_hl')}</div><h1 class="hsub">${t('hero_h')}</h1><p>${t('hero_sub2')}</p><div class="hacts"><a class="btn gold" href="#/catalog">${t('catalog')}</a><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/${CONTACT.wa}">${t('btn_wa')}</a></div><a class="btn call block" href="tel:+77781754241">${PH}${t('call')} ${CONTACT.phone}</a>${searchBox()}
     <div class="trust">${t('trust').map((x,i)=>`<div><b>${esc(x[0])}${i===0?LOCK:''}</b>${esc(x[1])}</div>`).join('')}</div></div></div>
   ${banner()}
   ${needsBlock()}
@@ -1807,6 +1834,8 @@ function viewProduct(slug){
         <button class="btn" data-act="padd" data-id="${esc(p.id)}" ${p.status!=='in'?'disabled':''}>${t('tocart')}</button>
         <button class="btn gold" data-act="pbuy" data-id="${esc(p.id)}" ${p.status!=='in'?'disabled':''}>${t('order')}</button>
         <button class="btn wa" data-act="wa1" data-id="${esc(p.id)}" ${p.status!=='in'?'disabled':''}>${t('wa1')}</button>
+        <button class="btn line" data-act="ask" data-id="${esc(p.id)}">${t('ask')}</button>
+        <a class="btn call" href="tel:+77781754241">${PH}${t('call')}</a>
         <button class="btn line favp${favHas(p.id)?' on':''}" data-act="fav" data-id="${esc(p.id)}" aria-pressed="${favHas(p.id)}">${favLabel(favHas(p.id))}</button>
         <button class="btn line" data-act="share" data-id="${esc(p.id)}">${t('share')}</button>
         <button class="btn line" data-act="copy" data-id="${esc(p.id)}">${t('copy')}</button>
@@ -1839,7 +1868,8 @@ function viewCart(){
     <div><label for="o-c">${t('comment')}</label><textarea id="o-c" name="c"></textarea></div>
     <button class="btn gold block" type="submit">${t('send_wa')}</button>
     <div class="note">${t('checkout_note')}</div>
-  </form>`;
+  </form>
+  <a class="btn call block" style="margin-top:14px" href="tel:+77781754241">${PH}${t('call')} ${CONTACT.phone}</a>`;
 }
 
 /* ============ Admin ============ */
@@ -2351,6 +2381,7 @@ function renderInner(){
   else if(path.startsWith('/product/'))html=viewProduct(safeDec(path.slice(9)));
   else if(path==='/cart')html=viewCart();
   else if(path==='/favorites')html=viewFav();
+  else if(path==='/go'){html=viewGo();document.title='MUSLIM SHOP — Атырау'}
   else if(path==='/podbor'){html=DB.loaded?viewQuiz():'<div class="note" style="margin-top:20px">Загрузка…</div>';document.title=(lang==='kk'?'Дәрумендерді таңдау':'Подбор витаминов')+' — MUSLIM SHOP'}
   else if(path==='/admin'){html=viewAdmin();if(GH.src==='pub'&&!GH.dirty&&!GH.reload){const g=ghGet();if(g&&g.t){GH.reload=1;const gp=ghLoadAll();GH.ready=gp;gp.then(()=>{GH.reload=0;return loadData()}).then(()=>render()).catch(()=>{GH.reload=0})}}}
   else html=viewHome();
@@ -2434,6 +2465,7 @@ document.addEventListener('click',e=>{
     case 'q-':pq=Math.max(1,pq-1);$('#qv').textContent=pq;break;
     case 'padd':addToCart(id,pq);break;
     case 'pbuy':addToCart(id,pq);location.hash='#/cart';break;
+    case 'ask':{const p=prodById(id);if(!p)break;const nm=(lang==='kk'&&p.name.kk)?p.name.kk:p.name.ru;const txt=(lang==='kk'?'Сәлеметсіз бе! Мына тауар қызықтырады:\n':'Здравствуйте! Интересует товар:\n')+nm+'\n'+prodUrl(p)+(lang==='kk'?'\nКеңес бере аласыз ба?':'\nПодскажите, пожалуйста.');try{ymGoal('ask_whatsapp')}catch(e){}window.open('https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(txt),'_blank','noopener');break}
     case 'wa1':{const p=prodById(id);if(!p)break;const q=pq||1;const txt='Здравствуйте! Хочу заказать:\n'+p.name.ru+' — '+q+' шт. × '+money(p.price)+' = '+money(p.price*q)+'\n'+prodUrl(p);try{ymGoal('order_whatsapp_1click')}catch(e){}try{statEv('o')}catch(e){}window.open('https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(txt),'_blank','noopener');break}
     case 'share':shareProduct(prodById(id));break;
     case 'copy':copyText(prodUrl(prodById(id)));break;
