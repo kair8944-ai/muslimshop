@@ -701,6 +701,16 @@ body #favbtn .hico{display:inline-flex}
   body .langsw button{min-width:50px;padding:0 8px}
 }
 /* ===== конец части 8 ===== */
+/* ===== КРУПНО И ПОНЯТНО, часть 9: шапка и заголовок не вылезают при увеличенном шрифте телефона / во встроенном браузере TikTok ===== */
+@media(max-width:560px){
+  body .hbar{flex-wrap:wrap;row-gap:6px;padding:6px 0;justify-content:space-between}
+  body .m-t{font-size:clamp(14px,4vw,19px)}
+  body .hbtn{min-width:48px;min-height:52px;padding:0 8px}
+  body .langsw button{font-size:clamp(15px,4.4vw,20px);min-width:44px;min-height:50px;padding:0 8px}
+}
+body .hero2 .hl{font-size:clamp(30px,9vw,64px)}
+/* ===== конец части 9 ===== */
+
 
 
 
@@ -856,7 +866,11 @@ async function ghFetchCatalog(){
   if(!r.ok)throw new Error('Не найден файл catalog.json рядом с index.html (код '+r.status+'). Загрузите catalog.json в ту же папку на GitHub, где лежит index.html.');
   return r.json();
 }
-async function ghLoadAll(){GH.err='';try{ghFromJson(await ghFetchCatalog());const hv=new Set(GH.thumbs||[]);let n=0;Object.keys(GH.cols.products).forEach(id=>{const im=(GH.cols.products[id].images||[])[0];const tr=thRel(im);if(tr&&!hv.has(tr))n++});GH.thNeed=n;try{ghBar()}catch(e){}}catch(e){GH.err=String(e&&e.message||e)}}
+async function ghLoadAll(){GH.err='';try{ghFromJson(await ghFetchCatalog());const hv=new Set(GH.thumbs||[]);let fl=[];try{fl=JSON.parse(localStorage.getItem('ms_thfail')||'[]')}catch(e){}
+const cand=[];Object.keys(GH.cols.products).forEach(id=>{const im=(GH.cols.products[id].images||[])[0];const tr=thRel(im);if(tr&&!hv.has(tr)&&!fl.includes(tr))cand.push(im)});
+GH.thNeed=cand.length;try{ghBar()}catch(e){}
+/* владелец: если само фото не открывается, лёгкое фото для него сделать нельзя — такое не считаем, иначе сообщение висит вечно */
+try{if(cand.length&&localStorage.getItem('ms_owner')){const okI=src=>new Promise(res=>{const i=new Image();i.onload=()=>res(i.naturalWidth>0);i.onerror=()=>res(false);setTimeout(()=>res(false),8000);i.src=src});const head=cand.slice(0,12),rest=cand.length-head.length;Promise.all(head.map(okI)).then(r=>{GH.thNeed=rest+r.filter(Boolean).length;try{ghBar()}catch(e){}})}}catch(e){}}catch(e){GH.err=String(e&&e.message||e)}}
 GH.ready=ghLoadAll();
 /* --- мини-замена Firestore: те же функции, но данные в памяти --- */
 const ghCol=n=>({k:'col',n});
@@ -1057,7 +1071,7 @@ async function ghPublish(){
         }
       }
       let k=0,done=0;const okTh=[];
-      const mk=async()=>{while(k<need.length){const it=need[k++];const b64=await makeTh(it.src);done++;if(b64){todo.push({rel:it.tr,path:b.dir+it.tr,b64});okTh.push(it.tr)}GH.msg='Делаю лёгкие фото для карточек: '+done+' из '+need.length+'…';ghBar()}};
+      const mk=async()=>{while(k<need.length){const it=need[k++];const b64=await makeTh(it.src);done++;if(b64){todo.push({rel:it.tr,path:b.dir+it.tr,b64});okTh.push(it.tr)}else{try{const a=JSON.parse(localStorage.getItem('ms_thfail')||'[]');if(!a.includes(it.tr)){a.push(it.tr);localStorage.setItem('ms_thfail',JSON.stringify(a))}}catch(e){}}GH.msg='Делаю лёгкие фото для карточек: '+done+' из '+need.length+'…';ghBar()}};
       if(need.length)await Promise.all([mk(),mk(),mk(),mk()]);
       GH.thumbs=[...have,...okTh];GH.thNeed=0;
     }
