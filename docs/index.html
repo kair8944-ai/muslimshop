@@ -728,6 +728,21 @@ body .gobtn.hits{background:#7A5A1E;border-color:#7A5A1E;color:#fff}
 body .gobtn.call{font-size:clamp(19px,5.4vw,24px)}
 body .go .gonote{margin-top:22px;font-size:18px;color:#333}
 /* ===== конец части 11 ===== */
+/* ===== КРУПНО И ПОНЯТНО, часть 12: красивая кнопка «Позвонить» и страница #/find «Как нас найти» ===== */
+body .btn.call{min-height:72px;gap:14px;padding:8px 16px}
+body .btn.call .cl{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;text-align:left}
+body .btn.call .cl b{font-size:23px;font-weight:800}
+body .btn.call .cl small{font-size:19px;font-weight:700;white-space:nowrap}
+body .btn.call svg{width:30px;height:30px}
+body .gobtn.call{min-height:86px}
+body .shopbtns .btn.call{min-height:64px;font-size:21px;margin-top:0}
+body .find{padding-top:16px}
+body .findaddr{font-size:21px;line-height:1.5;background:#fff;border:2px solid #E3E0D8;border-radius:16px;padding:14px 16px;margin:10px 0 16px}
+body .findaddr b{font-size:23px}
+body .findvideo{display:block;width:100%;border-radius:16px;background:#000;max-height:80vh}
+body .findimg{display:block;width:100%;height:auto;border-radius:16px}
+/* ===== конец части 12 ===== */
+
 
 
 
@@ -1497,6 +1512,29 @@ function favBadge(){
     if(h){const ic=h.querySelector('.hico');if(ic&&!ic.innerHTML)ic.innerHTML=HEART;h.classList.toggle('on',n>0)}
   }catch(e){}
 }
+function viewFind(){
+  const kk=lang==='kk';
+  return `<section class="find"><h1>${kk?'Бізді қалай табуға болады':'Как нас найти'}</h1>
+  <div class="findaddr"><b>${kk?'Атырау, Дина базары, 24-бутик':'Атырау, Рынок Дина, Бутик 24'}</b><div>${esc(t('addr_txt'))}</div><div>${kk?'Күн сайын 10:00–19:00':'Ежедневно 10:00–19:00'}</div></div>
+  <div id="findvid"></div>
+  <h2>${kk?'Біздің дүкен осылай көрінеді':'Так выглядит наш бутик'}</h2>
+  <img class="findimg" src="shop-front.jpg" width="1400" height="1201" alt="${kk?'MUSLIM SHOP дүкені':'Магазин MUSLIM SHOP'}" onerror="this.style.display='none'">
+  <div class="gobtns" style="margin-top:18px">
+    <a class="btn gobtn gold" href="${CONTACT.gis}" target="_blank" rel="noopener">${kk?'2ГИС картасында ашу':'Маршрут в 2ГИС'}</a>
+    <a class="btn gobtn call" href="tel:+77781754241">${PH}<span class="cl"><b>${t('call')}</b><small>${CONTACT.phone}</small></span></a>
+    <a class="btn gobtn wa" target="_blank" rel="noopener" href="https://wa.me/${CONTACT.wa}">${t('go_wa')}</a>
+  </div>
+  <p class="gonote">${kk?'Таба алмасаңыз, қоңырау шалыңыз — жол көрсетеміз.':'Не можете найти? Позвоните — подскажем дорогу.'}</p></section>`;
+}
+function findVid(){
+  try{
+    fetch('how-to-find.mp4',{method:'HEAD',cache:'no-store'}).then(r=>{
+      if(!r.ok||!/video|octet-stream/.test(r.headers.get('content-type')||'video/mp4'))return;
+      const b=document.getElementById('findvid');if(!b)return;
+      b.innerHTML='<h2>'+(lang==='kk'?'Бейне: жолды қалай табуға болады':'Видео: как пройти к нам')+'</h2><video class="findvideo" controls playsinline preload="metadata" poster="shop-front.jpg"><source src="how-to-find.mp4" type="video/mp4"></video>';
+    }).catch(()=>{});
+  }catch(e){}
+}
 function viewGo(){
   const kk=lang==='kk';
   return `<section class="go"><div class="kick">${kk?'АТЫРАУ · ҚАЗАҚСТАН БОЙЫНША ЖЕТКІЗУ':'АТЫРАУ · ДОСТАВКА ПО КАЗАХСТАНУ'}</div><h1>MUSLIM SHOP</h1><p>${t('go_hello')}</p>
@@ -1504,7 +1542,8 @@ function viewGo(){
     <a class="btn gobtn gold" href="#/catalog">${t('go_cat')}</a>
     <a class="btn gobtn hits" href="#/catalog?pop=1">${t('go_hits')}</a>
     <a class="btn gobtn wa" target="_blank" rel="noopener" href="https://wa.me/${CONTACT.wa}">${t('go_wa')}</a>
-    <a class="btn gobtn call" href="tel:+77781754241">${PH}${t('call')} ${CONTACT.phone}</a>
+    <a class="btn gobtn call" href="tel:+77781754241">${PH}<span class="cl"><b>${t('call')}</b><small>${CONTACT.phone}</small></span></a>
+    <a class="btn gobtn call" href="#/find">${kk?'Бізді қалай табуға болады':'Как нас найти'}</a>
   </div>
   <p class="gonote">${kk?'Атырау, Дина базары, 24-бутик':'Атырау, Рынок Дина, Бутик 24'} · ${kk?'Күн сайын 10:00–19:00':'Ежедневно 10:00–19:00'}</p></section>`;
 }
@@ -1662,7 +1701,7 @@ function viewHome(){
   const pop=pick(p=>p.popular,6),neu=pick(p=>p.isNew,10),fea=pick(p=>p.featured,10);
   const sec=(title,arr,rail)=>arr.length?`<section><h2>${title}</h2><div class="grid${rail?' rail':''}">${arr.map(card).join('')}</div></section>`:'';
   const tile=c=>`<a class="cat" href="#/catalog?cat=${esc(c.id)}"><span>${esc(L(c.name))}</span><small>${t('itemsn')} ${vis.filter(p=>p.cat===c.id).length}</small></a>`;
-  return `<div class="hero hero2"><div class="himg" role="img" aria-label="MUSLIM SHOP"></div><div class="htxt"><div class="kick">${t('hero_kick')}</div><div class="hl">${t('hero_hl')}</div><h1 class="hsub">${t('hero_h')}</h1><p>${t('hero_sub2')}</p><div class="hacts"><a class="btn gold" href="#/catalog">${t('catalog')}</a><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/${CONTACT.wa}">${t('btn_wa')}</a></div><a class="btn call block" href="tel:+77781754241">${PH}${t('call')} ${CONTACT.phone}</a>${searchBox()}
+  return `<div class="hero hero2"><div class="himg" role="img" aria-label="MUSLIM SHOP"></div><div class="htxt"><div class="kick">${t('hero_kick')}</div><div class="hl">${t('hero_hl')}</div><h1 class="hsub">${t('hero_h')}</h1><p>${t('hero_sub2')}</p><div class="hacts"><a class="btn gold" href="#/catalog">${t('catalog')}</a><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/${CONTACT.wa}">${t('btn_wa')}</a></div><a class="btn call block" href="tel:+77781754241">${PH}<span class="cl"><b>${t('call')}</b><small>${CONTACT.phone}</small></span></a>${searchBox()}
     <div class="trust">${t('trust').map((x,i)=>`<div><b>${esc(x[0])}${i===0?LOCK:''}</b>${esc(x[1])}</div>`).join('')}</div></div></div>
   ${banner()}
   ${needsBlock()}
@@ -1688,7 +1727,8 @@ function shopBlock(){
     <div>${kk?'Күн сайын 10:00–19:00':'Ежедневно 10:00–19:00'}</div>
     <div>${kk?'Тауарларды тікелей келіп көріңіз.':'Приходите посмотреть товары вживую.'}</div>
     <div class="shopbtns"><a class="btn block gold" href="${CONTACT.gis}" target="_blank" rel="noopener">${kk?'2ГИС картасында ашу':'Маршрут в 2ГИС'}</a>
-    <a class="btn block line" href="${wa}" target="_blank" rel="noopener">${kk?'WhatsApp-қа жазу':'Написать в WhatsApp'}</a></div></div>
+    <a class="btn block line" href="${wa}" target="_blank" rel="noopener">${kk?'WhatsApp-қа жазу':'Написать в WhatsApp'}</a>
+    <a class="btn block call" href="#/find">${kk?'Бізді қалай табуға болады':'Как нас найти'}</a></div></div>
   </div></section>`;
 }
 function socials(){
@@ -1869,7 +1909,7 @@ function viewCart(){
     <button class="btn gold block" type="submit">${t('send_wa')}</button>
     <div class="note">${t('checkout_note')}</div>
   </form>
-  <a class="btn call block" style="margin-top:14px" href="tel:+77781754241">${PH}${t('call')} ${CONTACT.phone}</a>`;
+  <a class="btn call block" style="margin-top:14px" href="tel:+77781754241">${PH}<span class="cl"><b>${t('call')}</b><small>${CONTACT.phone}</small></span></a>`;
 }
 
 /* ============ Admin ============ */
@@ -2381,6 +2421,7 @@ function renderInner(){
   else if(path.startsWith('/product/'))html=viewProduct(safeDec(path.slice(9)));
   else if(path==='/cart')html=viewCart();
   else if(path==='/favorites')html=viewFav();
+  else if(path==='/find'){html=viewFind();after=findVid;document.title=(lang==='kk'?'Бізді қалай табуға болады':'Как нас найти')+' — MUSLIM SHOP'}
   else if(path==='/go'){html=viewGo();document.title='MUSLIM SHOP — Атырау'}
   else if(path==='/podbor'){html=DB.loaded?viewQuiz():'<div class="note" style="margin-top:20px">Загрузка…</div>';document.title=(lang==='kk'?'Дәрумендерді таңдау':'Подбор витаминов')+' — MUSLIM SHOP'}
   else if(path==='/admin'){html=viewAdmin();if(GH.src==='pub'&&!GH.dirty&&!GH.reload){const g=ghGet();if(g&&g.t){GH.reload=1;const gp=ghLoadAll();GH.ready=gp;gp.then(()=>{GH.reload=0;return loadData()}).then(()=>render()).catch(()=>{GH.reload=0})}}}
