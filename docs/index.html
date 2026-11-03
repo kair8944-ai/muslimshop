@@ -4146,7 +4146,15 @@ function ntSeen(p){/* запоминаем просмотренные товар
   if(!p||!p.id)return;const m=ntMem();const a=(m.seen||[]).filter(x=>x.id!==p.id);
   a.unshift({id:p.id,n:cleanName(p.name.ru||p.name.kk).slice(0,60)});m.seen=a.slice(0,6);ntMemSet(m);
 }
+/* Уведомление о посетителе уходит только после живого действия (прокрутка, касание, клик, клавиша, движение мыши)
+   или если человек пробыл на открытой странице 10 секунд. Боты, которые открывают сайт и сразу уходят, не отправляются. */
 function ntVisit(path){
+  let fired=false;const ev=['scroll','pointerdown','touchstart','keydown','mousemove','wheel'];
+  const go=()=>{if(fired)return;fired=true;ev.forEach(e=>window.removeEventListener(e,go,true));clearTimeout(tm);try{ntVisitSend(path)}catch(e){}};
+  ev.forEach(e=>window.addEventListener(e,go,{capture:true,passive:true}));
+  const tm=setTimeout(()=>{if(!fired&&document.visibilityState==='visible')go()},10000);
+}
+function ntVisitSend(path){
   let src='';try{src=stSrc()}catch(e){}
   const m=ntMem(),now=Date.now(),n=(m.n|0)+1;let rep='🆕 Первый визит';
   if(n>1){
