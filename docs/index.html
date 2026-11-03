@@ -1846,6 +1846,7 @@ function updateCatalog(){
   $('#count').textContent=(CQ.cat?catName(CQ.cat)+' — ':'')+t('found')+' '+arr.length;
   if(snote){const sx=snote==='~'?(lang==='kk'?'Ұқсас нәтижелер':'Похожие результаты'):(lang==='kk'?'«'+snote+'» бойынша нәтижелер':'Показаны результаты для «'+snote+'»');$('#count').textContent+=' · '+sx}
   $('#plist').innerHTML=arr.length?`<div class="grid">${arr.map(card).join('')}</div>`:`<div class="empty">${t('nothing')}</div>`;
+  try{ntSearch(CQ.q,arr.length,snote)}catch(e){}
 }
 
 function viewProduct(slug){
@@ -1859,7 +1860,7 @@ function viewProduct(slug){
     else if(!FULLING[p0.id]&&!FULLERR[p0.id]&&fdb){FULLING[p0.id]=1;getFull(p0.id).then(()=>{delete FULLING[p0.id];KEEP=true;render()}).catch(e=>{delete FULLING[p0.id];FULLERR[p0.id]=String(e&&e.message||e);KEEP=true;render()})}
   }
   document.title=L(p.name)+' — MUSLIM SHOP';
-  CUR=p;
+  CUR=p;try{ntSeen(p)}catch(e){}
   const rows=specsRows(p.specs&&(p.specs[lang]||p.specs.ru));
   const desc=L(p.desc);
   return `<div class="crumbs"><a href="#/">${t('home')}</a> / <a href="#/catalog?cat=${esc(p.cat)}">${esc(catName(p.cat))}</a></div>
@@ -1868,6 +1869,7 @@ function viewProduct(slug){
     <div style="display:grid;gap:14px">
       <h1>${esc(L(p.name))}</h1>
       ${priceHtml(p)}${stockHtml(p)}
+      ${p.status==='out'?ntRestockBox(p):''}
       ${p.status==='hidden'?`<div class="note">Товар скрыт: его видите только вы как владелец.</div>`:''}
       ${p.sku?`<div class="sku">${t('sku')}: ${esc(p.sku)}</div>`:''}
       <div><label style="font-weight:700;display:block;margin-bottom:6px">${t('qty')}</label>
@@ -2509,7 +2511,7 @@ document.addEventListener('click',e=>{
     case 'padd':addToCart(id,pq);break;
     case 'pbuy':addToCart(id,pq);location.hash='#/cart';break;
     case 'ask':{const p=prodById(id);if(!p)break;const nm=(lang==='kk'&&p.name.kk)?p.name.kk:p.name.ru;const txt=(lang==='kk'?'Сәлеметсіз бе! Мына тауар қызықтырады:\n':'Здравствуйте! Интересует товар:\n')+nm+'\n'+prodUrl(p)+(lang==='kk'?'\nКеңес бере аласыз ба?':'\nПодскажите, пожалуйста.');try{ymGoal('ask_whatsapp')}catch(e){}window.open('https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(txt),'_blank','noopener');break}
-    case 'wa1':{const p=prodById(id);if(!p)break;const q=pq||1;const txt='Здравствуйте! Хочу заказать:\n'+p.name.ru+' — '+q+' шт. × '+money(p.price)+' = '+money(p.price*q)+'\n'+prodUrl(p);try{ymGoal('order_whatsapp_1click')}catch(e){}try{statEv('o')}catch(e){}window.open('https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(txt),'_blank','noopener');break}
+    case 'wa1':{const p=prodById(id);if(!p)break;const q=pq||1;const txt='Здравствуйте! Хочу заказать:\n'+p.name.ru+' — '+q+' шт. × '+money(p.price)+' = '+money(p.price*q)+'\n'+prodUrl(p);try{ymGoal('order_whatsapp_1click')}catch(e){}try{statEv('o')}catch(e){}try{ntOne(p,q)}catch(e){}window.open('https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(txt),'_blank','noopener');break}
     case 'share':shareProduct(prodById(id));break;
     case 'copy':copyText(prodUrl(prodById(id)));break;
     case 'inc':{const i=cart.find(x=>x.id===id);if(i){i.q=Math.min(99,i.q+1);saveCart();render()}break}
@@ -2633,13 +2635,14 @@ async function handleForm(f){
 }
 async function handleForm2(f){
   const kind=f.dataset.form,fd=new FormData(f);
+  if(kind==='restock'){ntRestock(f,fd);return}
   if(kind==='search'){const q=String(fd.get('q')||'').trim();location.hash='#/catalog'+(q?'?q='+encodeURIComponent(q):'');return}
   if(kind==='order'){
     const name=String(fd.get('name')||'').trim(),tel=String(fd.get('tel')||'').trim();
     if(!name||!tel){toast(t('fill'));return}
     const lines=cartLines(),total=lines.reduce((s,l)=>s+l.p.price*l.q,0);
     const txt='Заказ MUSLIM SHOP\n\n'+lines.map((l,i)=>(i+1)+'. '+l.p.name.ru+' — '+l.q+' шт. × '+money(l.p.price)+' = '+money(l.p.price*l.q)+'\n   '+prodUrl(l.p)).join('\n')+'\n\nИтого: '+money(total)+'\n\nИмя: '+name+'\nТелефон: '+tel+(fd.get('c')?'\nКомментарий: '+fd.get('c'):'');
-    ymGoal('order_whatsapp');try{statEv('o')}catch(e){}window.open('https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(txt),'_blank','noopener');return;
+    ymGoal('order_whatsapp');try{statEv('o')}catch(e){}try{ntOrder(name,tel,lines,total,String(fd.get('c')||'').trim())}catch(e){}window.open('https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(txt),'_blank','noopener');return;
   }
   if(kind==='plogin'){
     const msg=m=>{const b=$('#ploginmsg');if(b){b.style.display='block';b.textContent=m}toast(m)};
@@ -4126,6 +4129,7 @@ async function ntSend(text,force){
   try{
     if(!force&&(!anOn()||anIgnored()))return;
     if(!NT_RELAY)return;
+    if(!force){try{const v=anVid();if(v)text+='\n👤 Клиент #'+v.replace(/[^a-z0-9]/gi,'').slice(0,4).toUpperCase()}catch(e){}}
     await fetch(NT_RELAY,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({text}),keepalive:true});
   }catch(e){}
 }
@@ -4136,12 +4140,96 @@ function ntPageName(path){
   if(path.startsWith('/cart'))return 'Корзина';
   return path;
 }
+function ntMem(){try{return JSON.parse(localStorage.getItem('ms_nt_v')||'{}')||{}}catch(e){return {}}}
+function ntMemSet(m){try{localStorage.setItem('ms_nt_v',JSON.stringify(m))}catch(e){}}
+function ntSeen(p){/* запоминаем просмотренные товары этого клиента (последние 6) */
+  if(!p||!p.id)return;const m=ntMem();const a=(m.seen||[]).filter(x=>x.id!==p.id);
+  a.unshift({id:p.id,n:cleanName(p.name.ru||p.name.kk).slice(0,60)});m.seen=a.slice(0,6);ntMemSet(m);
+}
 function ntVisit(path){
   let src='';try{src=stSrc()}catch(e){}
-  ntSend('👀 Новый посетитель на сайте\n'+ntPageName(path)+'\nОткуда: '+(src||'—')+'\nУстройство: '+ntDev()+' · '+(lang==='kk'?'KZ':'RU')+'\nВремя: '+ntTime());
+  const m=ntMem(),now=Date.now(),n=(m.n|0)+1;let rep='🆕 Первый визит';
+  if(n>1){
+    const d=m.last?Math.floor((now-m.last)/864e5):-1;
+    const ago=d<0?'':d===0?'сегодня':d===1?'вчера':d+' дн. назад';
+    rep='🔁 Заходит уже '+n+'-й раз'+(ago?' (прошлый визит: '+ago+')':'');
+    const seen=(m.seen||[]).slice(0,3).map(x=>x.n).filter(Boolean);
+    if(seen.length)rep+='\nРаньше смотрел: '+seen.join('; ');
+    if(m.ord)rep+='\n✅ Уже заказывал раньше';
+  }
+  m.n=n;m.last=now;ntMemSet(m);
+  ntSend('👀 '+(n>1?'Вернулся посетитель':'Новый посетитель на сайте')+'\n'+ntPageName(path)+'\n'+rep+'\nОткуда: '+(src||'—')+'\nУстройство: '+ntDev()+' · '+(lang==='kk'?'KZ':'RU')+'\nВремя: '+ntTime());
 }
+/* ---- заказ из корзины ---- */
+let NT_DONE=false,NT_TOUCH=false,NT_ABSIG='';
+function ntOrdered(){NT_DONE=true;try{const m=ntMem();m.ord=1;ntMemSet(m)}catch(e){}}
+function ntOrder(name,tel,lines,total,com){
+  ntOrdered();
+  ntSend('🧾 НОВЫЙ ЗАКАЗ (корзина → WhatsApp)\n\n'+lines.map((l,i)=>(i+1)+'. '+cleanName(l.p.name.ru)+' — '+l.q+' шт. × '+money(l.p.price)).join('\n')+'\n\nИтого: '+money(total)+'\nИмя: '+name+'\nТелефон: '+tel+(com?'\nКомментарий: '+com:'')+'\nВремя: '+ntTime()+'\n\nЕсли клиент не напишет в WhatsApp в течение 10 минут, перезвоните ему.');
+}
+function ntOne(p,q){
+  ntOrdered();
+  ntSend('⚡ Заказ в 1 клик (WhatsApp)\n'+cleanName(p.name.ru)+' — '+q+' шт. × '+money(p.price)+' = '+money(p.price*q)+'\nВремя: '+ntTime()+'\nКлиент перешёл в WhatsApp, ждите сообщение.');
+}
+/* ---- поиск без результатов ---- */
+let NT_SQ=null;const NT_SQS={};
+function ntSearch(q,cnt,note){
+  q=String(q||'').trim();if(!q||q.length<2)return;
+  clearTimeout(NT_SQ);
+  if(cnt>0&&note!=='~')return;
+  NT_SQ=setTimeout(()=>{
+    const k=q.toLowerCase();if(NT_SQS[k])return;NT_SQS[k]=1;
+    ntSend('🔍 Искали и '+(cnt>0?'нашли только похожее':'НЕ нашли')+': «'+q.slice(0,80)+'»\nВремя: '+ntTime()+'\nВозможно, стоит завезти этот товар.');
+  },2500);
+}
+/* ---- «Сообщить о поступлении» ---- */
+function ntRestockBox(p){
+  const kk=lang==='kk';
+  return `<form class="note" data-form="restock" style="display:grid;gap:8px">
+  <b>${kk?'🔔 Түскенде хабарлаймыз':'🔔 Сообщить о поступлении'}</b>
+  <span style="font-size:15px">${kk?'Нөміріңізді қалдырыңыз, тауар келгенде хабарласамыз.':'Оставьте номер, и мы напишем, когда товар появится.'}</span>
+  <input type="hidden" name="pid" value="${esc(p.id)}">
+  <input name="rname" autocomplete="name" placeholder="${kk?'Атыңыз':'Ваше имя'}" style="width:100%;padding:12px 14px;border-radius:10px;font-size:16px;border:1px solid #bdbdbd">
+  <input name="rtel" type="tel" inputmode="tel" autocomplete="tel" required placeholder="+7 7__ ___ __ __" style="width:100%;padding:12px 14px;border-radius:10px;font-size:16px;border:1px solid #bdbdbd">
+  <button type="submit" class="btn gold block">${kk?'Хабарлау':'Сообщить мне'}</button></form>`;
+}
+function ntRestock(f,fd){
+  const kk=lang==='kk';
+  const tel=String(fd.get('rtel')||'').trim(),name=String(fd.get('rname')||'').trim();
+  if(tel.replace(/\D/g,'').length<10){toast(kk?'Телефон нөмірін толық жазыңыз':'Укажите телефон полностью');return}
+  const p=prodById(String(fd.get('pid')||''));
+  ntSend('🔔 Просят сообщить о поступлении\n'+(p?cleanName(p.name.ru||p.name.kk):'товар')+'\nИмя: '+(name||'—')+'\nТелефон: '+tel+'\nВремя: '+ntTime());
+  f.innerHTML='<b>'+(kk?'✓ Рахмет! Тауар келгенде хабарласамыз.':'✓ Спасибо! Напишем, как только товар появится.')+'</b>';
+}
+/* ---- брошенная корзина: клиент положил товар и ушёл без заказа ---- */
+function ntAbandon(){
+  try{
+    if(NT_DONE||!NT_TOUCH||!cart.length)return;
+    const lines=cartLines().filter(l=>l.p);if(!lines.length)return;
+    const sig=lines.map(l=>l.p.id+'x'+l.q).join(',');if(sig===NT_ABSIG)return;NT_ABSIG=sig;
+    const sum=lines.reduce((s,l)=>s+l.p.price*l.q,0);
+    ntSend('🛒💤 Брошенная корзина: клиент ушёл без заказа\n'+lines.map(l=>'• '+cleanName(l.p.name.ru)+' — '+l.q+' шт.').join('\n')+'\nНа сумму: '+money(sum)+'\nВремя: '+ntTime());
+  }catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')ntAbandon()});
+window.addEventListener('pagehide',ntAbandon);
+/* ---- нажатия «Позвонить», «WhatsApp», «Спросить» ---- */
+const NT_CL={};
+document.addEventListener('click',e=>{
+  try{
+    const a=e.target.closest('a[href^="tel:"],a[href*="wa.me"],button[data-act="ask"]');if(!a)return;
+    let kind,txt;const pg=ntPageName((location.hash||'#/').slice(1).split('?')[0]);
+    if(a.matches('a[href^="tel:"]')){kind='tel';txt='📞 Нажали «Позвонить»'}
+    else if(a.matches('button[data-act="ask"]')){kind='ask';const p=prodById(a.dataset.id);txt='❓ Спрашивают про товар в WhatsApp'+(p?'\n'+cleanName(p.name.ru):'')}
+    else{kind='wa';txt='💬 Нажали «WhatsApp»'}
+    /* клиент связывается сам, поэтому текущую корзину не считаем брошенной */
+    NT_ABSIG=cart.length?cartLines().filter(l=>l.p).map(l=>l.p.id+'x'+l.q).join(','):NT_ABSIG;
+    const k=kind+pg;if(NT_CL[k]&&Date.now()-NT_CL[k]<60000)return;NT_CL[k]=Date.now();
+    ntSend(txt+'\nСтраница: '+pg+'\nВремя: '+ntTime()+(kind==='tel'?'\nСейчас может позвонить клиент.':''));
+  }catch(err){}
+},true);
 function ntCart(id){
-  const p=prodById(id);if(!p)return;
+  const p=prodById(id);if(!p)return;NT_TOUCH=true;
   let n=0,sum=0;try{cartLines().forEach(x=>{n+=x.q;sum+=x.q*(x.p.price||0)})}catch(e){}
   ntSend('🛒 Товар добавлен в корзину\n'+cleanName(p.name.ru||p.name.kk)+(p.price>0?' — '+money(p.price):'')+'\nВ корзине: '+n+' шт. на '+money(sum)+'\nВремя: '+ntTime());
 }
@@ -4205,7 +4293,7 @@ function ntPanel(){
   return `<details class="note" style="margin-bottom:14px"><summary><b>🔔 Уведомления о посетителях</b> · <span id="nt-st">${esc(NT_ADM)}</span></summary><div style="margin-top:10px;display:grid;gap:8px">
   <div style="font-size:15px">Токен бота теперь хранится в вашем посреднике Cloudflare Worker, а не на сайте и не в базе. Посетители его не видят.</div>
   <button type="button" class="btn sm line block" data-act="nt-test">Тест</button>
-  <div style="font-size:14px">Приходит: новый посетитель (один раз за визит) и каждое добавление в корзину. Ваши собственные заходы не отправляются.</div></div></details>`;
+  <div style="font-size:14px">Приходит: новый и вернувшийся посетитель (что смотрел раньше), добавление в корзину, брошенная корзина, новый заказ и заказ в 1 клик, поиск без результата, просьба сообщить о поступлении, нажатия «Позвонить» и «WhatsApp». Ваши собственные заходы не отправляются.</div></div></details>`;
 }
 
 /* ============ Плавающая кнопка WhatsApp ============ */
