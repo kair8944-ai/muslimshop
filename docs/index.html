@@ -2549,6 +2549,7 @@ document.addEventListener('click',e=>{
     case 'nt-test':ntTest();break;
     case 'nt-off':ntOff();break;
     case 'tg-bulk':tgBulk();break;
+    case 'tg-topics':tgMkTopics().catch(e=>toast('Ошибка: '+(e&&e.message||e)));break;
     case 'tg-menu':tgMenu().catch(e=>toast('Ошибка: '+(e&&e.message||e)));break;
     case 'astats-range':ST.range=Number(id)||7;KEEP=true;render();break;
     case 'astats-refresh':stLoad();break;
@@ -3797,7 +3798,9 @@ async function tgSend(id){
   if(!p)throw new Error('Товар не найден');
   if(p.status==='hidden')throw new Error('Товар скрыт на сайте. Сначала нажмите «Показать».');
   const c=tgCfg(),kb=tgKb(p),src=(p.images&&p.images[0])||p.img||'';
+  const th=(tgTopics()[c.ch]||{})[p.cat],TH=th?{message_thread_id:th}:{};
   let parts=tgParts(p,false,c.cap),done=false;
+  try{
   if(src){
     let blob=null,carded=false;
     if(c.fmt==='card'){try{blob=await sgCardBlob(p,src);carded=!!blob}catch(e){blob=null}}
@@ -3805,13 +3808,17 @@ async function tgSend(id){
     if(!blob)blob=await tgBlob(src);
     parts=tgParts(p,carded,c.cap);
     const fd=new FormData();
-    fd.append('chat_id',c.ch);fd.append('caption',parts.cap);fd.append('parse_mode','HTML');fd.append('reply_markup',JSON.stringify({inline_keyboard:kb}));
+    fd.append('chat_id',c.ch);if(th)fd.append('message_thread_id',String(th));fd.append('caption',parts.cap);fd.append('parse_mode','HTML');fd.append('reply_markup',JSON.stringify({inline_keyboard:kb}));
     if(blob){fd.append('photo',blob,'photo.jpg');await tgApi('sendPhoto',fd,true);done=true}
     else if(/^https?:/i.test(src)){fd.append('photo',src);await tgApi('sendPhoto',fd,true);done=true}
   }
-  if(!done)await tgApi('sendMessage',{chat_id:c.ch,text:parts.cap,parse_mode:'HTML',link_preview_options:{is_disabled:true},reply_markup:{inline_keyboard:kb}});
+  if(!done)await tgApi('sendMessage',{...TH,chat_id:c.ch,text:parts.cap,parse_mode:'HTML',link_preview_options:{is_disabled:true},reply_markup:{inline_keyboard:kb}});
   if(parts.body){
-    for(let i=0;i<parts.body.length;i+=3800)await tgApi('sendMessage',{chat_id:c.ch,text:tgH(parts.body.slice(i,i+3800)),parse_mode:'HTML',link_preview_options:{is_disabled:true}});
+    for(let i=0;i<parts.body.length;i+=3800)await tgApi('sendMessage',{...TH,chat_id:c.ch,text:tgH(parts.body.slice(i,i+3800)),parse_mode:'HTML',link_preview_options:{is_disabled:true}});
+  }
+  }catch(e){
+    if(th&&/thread not found|topic_deleted|TOPIC_CLOSED|topic closed/i.test(String(e&&e.message))){const m=tgTopics();if(m[c.ch])delete m[c.ch][p.cat];LS.set('ms_tg_topics',m);throw new Error('Тема этой категории удалена или закрыта в группе. Нажмите «Создать темы по категориям», и я сделаю её заново.')}
+    throw e;
   }
   const s=tgSent();s[id]=Date.now();LS.set('ms_tg_sent',s);
 }
@@ -3880,6 +3887,45 @@ async function tgBulk(){
   }finally{tgBusy=false;tgBar(null);try{admRefresh()}catch(e){}}
   await tgAsk('<b>Готово</b><br>Отправлено: '+ok+(skip?'<br>Пропущено (уже были в канале): '+skip:'')+(err?'<br>С ошибкой: '+err:'')+(tgStop?'<br>Остановлено вами.':''),[['ok','Хорошо',1]]);
 }
+/* ===== Темы (Topics) в группе: каждая категория — своя тема с иконкой, товары уходят в свою тему ===== */
+const tgTopics=()=>LS.get('ms_tg_topics',{});
+const TG_EMO=[[/витамин|бад|добавк|омега|коллаг|магни|цинк|желез/i,'💊'],[/м[её]д|урбеч|паст/i,'🍯'],[/аромат|дух|парфюм|масл.*аром|мускус/i,'🌸'],[/масл/i,'🫒'],[/чай|кофе|напит/i,'☕'],[/финик|сухофрукт|орех|сладост/i,'🌴'],[/дет|малыш|ребен/i,'👶'],[/женщ|для неё|красот|косметик|уход/i,'💄'],[/мужч|для него/i,'🧔'],[/книг|коран/i,'📚'],[/одежд|хиджаб|платок/i,'👗'],[/подар|набор/i,'🎁'],[/спорт|протеин|фитнес/i,'💪'],[/здоров|иммун/i,'❤️'],[/акци|скидк|распрод/i,'🔥'],[/нов/i,'🆕']];
+const tgEmo=n=>{for(const x of TG_EMO)if(x[0].test(n))return x[1];return '🛍'};
+async function tgMkTopics(){
+  if(tgBusy){toast('Подождите: идёт другая отправка в Telegram');return}
+  const c=tgCfg();
+  if(!c.t){toast('Сначала сохраните токен бота в блоке «Telegram-канал».');return}
+  tgBusy=true;
+  try{
+    const chat=await tgApi('getChat',{chat_id:c.ch});
+    if(!chat.is_forum){
+      await tgAsk('<b>Темы работают только в группе</b><br><span style="font-size:14px">В обычном канале тем нет. Чтобы было как в примере:<br>1. Создайте группу в Telegram.<br>2. Настройки группы → включите <b>«Темы»</b>.<br>3. Добавьте бота администратором с правами «Управление темами», «Отправка сообщений», «Закрепление».<br>4. Разрешения группы → выключите «Отправка сообщений» для участников, чтобы писали только вы.<br>5. Впишите адрес группы (например @muslim_shop_kz) в поле «Канал» здесь и нажмите «Сохранить и проверить».</span>',[['ok','Понятно',1]]);
+      return;
+    }
+    const has={};(DB.products||[]).forEach(p=>{if(p&&p.status!=='hidden')has[p.cat]=1});
+    const cats=(DB.cats||[]).filter(x=>x&&has[x.id]&&x.name&&(x.name.ru||x.name.kk));
+    if(!cats.length){toast('Нет категорий с товарами');return}
+    const all=tgTopics(),m=all[c.ch]||{};
+    const todo=cats.filter(x=>!m[x.id]);
+    if(!todo.length){await tgAsk('<b>Все темы уже созданы ✓</b><br>Категорий: '+cats.length+'. Новые товары будут уходить каждый в свою тему.',[['ok','Хорошо',1]]);return}
+    let icons=[];try{icons=await tgApi('getForumTopicIconStickers',{})||[]}catch(e){}
+    let ok=0,err='';
+    for(let i=0;i<todo.length;i++){
+      const x=todo[i],nm=String(x.name.ru||x.name.kk),emo=tgEmo(nm);
+      tgBar('Создаю тему '+(i+1)+' из '+todo.length+': '+nm);
+      const ic=icons.find(s=>s&&s.emoji&&s.emoji.replace(/\uFE0F/g,'')===emo.replace(/\uFE0F/g,''));
+      const body={chat_id:c.ch,name:(nm+' '+emo).slice(0,128)};
+      if(ic&&ic.custom_emoji_id)body.icon_custom_emoji_id=ic.custom_emoji_id;
+      try{const r=await tgApi('createForumTopic',body);m[x.id]=r.message_thread_id;all[c.ch]=m;LS.set('ms_tg_topics',all);ok++}
+      catch(e){err=tgErr(e);if(/not enough rights|administrator|CHAT_ADMIN_REQUIRED/i.test(err)){err='У бота нет права «Управление темами». Дайте его в настройках группы.';break}}
+      if(i<todo.length-1)await new Promise(r=>setTimeout(r,1500));
+    }
+    tgBar(null);
+    await tgAsk('<b>Темы созданы: '+ok+' из '+todo.length+'</b>'+(err?'<br><span style="color:#B3261E;font-size:14px">'+esc(err)+'</span>':'')+'<br><span style="font-size:14px">Теперь «В Telegram» и «Отправить отмеченные» кладут каждый товар в тему его категории.</span>',[['ok','Хорошо',1]]);
+  }catch(e){
+    await tgAsk('<b>Не получилось создать темы</b><br><span style="color:#5F5A52;font-size:14px">'+esc(tgErr(e))+'</span>',[['ok','Понятно',1]]);
+  }finally{tgBusy=false;tgBar(null)}
+}
 async function tgMenu(){
   if(tgBusy){toast('Подождите: идёт другая отправка в Telegram');return}
   const c=tgCfg();
@@ -3937,11 +3983,12 @@ function tgPanel(){
   const c=tgCfg();
   return `<details class="note" style="margin-bottom:14px"><summary><b>✈ Telegram-канал</b> · ${c.t?'подключён':'не подключён'}</summary><div style="margin-top:10px;display:grid;gap:8px">
   <div><label for="tg-token">Токен бота</label><input id="tg-token" type="password" autocomplete="off" autocapitalize="none" placeholder="${c.t?'сохранён (оставьте пустым, чтобы не менять)':'вставьте токен от @BotFather'}" style="width:100%"></div>
-  <div><label for="tg-ch">Канал</label><input id="tg-ch" value="${esc(c.ch)}" autocapitalize="none" style="width:100%"></div>
+  <div><label for="tg-ch">Канал или группа</label><input id="tg-ch" value="${esc(c.ch)}" autocapitalize="none" style="width:100%"></div>
   <button type="button" class="btn sm gold block" data-act="tg-save">Сохранить и проверить</button>
   <div><div style="font-size:14px;margin-bottom:4px">Фото в посте</div><div style="display:flex;flex-wrap:wrap;gap:6px">${TG_FMTS.map(x=>'<button type="button" class="btn sm '+(c.fmt===x[0]?'gold':'line')+'" data-act="tg-fmt" data-id="'+x[0]+'">'+x[1]+'</button>').join('')}</div></div>
   <div><div style="font-size:14px;margin-bottom:4px">Подпись под фото</div><div style="display:flex;flex-wrap:wrap;gap:6px">${TG_CAPS.map(x=>'<button type="button" class="btn sm '+(c.cap===x[0]?'gold':'line')+'" data-act="tg-cap" data-id="'+x[0]+'">'+x[1]+'</button>').join('')}</div></div>
   <button type="button" class="btn sm line block" data-act="tg-bulk">Отправить отмеченные товары в канал</button>
+  <button type="button" class="btn sm line block" data-act="tg-topics">Создать темы по категориям (для группы с темами)</button>
   <button type="button" class="btn sm line block" data-act="tg-menu">Обновить меню категорий в канале</button>
   <div style="font-size:14px">Токен хранится только на этом телефоне. У каждого товара в списке есть кнопка «✈ В Telegram».</div></div></details>`;
 }
