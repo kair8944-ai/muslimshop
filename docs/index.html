@@ -2549,6 +2549,7 @@ document.addEventListener('click',e=>{
     case 'nt-test':ntTest();break;
     case 'nt-off':ntOff();break;
     case 'tg-bulk':tgBulk();break;
+    case 'tg-reset':tgResetTopics().catch(e=>toast('Ошибка: '+(e&&e.message||e)));break;
     case 'tg-topics':tgMkTopics().catch(e=>toast('Ошибка: '+(e&&e.message||e)));break;
     case 'tg-menu':tgMenu().catch(e=>toast('Ошибка: '+(e&&e.message||e)));break;
     case 'astats-range':ST.range=Number(id)||7;KEEP=true;render();break;
@@ -3741,6 +3742,8 @@ function tgSentAll(){
   return a;
 }
 const tgSent=()=>tgSentAll()[tgCfg().ch||'']||{};
+/* номера сообщений бота по каждому товару: чтобы в будущем можно было удалить дубликаты */
+function tgMid(id,r){try{if(!r||!r.message_id)return;const a=LS.get('ms_tg_msgs',{}),ch=tgCfg().ch||'';a[ch]=a[ch]||{};(a[ch][id]=a[ch][id]||[]).push(r.message_id);LS.set('ms_tg_msgs',a)}catch(e){}}
 function tgMark(id){const a=tgSentAll(),ch=tgCfg().ch||'';a[ch]=a[ch]||{};a[ch][id]=Date.now();LS.set('ms_tg_sent2',a)}
 let tgBusy=false;
 const tgH=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -3836,11 +3839,11 @@ async function tgSend(id){
     parts=tgParts(p,carded,c.cap);
     const fd=new FormData();
     fd.append('chat_id',c.ch);if(th)fd.append('message_thread_id',String(th));fd.append('caption',parts.cap);fd.append('parse_mode','HTML');fd.append('reply_markup',JSON.stringify({inline_keyboard:kb}));
-    if(blob){fd.append('photo',blob,'photo.jpg');await tgApi('sendPhoto',fd,true);done=true}
-    else if(/^https?:/i.test(src)){fd.append('photo',src);await tgApi('sendPhoto',fd,true);done=true}
+    if(blob){fd.append('photo',blob,'photo.jpg');tgMid(id,await tgApi('sendPhoto',fd,true));done=true}
+    else if(/^https?:/i.test(src)){fd.append('photo',src);tgMid(id,await tgApi('sendPhoto',fd,true));done=true}
   }
   if(done)tgMark(id);
-  if(!done){await tgApi('sendMessage',{...TH,chat_id:c.ch,text:parts.cap,parse_mode:'HTML',link_preview_options:{is_disabled:true},reply_markup:{inline_keyboard:kb}});tgMark(id)}
+  if(!done){tgMid(id,await tgApi('sendMessage',{...TH,chat_id:c.ch,text:parts.cap,parse_mode:'HTML',link_preview_options:{is_disabled:true},reply_markup:{inline_keyboard:kb}}));tgMark(id)}
   if(parts.body){
     for(let i=0;i<parts.body.length;i+=3800)await tgApi('sendMessage',{...TH,chat_id:c.ch,text:tgH(parts.body.slice(i,i+3800)),parse_mode:'HTML',link_preview_options:{is_disabled:true}});
   }
@@ -3913,6 +3916,32 @@ async function tgBulk(){
 const tgTopics=()=>LS.get('ms_tg_topics',{});
 const TG_EMO=[[/витамин|бад|добавк|омега|коллаг|магни|цинк|желез/i,'💊'],[/м[её]д|урбеч|паст/i,'🍯'],[/аромат|дух|парфюм|масл.*аром|мускус/i,'🌸'],[/масл/i,'🫒'],[/чай|кофе|напит/i,'☕'],[/финик|сухофрукт|орех|сладост/i,'🌴'],[/дет|малыш|ребен/i,'👶'],[/женщ|для неё|красот|косметик|уход/i,'💄'],[/мужч|для него/i,'🧔'],[/книг|коран/i,'📚'],[/одежд|хиджаб|платок/i,'👗'],[/подар|набор/i,'🎁'],[/спорт|протеин|фитнес/i,'💪'],[/здоров|иммун/i,'❤️'],[/акци|скидк|распрод/i,'🔥'],[/нов/i,'🆕']];
 const tgEmo=n=>{for(const x of TG_EMO)if(x[0].test(n))return x[1];return '🛍'};
+/* очистка группы: удаляем темы-категории целиком (вместе со всеми постами и дубликатами), создаём заново */
+async function tgResetTopics(){
+  if(tgBusy){toast('Подождите: идёт другая отправка в Telegram');return}
+  const c=tgCfg();if(!c.t){toast('Сначала сохраните токен бота.');return}
+  const all=tgTopics(),m=all[c.ch]||{},ths=Object.values(m);
+  if(!ths.length){toast('В этой группе нет тем, созданных из админки');return}
+  const k=await tgAsk('<b>Очистить группу и начать заново?</b><br><span style="font-size:14px">Удалю '+ths.length+' тем(ы)-категорий вместе со всеми постами и дубликатами внутри, затем создам их заново пустыми. Подписчики и настройки группы останутся. Это нельзя отменить.</span>',[['go','Да, очистить',1],['no','Отмена']]);
+  if(k!=='go')return;
+  tgBusy=true;let ok=0,err='';
+  try{
+    const ids=Object.keys(m);
+    for(let i=0;i<ids.length;i++){
+      tgBar('Удаляю тему '+(i+1)+' из '+ids.length+'…');
+      try{await tgApi('deleteForumTopic',{chat_id:c.ch,message_thread_id:m[ids[i]]});ok++;delete m[ids[i]]}
+      catch(e){const t=tgErr(e);if(/thread not found|TOPIC_ID_INVALID/i.test(t)){delete m[ids[i]];ok++}else{err=t;if(/rights|admin/i.test(t)){err='У бота нет права «Управление темами» или «Удаление сообщений».';break}}}
+      all[c.ch]=m;LS.set('ms_tg_topics',all);
+      await new Promise(r=>setTimeout(r,1200));
+    }
+    const s2=tgSentAll();s2[c.ch]={};LS.set('ms_tg_sent2',s2);
+    const mm=LS.get('ms_tg_msgs',{});mm[c.ch]={};LS.set('ms_tg_msgs',mm);
+  }finally{tgBusy=false;tgBar(null)}
+  if(err){await tgAsk('<b>Удалено тем: '+ok+' из '+ths.length+'</b><br><span style="color:#B3261E;font-size:14px">'+esc(err)+'</span>',[['ok','Понятно',1]]);return}
+  await tgMkTopics();
+  toast('Готово. Теперь «Отметить все» → «Отправить отмеченные»');
+  try{admRefresh()}catch(e){}
+}
 async function tgMkTopics(){
   if(tgBusy){toast('Подождите: идёт другая отправка в Telegram');return}
   const c=tgCfg();
@@ -4011,6 +4040,7 @@ function tgPanel(){
   <div><div style="font-size:14px;margin-bottom:4px">Подпись под фото</div><div style="display:flex;flex-wrap:wrap;gap:6px">${TG_CAPS.map(x=>'<button type="button" class="btn sm '+(c.cap===x[0]?'gold':'line')+'" data-act="tg-cap" data-id="'+x[0]+'">'+x[1]+'</button>').join('')}</div></div>
   <button type="button" class="btn sm line block" data-act="tg-bulk">Отправить отмеченные товары в канал</button>
   <button type="button" class="btn sm line block" data-act="tg-topics">Создать темы по категориям (для группы с темами)</button>
+  <button type="button" class="btn sm line block" data-act="tg-reset" style="color:#B3261E">Очистить группу от дубликатов и начать заново</button>
   <button type="button" class="btn sm line block" data-act="tg-menu">Обновить меню категорий в канале</button>
   <div style="font-size:14px">Токен хранится только на этом телефоне. У каждого товара в списке есть кнопка «✈ В Telegram».</div></div></details>`;
 }
