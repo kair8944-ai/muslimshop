@@ -3881,26 +3881,32 @@ async function tgBulk(){
   await tgAsk('<b>Готово</b><br>Отправлено: '+ok+(skip?'<br>Пропущено (уже были в канале): '+skip:'')+(err?'<br>С ошибкой: '+err:'')+(tgStop?'<br>Остановлено вами.':''),[['ok','Хорошо',1]]);
 }
 async function tgMenu(){
-  if(tgBusy)return;
-  const has={};DB.products.forEach(p=>{if(p.status!=='hidden')has[p.cat]=1});
-  const cats=DB.cats.filter(c=>has[c.id]&&c.name&&(c.name.ru||c.name.kk));
-  if(!cats.length){toast('Нет категорий с товарами');return}
-  tgBusy=true;toast('Обновляю меню в канале…');
-  const c=tgCfg(),text='📚 <b>Каталог по категориям</b>\nНажмите на нужную категорию, и откроется страница магазина с товарами.';
-  const rows=[];for(let i=0;i<cats.length;i+=2)rows.push(cats.slice(i,i+2).map(x=>({text:x.name.ru||x.name.kk,url:tgCatUrl(x.id)})));
-  rows.push([{text:'🛒 Открыть магазин',url:location.origin+location.pathname}]);
-  const kb={inline_keyboard:rows};
+  if(tgBusy){toast('Подождите: идёт другая отправка в Telegram');return}
+  const c=tgCfg();
+  if(!c.t){toast('Сначала сохраните токен бота в блоке «Telegram-канал».');return}
+  tgBusy=true;
   try{
-    const m=LS.get('ms_tg_menu',null);let done=false;
-    if(m&&m.ch===c.ch&&m.id){try{await tgApi('editMessageText',{chat_id:c.ch,message_id:m.id,text,parse_mode:'HTML',reply_markup:kb});done=true}catch(e){if(/not modified/i.test(String(e&&e.message)))done=true}}
-    if(!done){
-      const r=await tgApi('sendMessage',{chat_id:c.ch,text,parse_mode:'HTML',reply_markup:kb});
-      LS.set('ms_tg_menu',{ch:c.ch,id:r.message_id});
-      try{await tgApi('pinChatMessage',{chat_id:c.ch,message_id:r.message_id,disable_notification:true})}catch(e){}
-    }
-    toast('Меню категорий в канале обновлено ✓');
-  }catch(e){toast('Telegram: '+tgErr(e))}
-  tgBusy=false;
+    const has={};(DB.products||[]).forEach(p=>{if(p&&p.status!=='hidden')has[p.cat]=1});
+    const cats=(DB.cats||[]).filter(x=>x&&has[x.id]&&x.name&&(x.name.ru||x.name.kk));
+    if(!cats.length){toast('Нет категорий с товарами');return}
+    toast('Обновляю меню в канале…');
+    const shop=(/^https?:/.test(location.protocol)&&!/localhost|127\.0\.0\.1/.test(location.hostname))?location.origin+location.pathname:'https://muslimshop.kz/';
+    const text='📚 <b>Каталог по категориям</b>\nНажмите на нужную категорию, и откроется страница магазина с товарами.';
+    const rows=[];for(let i=0;i<cats.length;i+=2)rows.push(cats.slice(i,i+2).map(x=>({text:String(x.name.ru||x.name.kk).slice(0,60),url:shop+'#/catalog?cat='+encodeURIComponent(x.id)})));
+    rows.push([{text:'🛒 Открыть магазин',url:shop}]);
+    const kb={inline_keyboard:rows};
+    /* всегда новое сообщение внизу канала, чтобы меню было видно; старое меню удаляем */
+    const r=await tgApi('sendMessage',{chat_id:c.ch,text,parse_mode:'HTML',reply_markup:kb,disable_notification:true});
+    const old=LS.get('ms_tg_menu',null);
+    LS.set('ms_tg_menu',{ch:c.ch,id:r.message_id});
+    let pinned=true;
+    try{await tgApi('pinChatMessage',{chat_id:c.ch,message_id:r.message_id,disable_notification:true})}catch(e){pinned=false}
+    if(old&&old.ch===c.ch&&old.id&&old.id!==r.message_id){try{await tgApi('deleteMessage',{chat_id:c.ch,message_id:old.id})}catch(e){}}
+    const ch=String(c.ch),link=/^@\w+$/.test(ch)?'https://t.me/'+ch.slice(1)+'/'+r.message_id:'';
+    await tgAsk('<b>Меню категорий в канале обновлено ✓</b><br>Категорий: '+cats.length+(pinned?'<br>Меню закреплено вверху канала.':'<br>Закрепить не получилось: дайте боту право «Закреплять сообщения» в настройках канала.')+(link?'<br><a href="'+link+'" target="_blank" rel="noopener" style="color:#9A7B2F">Открыть в Telegram</a>':''),[['ok','Хорошо',1]]);
+  }catch(e){
+    await tgAsk('<b>Не получилось обновить меню</b><br><span style="color:#5F5A52;font-size:14px">'+esc(tgErr(e))+'</span>',[['ok','Понятно',1]]);
+  }finally{tgBusy=false}
 }
 const TG_FMTS=[['card','Карточка'],['wide','Широкое 4:3'],['sq','Квадрат'],['orig','Как есть']];
 const TG_CAPS=[['short','Коротко'],['mid','Описание кратко'],['full','Описание полностью'],['site','Как на сайте']];
