@@ -3727,7 +3727,21 @@ const tgCfg=()=>{
   const cap=(c.cap==='short'||c.cap==='mid'||c.cap==='full'||c.cap==='site')?c.cap:(fmt==='card'?'short':'mid');
   return {t:String(c.t||''),ch:String(c.ch||'@muslim_shop06'),fmt,cap};
 };
-const tgSent=()=>LS.get('ms_tg_sent',{});
+/* отметки «уже отправлено» хранятся отдельно для каждого канала/группы: товар из старого канала не считается отправленным в новую группу */
+function tgSentAll(){
+  let a=LS.get('ms_tg_sent2',null);
+  if(!a||typeof a!=='object'){
+    a={};const old=LS.get('ms_tg_sent',{})||{},ch=tgCfg().ch||'';
+    const ts=Object.entries(old).filter(x=>typeof x[1]==='number').sort((x,y)=>y[1]-x[1]);
+    /* последняя серия отправок (паузы меньше 3 минут) — это отправка в текущую группу, всё более раннее — старый канал */
+    const cur={},prev={};let last=null,inBurst=!!LS.get('ms_tg_topics',{})[ch];
+    for(const [id,t] of ts){if(inBurst&&(last===null||last-t<180000)){cur[id]=t;last=t}else{inBurst=false;prev[id]=t}}
+    if(ch)a[ch]=cur;a._old=prev;LS.set('ms_tg_sent2',a);
+  }
+  return a;
+}
+const tgSent=()=>tgSentAll()[tgCfg().ch||'']||{};
+function tgMark(id){const a=tgSentAll(),ch=tgCfg().ch||'';a[ch]=a[ch]||{};a[ch][id]=Date.now();LS.set('ms_tg_sent2',a)}
 let tgBusy=false;
 const tgH=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function tgErr(e){
@@ -3740,10 +3754,23 @@ function tgErr(e){
 }
 async function tgApi(method,body,isForm){
   const c=tgCfg();if(!c.t)throw new Error('Сначала сохраните токен бота в блоке «Telegram-канал».');
-  const r=await fetch('https://api.telegram.org/bot'+c.t+'/'+method,{method:'POST',headers:isForm?undefined:{'Content-Type':'application/json'},body:isForm?body:JSON.stringify(body)});
-  const j=await r.json().catch(()=>null);
-  if(!j||!j.ok)throw new Error((j&&j.description)||('код '+r.status));
-  return j.result;
+  const waits=[3,6,10,15,20,30];
+  for(let n=0;;n++){
+    let r=null,j=null,net=false;
+    try{const ac=typeof AbortController!=='undefined'?new AbortController():null,to=ac?setTimeout(()=>ac.abort(),90000):0;try{r=await fetch('https://api.telegram.org/bot'+c.t+'/'+method,{signal:ac?ac.signal:undefined,method:'POST',headers:isForm?undefined:{'Content-Type':'application/json'},body:isForm?body:JSON.stringify(body)});j=await r.json().catch(()=>null)}finally{clearTimeout(to)}}
+    catch(e){net=true}
+    if(j&&j.ok)return j.result;
+    const flood=r&&r.status===429,srv=r&&r.status>=500;
+    if((net||flood||srv)&&n<waits.length&&!tgStop){
+      let w=flood&&j&&j.parameters&&j.parameters.retry_after?j.parameters.retry_after+1:waits[n];
+      try{tgBar((net?'Нет интернета, жду ':flood?'Telegram просит подождать ':'Telegram не отвечает, жду ')+w+' сек… (попытка '+(n+2)+')')}catch(e){}
+      await new Promise(res=>setTimeout(res,w*1000));
+      if(net&&typeof navigator!=='undefined'&&navigator.onLine===false){for(let k=0;k<60&&navigator.onLine===false&&!tgStop;k++)await new Promise(res=>setTimeout(res,2000))}
+      continue;
+    }
+    if(net)throw new Error('Нет интернета. Проверьте связь и нажмите «Повторить».');
+    throw new Error((j&&j.description)||('код '+(r&&r.status)));
+  }
 }
 function tgTag(cid){
   const c=(DB.cats||[]).find(x=>x.id===cid);
@@ -3812,7 +3839,8 @@ async function tgSend(id){
     if(blob){fd.append('photo',blob,'photo.jpg');await tgApi('sendPhoto',fd,true);done=true}
     else if(/^https?:/i.test(src)){fd.append('photo',src);await tgApi('sendPhoto',fd,true);done=true}
   }
-  if(!done)await tgApi('sendMessage',{...TH,chat_id:c.ch,text:parts.cap,parse_mode:'HTML',link_preview_options:{is_disabled:true},reply_markup:{inline_keyboard:kb}});
+  if(done)tgMark(id);
+  if(!done){await tgApi('sendMessage',{...TH,chat_id:c.ch,text:parts.cap,parse_mode:'HTML',link_preview_options:{is_disabled:true},reply_markup:{inline_keyboard:kb}});tgMark(id)}
   if(parts.body){
     for(let i=0;i<parts.body.length;i+=3800)await tgApi('sendMessage',{...TH,chat_id:c.ch,text:tgH(parts.body.slice(i,i+3800)),parse_mode:'HTML',link_preview_options:{is_disabled:true}});
   }
@@ -3820,7 +3848,6 @@ async function tgSend(id){
     if(th&&/thread not found|topic_deleted|TOPIC_CLOSED|topic closed/i.test(String(e&&e.message))){const m=tgTopics();if(m[c.ch])delete m[c.ch][p.cat];LS.set('ms_tg_topics',m);throw new Error('Тема этой категории удалена или закрыта в группе. Нажмите «Создать темы по категориям», и я сделаю её заново.')}
     throw e;
   }
-  const s=tgSent();s[id]=Date.now();LS.set('ms_tg_sent',s);
 }
 async function tgOne(id){
   if(tgBusy)return;
@@ -3857,7 +3884,7 @@ async function tgBulk(){
   const hid=all.filter(p=>p.status==='hidden'),ids=all.filter(p=>p.status!=='hidden').map(p=>p.id);
   const was=ids.filter(id=>tgSent()[id]).length;
   if(!ids.length){toast('Все отмеченные товары скрыты на сайте');return}
-  const go=await tgAsk('<b>Отправить в канал: '+ids.length+'</b>'+(was?'<br>Из них уже были в канале: '+was+'. По каждому такому я спрошу, пропустить или отправить.':'')+(hid.length?'<br>Скрытые товары пропущу: '+hid.length+'.':'')+'<br><span style="color:#5F5A52;font-size:14px">Между постами пауза 3–4 секунды, чтобы Telegram не заблокировал бота.</span>',[['go','Начать',1],['no','Отмена']]);
+  const go=await tgAsk('<b>Отправить в канал: '+ids.length+'</b>'+(was?'<br>Из них уже были в канале: '+was+'. Их я пропущу и продолжу с остальных.':'')+(hid.length?'<br>Скрытые товары пропущу: '+hid.length+'.':'')+'<br><span style="color:#5F5A52;font-size:14px">Между постами пауза 3–4 секунды, чтобы Telegram не заблокировал бота.</span>',[['go','Начать',1],['no','Отмена']]);
   if(go!=='go')return;
   tgBusy=true;tgStop=false;let ok=0,skip=0,skipAll=false,sendAll=false,err=0;
   try{
@@ -3865,21 +3892,16 @@ async function tgBulk(){
       if(tgStop)break;
       const id=ids[i],p=prodById(id),nm=p?L(p.name):id;
       const t=tgSent()[id];
-      if(t&&!sendAll){
-        if(skipAll){skip++;continue}
-        tgBar('Жду ваш ответ… ('+(i+1)+' из '+ids.length+')');
-        const k=await tgAsk('⚠️ <b>Этот товар уже есть в канале</b><br>'+esc(nm)+'<br><span style="color:#5F5A52;font-size:14px">Отправлен '+new Date(t).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+'</span>',[['skip','Пропустить этот товар',1],['send','Отправить ещё раз'],['skipall','Пропускать все уже отправленные'],['sendall','Отправлять все повторно'],['stop','Остановить']]);
-        if(k==='stop')break;
-        if(k==='skip'){skip++;continue}
-        if(k==='skipall'){skipAll=true;skip++;continue}
-        if(k==='sendall')sendAll=true;
-      }
+      if(t){skip++;continue}
       tgBar('Отправляю '+(i+1)+' из '+ids.length+': '+nm);
       try{await tgSend(id);ok++}
       catch(e){
         err++;
-        const k=await tgAsk('Не получилось отправить<br><b>'+esc(nm)+'</b><br><span style="color:#5F5A52;font-size:14px">'+esc(tgErr(e))+'</span>',[['next','Пропустить и продолжить',1],['stop','Остановить']]);
+        if(tgSent()[id]){ok++;err--;continue}
+        tgBar('Жду ваш ответ… ('+(i+1)+' из '+ids.length+')');
+        const k=await tgAsk('Не получилось отправить<br><b>'+esc(nm)+'</b><br><span style="color:#5F5A52;font-size:14px">'+esc(tgErr(e))+'</span>',[['retry','Повторить этот товар',1],['next','Пропустить и продолжить'],['stop','Остановить']]);
         if(k==='stop')break;
+        if(k==='retry'){err--;i--;continue}
         continue;
       }
       if(i<ids.length-1&&!tgStop)await new Promise(r=>setTimeout(r,3500));
