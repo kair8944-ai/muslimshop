@@ -34,7 +34,7 @@
 "address":{"@type":"PostalAddress","streetAddress":"пр. Султана Бейбарыса, 45а/5, ТД «Дина Байзар», Бутик №24","addressLocality":"Атырау","addressRegion":"Атырауская область","addressCountry":"KZ"},
 "openingHours":"Mo-Su 10:00-19:00",
 "openingHoursSpecification":[{"@type":"OpeningHoursSpecification","dayOfWeek":["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],"opens":"10:00","closes":"19:00"}],
-"sameAs":["https://instagram.com/musliim_shop06","https://www.tiktok.com/@muslim_shop06","https://t.me/muslim_shop06","https://2gis.kz/atyrau/geo/70000001094546376"]}
+"sameAs":["https://instagram.com/musliim_shop06","https://www.tiktok.com/@muslim_shop06","https://t.me/muslim_shop06","https://t.me/muslimshop_kz","https://2gis.kz/atyrau/geo/70000001094546376"]}
 </script>
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"WebSite","name":"MUSLIM SHOP","alternateName":["Muslim Shop Атырау","muslimshop.kz"],"url":"https://muslimshop.kz/","inLanguage":["ru","kk"]}
@@ -754,6 +754,17 @@ body .findimg{display:block;width:100%;height:auto;border-radius:16px}
 
 
 
+
+/* иконки соцсетей */
+.sico{display:inline-flex;flex:0 0 auto;width:34px;height:34px;border-radius:10px;overflow:hidden}
+.sico svg{width:100%;height:100%;display:block}
+footer a.fs{display:flex;align-items:center;gap:12px;padding:8px 0}
+footer a.fs .sico{width:32px;height:32px}
+.soc.si{flex-direction:row;align-items:center;gap:14px}
+.soc.si>span:last-child{display:flex;flex-direction:column;min-width:0}
+.soc.si .sico{width:42px;height:42px;border-radius:12px}
+.contacts .cl{display:flex;align-items:center;gap:10px}
+.contacts .cl .sico{width:28px;height:28px;border-radius:8px}
 </style>
 <style id="vd-light">
 /* окно «Видео» в светлых тонах: хорошо видно все кнопки и надписи */
@@ -1172,8 +1183,16 @@ const CONTACT={
   ig:'https://www.instagram.com/musliim_shop06?stkn=dnAzejJ2cm5nOXNi',
   tt:'https://www.tiktok.com/@muslim_shop06?_r=1&_t=ZS-9AFgdLAOcZ2',
   tg:'https://t.me/muslim_shop06',
+  tgg:'https://t.me/muslimshop_kz',
   gis:'https://2gis.kz/atyrau/geo/70000001094546376'
 };
+const SICO={
+ ig:'<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="igg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#FEDA75"/><stop offset=".35" stop-color="#FA7E1E"/><stop offset=".6" stop-color="#D62976"/><stop offset=".8" stop-color="#962FBF"/><stop offset="1" stop-color="#4F5BD5"/></linearGradient></defs><rect width="48" height="48" rx="13" fill="url(#igg)"/><rect x="11" y="11" width="26" height="26" rx="8" fill="none" stroke="#fff" stroke-width="3"/><circle cx="24" cy="24" r="6.3" fill="none" stroke="#fff" stroke-width="3"/><circle cx="31.6" cy="16.4" r="1.9" fill="#fff"/></svg>',
+ tt:'<svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="13" fill="#000"/><path d="M27.5 10h4.6c.4 3.6 2.6 6 6 6.4v4.7c-2.3 0-4.3-.7-6-1.9v9.7c0 5.4-4.1 9.1-9 9.1s-8.6-3.9-8.6-8.7c0-5.2 4.5-9.2 9.9-8.4v4.9c-2.7-.6-5.1 1.2-5.1 3.6 0 2.1 1.7 3.8 3.9 3.8 2.4 0 4.3-1.7 4.3-4.6z" fill="#25F4EE" transform="translate(-1.2 -1)"/><path d="M27.5 10h4.6c.4 3.6 2.6 6 6 6.4v4.7c-2.3 0-4.3-.7-6-1.9v9.7c0 5.4-4.1 9.1-9 9.1s-8.6-3.9-8.6-8.7c0-5.2 4.5-9.2 9.9-8.4v4.9c-2.7-.6-5.1 1.2-5.1 3.6 0 2.1 1.7 3.8 3.9 3.8 2.4 0 4.3-1.7 4.3-4.6z" fill="#FE2C55" transform="translate(1.2 1)"/><path d="M27.5 10h4.6c.4 3.6 2.6 6 6 6.4v4.7c-2.3 0-4.3-.7-6-1.9v9.7c0 5.4-4.1 9.1-9 9.1s-8.6-3.9-8.6-8.7c0-5.2 4.5-9.2 9.9-8.4v4.9c-2.7-.6-5.1 1.2-5.1 3.6 0 2.1 1.7 3.8 3.9 3.8 2.4 0 4.3-1.7 4.3-4.6z" fill="#fff"/></svg>',
+ tg:'<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="24" fill="#2AABEE"/><path d="M10.6 23.4l22.6-8.7c1.1-.4 2 .3 1.7 1.9l-3.8 18c-.3 1.3-1.1 1.6-2.2 1l-6-4.4-2.9 2.8c-.3.3-.6.6-1.2.6l.4-6.1 11.1-10c.5-.4-.1-.7-.7-.3l-13.7 8.6-5.9-1.8c-1.3-.4-1.3-1.3.3-1.9z" fill="#fff"/></svg>',
+ gis:'<svg viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="13" fill="#19AA1E"/><path d="M24 9c-6.4 0-11.5 5-11.5 11.3 0 8.3 11.5 18.7 11.5 18.7s11.5-10.4 11.5-18.7C35.5 14 30.4 9 24 9z" fill="#fff"/><circle cx="24" cy="20.3" r="4.6" fill="#19AA1E"/></svg>'
+};
+const sico=k=>'<span class="sico">'+SICO[k]+'</span>';
 let toastT;
 function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',2600)}
 
@@ -1735,18 +1754,21 @@ function shopBlock(){
 }
 function socials(){
   return `<div class="socs">
-   <a class="soc" href="${CONTACT.ig}" target="_blank" rel="noopener"><small>Instagram</small><b>@musliim_shop06</b></a>
-   <a class="soc" href="${CONTACT.tt}" target="_blank" rel="noopener"><small>TikTok</small><b>@muslim_shop06</b></a>
-   <a class="soc" href="${CONTACT.tg}" target="_blank" rel="noopener"><small>Telegram</small><b>@muslim_shop06</b></a></div>`;
+   <a class="soc si" href="${CONTACT.tgg}" target="_blank" rel="noopener">${sico('tg')}<span><small>${lang==='kk'?'Telegram-топ · каталог':'Telegram-группа · каталог'}</small><b>@muslimshop_kz</b></span></a>
+   <a class="soc si" href="${CONTACT.ig}" target="_blank" rel="noopener">${sico('ig')}<span><small>Instagram</small><b>@musliim_shop06</b></span></a>
+   <a class="soc si" href="${CONTACT.tt}" target="_blank" rel="noopener">${sico('tt')}<span><small>TikTok</small><b>@muslim_shop06</b></span></a>
+   <a class="soc si" href="${CONTACT.tg}" target="_blank" rel="noopener">${sico('tg')}<span><small>Telegram</small><b>@muslim_shop06</b></span></a>
+   <a class="soc si" href="${CONTACT.gis}" target="_blank" rel="noopener">${sico('gis')}<span><small>2ГИС</small><b>${lang==='kk'?'Картада ашу':'Мы на карте'}</b></span></a></div>`;
 }
 function contactBox(){
   return `<div class="contacts"><div><b>MUSLIM SHOP</b></div><div>${lang==='kk'?'Атырау, Дина базары, 24-бутик':'Атырау, Рынок Дина, Бутик 24'}</div><div>${t('addr')}: ${esc(t('addr_txt'))}</div>
    <div>${t('phone')}: <a href="tel:+77781754241">${CONTACT.phone}</a></div>
    <div>${lang==='kk'?'Жұмыс уақыты: күн сайын 10:00–19:00':'Часы работы: ежедневно 10:00–19:00'}</div>
    <div>2ГИС: <a href="${CONTACT.gis}" target="_blank" rel="noopener">${lang==='kk'?'картада ашу':'открыть на карте'}</a></div>
-   <div>Instagram: <a href="${CONTACT.ig}" target="_blank" rel="noopener">@musliim_shop06</a></div>
-   <div>TikTok: <a href="${CONTACT.tt}" target="_blank" rel="noopener">@muslim_shop06</a></div>
-   <div>Telegram: <a href="${CONTACT.tg}" target="_blank" rel="noopener">@muslim_shop06</a></div></div>`;
+   <div class="cl">${sico('tg')}<span>${lang==='kk'?'Telegram-топ':'Telegram-группа'}: <a href="${CONTACT.tgg}" target="_blank" rel="noopener">@muslimshop_kz</a></span></div>
+   <div class="cl">${sico('ig')}<span>Instagram: <a href="${CONTACT.ig}" target="_blank" rel="noopener">@musliim_shop06</a></span></div>
+   <div class="cl">${sico('tt')}<span>TikTok: <a href="${CONTACT.tt}" target="_blank" rel="noopener">@muslim_shop06</a></span></div>
+   <div class="cl">${sico('tg')}<span>Telegram: <a href="${CONTACT.tg}" target="_blank" rel="noopener">@muslim_shop06</a></span></div></div>`;
 }
 
 let CQ={};
@@ -2453,7 +2475,7 @@ function renderChrome(){
   $('#foot').innerHTML=`<footer><div class="wrap fg">
     <div><h3>MUSLIM SHOP</h3><div>АТЫРАУ • РЫНОК ДИНА • БУТИК 24${LOCK}</div><div style="margin-top:6px">${esc(t('addr_txt'))}</div><div style="margin-top:6px"><a href="tel:+77781754241">${CONTACT.phone}</a></div><div style="margin-top:6px">${lang==='kk'?'Күн сайын 10:00–19:00':'Ежедневно 10:00–19:00'}</div></div>
     <div><h3>${t('menu_nav')}</h3><a href="#/">${t('home')}</a><a href="#/catalog">${t('catalog')}</a><a href="#/cart">${t('cart')}</a></div>
-    <div><h3>${t('social')}</h3><a href="${CONTACT.ig}" target="_blank" rel="noopener">Instagram @musliim_shop06</a><a href="${CONTACT.tt}" target="_blank" rel="noopener">TikTok @muslim_shop06</a><a href="${CONTACT.tg}" target="_blank" rel="noopener">Telegram @muslim_shop06</a><a href="${CONTACT.gis}" target="_blank" rel="noopener">2ГИС — ${lang==='kk'?'картада':'мы на карте'}</a></div>
+    <div><h3>${t('social')}</h3><a class="fs" href="${CONTACT.tgg}" target="_blank" rel="noopener">${sico('tg')}<span>${lang==='kk'?'Telegram-топ':'Telegram-группа'} @muslimshop_kz</span></a><a class="fs" href="${CONTACT.ig}" target="_blank" rel="noopener">${sico('ig')}<span>Instagram @musliim_shop06</span></a><a class="fs" href="${CONTACT.tt}" target="_blank" rel="noopener">${sico('tt')}<span>TikTok @muslim_shop06</span></a><a class="fs" href="${CONTACT.tg}" target="_blank" rel="noopener">${sico('tg')}<span>Telegram @muslim_shop06</span></a><a class="fs" href="${CONTACT.gis}" target="_blank" rel="noopener">${sico('gis')}<span>2ГИС — ${lang==='kk'?'картада':'мы на карте'}</span></a></div>
     </div><div class="wrap copy">© MUSLIM SHOP, Атырау</div></footer>`;
   updateBadge();
   try{waFab()}catch(e){}
@@ -3726,7 +3748,7 @@ const tgCfg=()=>{
   const c=Object.assign({},LS.get('ms_tg',null)||{},TGMEM);
   const fmt=(c.fmt==='card'||c.fmt==='sq'||c.fmt==='wide'||c.fmt==='orig')?c.fmt:(c.sq===false?'orig':'card');
   const cap=(c.cap==='short'||c.cap==='mid'||c.cap==='full'||c.cap==='site')?c.cap:(fmt==='card'?'short':'mid');
-  return {t:String(c.t||''),ch:String(c.ch||'@muslim_shop06'),fmt,cap};
+  return {t:String(c.t||''),ch:String(c.ch||'@muslimshop_kz'),fmt,cap};
 };
 /* отметки «уже отправлено» хранятся отдельно для каждого канала/группы: товар из старого канала не считается отправленным в новую группу */
 function tgSentAll(){
@@ -3749,7 +3771,7 @@ let tgBusy=false;
 const tgH=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function tgErr(e){
   const m=String(e&&e.message||e);
-  if(/chat not found/i.test(m))return 'Канал не найден. Проверьте имя канала (например @muslim_shop06).';
+  if(/chat not found/i.test(m))return 'Канал не найден. Проверьте имя канала (например @muslimshop_kz).';
   if(/not a member|kicked|forbidden/i.test(m))return 'Бот не добавлен в канал администратором с правом публикации.';
   if(/unauthorized|404/i.test(m))return 'Telegram не принял токен. Проверьте, что скопировали его целиком.';
   if(/failed to fetch|networkerror|load failed/i.test(m))return 'Нет связи с Telegram. Проверьте интернет и попробуйте ещё раз.';
@@ -3950,7 +3972,7 @@ async function tgMkTopics(){
   try{
     const chat=await tgApi('getChat',{chat_id:c.ch});
     if(!chat.is_forum){
-      await tgAsk('<b>Темы работают только в группе</b><br><span style="font-size:14px">В обычном канале тем нет. Чтобы было как в примере:<br>1. Создайте группу в Telegram.<br>2. Настройки группы → включите <b>«Темы»</b>.<br>3. Добавьте бота администратором с правами «Управление темами», «Отправка сообщений», «Закрепление».<br>4. Разрешения группы → выключите «Отправка сообщений» для участников, чтобы писали только вы.<br>5. Впишите адрес группы (например @muslim_shop_kz) в поле «Канал» здесь и нажмите «Сохранить и проверить».</span>',[['ok','Понятно',1]]);
+      await tgAsk('<b>Темы работают только в группе</b><br><span style="font-size:14px">В обычном канале тем нет. Чтобы было как в примере:<br>1. Создайте группу в Telegram.<br>2. Настройки группы → включите <b>«Темы»</b>.<br>3. Добавьте бота администратором с правами «Управление темами», «Отправка сообщений», «Закрепление».<br>4. Разрешения группы → выключите «Отправка сообщений» для участников, чтобы писали только вы.<br>5. Впишите адрес группы (например @muslimshop_kz) в поле «Канал» здесь и нажмите «Сохранить и проверить».</span>',[['ok','Понятно',1]]);
       return;
     }
     const has={};(DB.products||[]).forEach(p=>{if(p&&p.status!=='hidden')has[p.cat]=1});
