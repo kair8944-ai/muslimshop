@@ -1260,7 +1260,12 @@ const T={
   hero_h:'Атыраудағы түпнұсқа адал iHerb дәрумендері',hero_kick:'Атырау · Қазақстан бойынша жеткізу',hero_hl:'Табиғи. Адал. <em>Сенімді.</em>',hero_sub2:'БАД, бал және қара зире майы. Бүкіл Қазақстан бойынша жеткізу',btn_wa:'WhatsApp',needs_t:'Сізді не мазалайды?',hero_sub:'Атырауда адал дәрумендер, БАД, бал және денсаулыққа арналған тауарлар. Қазақстан бойынша жеткізу',itemsn:'Тауар:',
   trust:[['24-бутик','Дина базары, Атырау'],['Тапсырыс','WhatsApp арқылы'],['Бағасы','теңгемен ₸'],['Төлем','Kaspi, қашықтан']]}
 };
-let lang=LS.get('ms_lang','ru'); if(lang!=='kk')lang='ru';
+/* язык: ссылка ?lang=kk / ?lang=ru важнее сохранённого выбора */
+const URL_LANG=(()=>{try{const v=(new URLSearchParams(location.search).get('lang')||'').toLowerCase();return v==='kk'||v==='kz'?'kk':v==='ru'?'ru':''}catch(e){return ''}})();
+let lang=URL_LANG||LS.get('ms_lang','ru'); if(lang!=='kk')lang='ru';
+if(URL_LANG)LS.set('ms_lang',lang);
+function syncLangUrl(){try{const u=new URL(location.href);if(u.searchParams.get('lang')===lang)return;u.searchParams.set('lang',lang);history.replaceState(history.state,'',u.pathname+u.search+u.hash)}catch(e){}}
+syncLangUrl();
 const t=k=>(T[lang][k]??T.ru[k]??k);
 const L=o=>o?(o[lang]||o.ru||''):'';
 
@@ -1526,7 +1531,7 @@ const prod=slug=>DB.products.find(p=>p.slug===slug);
 const prodById=id=>DB.products.find(p=>p.id===id);
 const catName=id=>{const c=DB.cats.find(c=>c.id===id);return c?L(c.name):''};
 const specsRows=s=>String(s||'').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const i=l.indexOf(':');return i>0?[l.slice(0,i).trim(),l.slice(i+1).trim()]:['',l]});
-const prodUrl=p=>location.origin+location.pathname+'#/product/'+encodeURIComponent(p.slug);
+const prodUrl=p=>location.origin+location.pathname+'?lang='+lang+'#/product/'+encodeURIComponent(p.slug);
 const safeDec=x=>{try{return decodeURIComponent(x)}catch(e){return x}};
 let PENDING=false;
 
@@ -2549,7 +2554,7 @@ document.addEventListener('click',e=>{
     case 'menu':$('#drawer').classList.add('open');break;
     case 'closemenu':closeMenu();break;
     case 'goto':e.preventDefault();closeMenu();if(location.hash!=='#/'&&location.hash!==''){location.hash='#/';setTimeout(()=>{const el=document.getElementById(id);el&&el.scrollIntoView()},60)}else{const el=document.getElementById(id);el&&el.scrollIntoView()}break;
-    case 'lang':lang=id;LS.set('ms_lang',lang);render();break;
+    case 'lang':lang=id;LS.set('ms_lang',lang);syncLangUrl();render();break;
     case 'allcats':{const x=$('#catsx');x.classList.toggle('open');b.textContent=x.classList.contains('open')?t('hidecats'):t('allcats');break}
     case 'fav':{e.preventDefault();const sid=String(id),i=FAV.indexOf(sid);if(i>=0)FAV.splice(i,1);else FAV.push(sid);LS.set('ms_fav',FAV);favBadge();
       const on=FAV.includes(sid);
