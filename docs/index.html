@@ -792,6 +792,52 @@ footer a.fs .sico{width:32px;height:32px}
 #vdmodal [data-vd="col"]{border-color:#E0DACF!important}
 #vdmodal canvas{background:#EDE8DF!important;box-shadow:0 6px 24px rgba(0,0,0,.12)}
 </style>
+
+<style id="cards-v2">
+/* ===== Карточки товаров v2 (2026-11-07): по две в ряд, фото на светлой плашке ===== */
+html body .grid:not(.rail),html body .grid.rail{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;overflow:visible;padding:0}
+@media(min-width:760px){html body .grid:not(.rail),html body .grid.rail{grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}}
+@media(min-width:1080px){html body .grid:not(.rail),html body .grid.rail{grid-template-columns:repeat(4,minmax(0,1fr))}}
+html body .grid.rail .card.v2{flex:none;max-width:100%}
+html body .grid.rail .card.v2:nth-child(n+5){display:none}
+html body #app:has(.hero2) .grid .card.v2:nth-child(n+4){display:flex}
+html body #app:has(.hero2) .grid .card.v2:nth-child(n+5){display:none}
+html body .card.v2{position:relative;display:flex;flex-direction:column;background:#fff;border:1px solid #ECE6DA;border-radius:20px;padding:6px;box-shadow:0 1px 2px rgba(40,30,10,.04),0 8px 24px rgba(40,30,10,.07);overflow:hidden}
+html body .card.v2 .ph{aspect-ratio:1/1;background:#fff;border-radius:15px;overflow:hidden;display:block;position:relative}
+html body .card.v2 .ph img{object-fit:contain;padding:4%;box-sizing:border-box;transition:transform .5s ease}
+@media(hover:hover){html body .card.v2:hover .ph img{transform:scale(1.05)}}
+html body .card.v2 .ph .tag{top:8px;bottom:auto;left:8px;font-family:"PT Sans",Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:999px;background:linear-gradient(135deg,#D9B26A,#A9834B);color:#fff;box-shadow:0 2px 6px rgba(169,131,75,.35)}
+html body .card.v2 .ph .tag.disc{background:#D6342A;box-shadow:0 2px 6px rgba(214,52,42,.35);left:auto;right:auto}
+html body .card.v2 .ph .tag+.tag.disc{top:36px}
+html body .card.v2 .favbtn{top:12px;right:12px;width:36px;height:36px;border:0;background:rgba(255,255,255,.92);color:#2a2a2a;box-shadow:0 2px 8px rgba(0,0,0,.12);backdrop-filter:blur(6px)}
+html body .card.v2 .favbtn svg{width:19px;height:19px}
+html body .card.v2 .favbtn.on{background:#D6342A;color:#fff}
+html body .card.v2 .cb{padding:10px 6px 4px;gap:6px;display:flex;flex-direction:column;flex:1}
+html body .card.v2 .cn{font-family:"PT Sans",Arial,sans-serif;font-size:15px;line-height:1.3;font-weight:700;color:#1d1d1d;-webkit-line-clamp:3;min-height:58px;letter-spacing:0}
+html body .card.v2 .price{font-family:"PT Sans",Arial,sans-serif;font-size:20px;font-weight:800;color:#1A1A1A;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;white-space:nowrap}
+html body .card.v2 .old{display:inline;margin:0;font-size:13px;font-weight:400;color:#9a948a;text-decoration:line-through}
+html body .card.v2 .stock{font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px}
+html body .card.v2 .stock::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+html body .card.v2 .stock.in{color:#2E8B57}
+html body .card.v2 .stock.out{color:#A04040}
+html body .card.v2 .row{margin-top:auto;padding-top:4px}
+html body .card.v2 .row .btn{width:100%;min-height:42px;height:42px;border-radius:13px;font-size:14px;font-weight:700;letter-spacing:.01em;text-transform:none;display:flex;align-items:center;justify-content:center;gap:7px;padding:0 8px;background:#1F1E1B;color:#fff;border:0;box-shadow:none;white-space:nowrap}
+html body .card.v2 .row .btn:active{transform:scale(.97)}
+html body .card.v2 .row .btn .cico{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+html body .card.v2 .row .btn[disabled]{background:#EFEBE4;color:#8b857b}
+html body .card.v2.is-out .ph img{opacity:.55;filter:grayscale(.4)}
+/* тёмная тема: тёмная карточка, фото на светлой плашке */
+html[data-theme="dark"] body .card.v2{background:#1B1A18;border:1px solid #2E2C28;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+html[data-theme="dark"] body .card.v2 .ph{background:#fff}
+html[data-theme="dark"] body .card.v2 .cn{color:#EDEAE4}
+html[data-theme="dark"] body .card.v2 .price{color:#E3C285}
+html[data-theme="dark"] body .card.v2 .old{color:#8f8a80}
+html[data-theme="dark"] body .card.v2 .stock.in{color:#5CC48A}
+html[data-theme="dark"] body .card.v2 .stock.out{color:#E07B7B}
+html[data-theme="dark"] body .card.v2 .row .btn{background:linear-gradient(135deg,#D9B26A,#A9834B);color:#17150f}
+html[data-theme="dark"] body .card.v2 .row .btn[disabled]{background:#2A2824;color:#8a857b}
+@media(max-width:360px){html body .card.v2 .row .btn .cico{display:none}html body .card.v2 .cn{font-size:14px}html body .card.v2 .price{font-size:18px}}
+</style>
 </head>
 <body>
 <div id="splash" aria-hidden="true"><b>MUSLIM SHOP</b><i></i><small>АТЫРАУ • РЫНОК ДИНА • БУТИК 24</small></div>
@@ -1611,14 +1657,14 @@ const stockHtml=p=>p.status==='in'?`<div class="stock in">${t('in')}</div>`:`<di
 const priceHtml=p=>`<div class="price">${money(p.price)}${p.old>p.price?`<span class="old">${money(p.old)}</span>`:''}</div>`;
 const cleanName=s=>String(s||'').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu,'').replace(/\s{2,}/g,' ').trim()||String(s||'');
 function card(p){
-  return `<article class="card">
+  return `<article class="card v2${p.status!=='in'?' is-out':''}">
     <button type="button" class="favbtn${favHas(p.id)?' on':''}" data-act="fav" data-id="${esc(p.id)}" aria-label="${t('fav_add')}" aria-pressed="${favHas(p.id)}">${HEART}</button>
     <a href="#/product/${esc(p.slug)}" aria-label="${esc(L(p.name))}">${imgBox(p,'ph',1)}</a>
     <div class="cb">
       <a class="cn" href="#/product/${esc(p.slug)}">${esc(cleanName(L(p.name)))}</a>
       ${priceHtml(p)}${stockHtml(p)}
       <div class="row">
-        <button class="btn sm" data-act="add" data-id="${esc(p.id)}" ${p.status!=='in'?'disabled':''}>${p.status==='in'?t('tocart'):t('out')}</button>
+        <button class="btn sm" data-act="add" data-id="${esc(p.id)}" ${p.status!=='in'?'disabled':''}>${p.status==='in'?'<svg class="cico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.5L21 8H6.2"/><circle cx="10" cy="20.5" r="1.3"/><circle cx="17" cy="20.5" r="1.3"/></svg>'+t('tocart'):t('out')}</button>
       </div>
     </div></article>`;
 }
