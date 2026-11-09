@@ -871,6 +871,92 @@ html body .card.v2 .ph,html body .grid.rail.big .card.v2 .ph{border-radius:0;asp
 html body .card.v2 .cb{padding:10px 12px 12px}
 html body .grid.rail.big .card.v2 .cb{padding:14px 16px 16px}
 </style>
+<style id="flip-style">
+/* ===== Стиль как на flip.kz (2026-11-09) ===== */
+html body .card.fl{position:relative;display:flex;flex-direction:column;background:#fff;border:0;border-radius:16px;padding:0;box-shadow:none;overflow:visible;min-width:0}
+html body .card.fl .flph{display:block;aspect-ratio:3/4;background:#fff;border-radius:16px;overflow:hidden}
+html body .card.fl .flph img{width:100%;height:100%;object-fit:contain;padding:0;display:block}
+html body .card.fl .noimg{display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:48px;color:#bbb}
+html body .card.fl .favbtn{position:absolute;top:8px;right:8px;width:34px;height:34px;border:0;background:none;box-shadow:none;color:#222;padding:0;display:flex;align-items:center;justify-content:center;border-radius:50%}
+html body .card.fl .favbtn svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8}
+html body .card.fl .favbtn.on,html[data-theme="dark"] body .card.fl .favbtn.on{background:none!important;box-shadow:none}
+html body .card.fl .favbtn.on svg{fill:#E53935;stroke:#E53935}
+html body .card.fl .favbtn,html[data-theme="dark"] body .card.fl .favbtn{background:none!important;color:#222}
+html body .card.fl .flimg{position:relative}
+html body .card.fl .flcart{position:absolute;right:8px;bottom:-18px;z-index:2;width:52px;height:52px;border-radius:50%;border:0;background:#FFC20E;color:#1b1b1b;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.18);cursor:pointer;transition:transform .12s}
+html body .card.fl .flcart:active{transform:scale(.9)}
+html body .card.fl .flcart svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+html body .card.fl .flcart[disabled]{background:#ddd;color:#999;box-shadow:none}
+html body .card.fl .flb{padding:10px 4px 6px 4px;display:flex;flex-direction:column;gap:5px}
+html body .card.fl .flpr{padding-right:52px;min-height:28px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;font-family:"PT Sans",Arial,sans-serif}
+html body .card.fl .flpr b{font-size:20px;font-weight:800;color:#111;letter-spacing:-.01em}
+html body .card.fl .flpr s{font-size:13px;color:#9a9a9a}
+html body .card.fl .flbd{display:flex;gap:4px;flex-wrap:wrap}
+html body .card.fl .flbd span{font-size:12px;font-weight:700;color:#fff;border-radius:5px;padding:2px 6px;line-height:1.3}
+html body .card.fl .flbd .bd{background:#E53935}
+html body .card.fl .flbd .bn{background:#2E9E57}
+html body .card.fl .flnm{font-size:15px;line-height:1.3;color:#222;text-decoration:none;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:400}
+html body .card.fl .flst{font-size:13px;font-weight:700;color:#222}
+html body .card.fl .flst.out{color:#b44}
+html body .card.fl.is-out .flph img{opacity:.5}
+/* сетка каталога: 2 в ряд, как на Flip */
+html body .grid:not(.rail){gap:18px 10px}
+/* большие карточки со свайпом на главной */
+html body .grid.rail.big .card.fl{flex:0 0 82%;scroll-snap-align:start;scroll-snap-stop:always;display:flex}
+@media(min-width:640px){html body .grid.rail.big .card.fl{flex-basis:44%}}
+@media(min-width:1000px){html body .grid.rail.big .card.fl{flex-basis:30%}}
+html body #app:has(.hero2) .grid .card.fl:nth-child(n){display:flex}
+html body .grid.rail.big .card.fl .flph{aspect-ratio:1/1;border-radius:20px}
+html body .grid.rail.big .card.fl .flcart{width:68px;height:68px}
+html body .grid.rail.big .card.fl .flcart svg{width:30px;height:30px}
+html body .grid.rail.big .card.fl .favbtn{width:46px;height:46px;top:12px;right:12px}
+html body .grid.rail.big .card.fl .favbtn svg{width:34px;height:34px}
+html body .grid.rail.big .card.fl .flpr b{font-size:30px}
+html body .grid.rail.big .card.fl .flpr s{font-size:18px}
+html body .grid.rail.big .card.fl .flbd span{font-size:16px;padding:3px 9px}
+html body .grid.rail.big .card.fl .flnm{font-size:20px}
+html body .grid.rail.big .card.fl .flst{font-size:16px}
+html body .grid.rail.big .card.fl .flb{padding:14px 14px 16px}
+html body .grid.rail.big .card.fl .flcart{bottom:-26px;right:14px}
+html body .grid.rail.big .card.fl{background:#fff;border-radius:20px;overflow:hidden}
+/* тёмная тема */
+html[data-theme="dark"] body .card.fl,html[data-theme="dark"] body .grid.rail.big .card.fl{background:#1B1B1D}
+html[data-theme="dark"] body .card.fl .flpr b{color:#fff}
+html[data-theme="dark"] body .card.fl .flnm,html[data-theme="dark"] body .card.fl .flst{color:#E8E6E1}
+html[data-theme="dark"] body .card.fl .flst.out{color:#E07B7B}
+html[data-theme="dark"] body .card.fl .flpr s{color:#8a8a8a}
+html[data-theme="dark"] body .card.fl .flb{padding-left:12px;padding-bottom:12px}
+html[data-theme="dark"] body .card.fl .flph{border-radius:16px 16px 0 0}
+html[data-theme="dark"] body .card.fl{border-radius:16px;overflow:hidden}
+/* поиск в шапке */
+.hsearch{display:flex;gap:0;margin:0 auto;max-width:1100px;padding:8px 14px 10px;background:inherit;position:sticky;top:0;z-index:30}
+.hsearch input{flex:1;min-width:0;height:46px;border:2px solid #FFC20E;border-right:0;border-radius:12px 0 0 12px;padding:0 14px;font:16px "PT Sans",Arial,sans-serif;background:#fff;color:#111}
+.hsearch button{width:56px;height:46px;border:0;border-radius:0 12px 12px 0;background:#FFC20E;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.hsearch svg{width:24px;height:24px;fill:none;stroke:#111;stroke-width:2.4;stroke-linecap:round}
+html[data-theme="dark"] .hsearch{background:#141517}
+html body:not([data-x]) .hsearch{background:var(--bg,#f4f2ee)}
+html[data-theme="dark"] body .hsearch{background:#141517}
+/* нижнее меню */
+#bnav{display:none}
+@media(max-width:759px){
+ #bnav{position:fixed;left:0;right:0;bottom:0;z-index:80;display:flex;background:#fff;border-top:1px solid #e6e6e6;padding:6px 0 calc(6px + env(safe-area-inset-bottom,0px))}
+ #bnav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;text-decoration:none;color:#8a8a8a;font:12px "PT Sans",Arial,sans-serif;position:relative}
+ #bnav svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+ #bnav a.on{color:#111}
+ #bnav #bnc{position:absolute;top:-2px;left:calc(50% + 6px);min-width:18px;height:18px;border-radius:9px;background:#E53935;color:#fff;font:700 11px/18px Arial;font-style:normal;display:none;align-items:center;justify-content:center;padding:0 4px}
+ html[data-theme="dark"] #bnav{background:#1B1B1D;border-top-color:#2c2c2e}
+ html[data-theme="dark"] #bnav a{color:#8f8f93}
+ html[data-theme="dark"] #bnav a.on{color:#fff}
+ body{padding-bottom:calc(68px + env(safe-area-inset-bottom,0px))}
+ body:not(.noBnav) #wafab{display:none!important}
+ body:not(.noBnav) #toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+ body.noBnav #bnav{display:none}
+ body.noBnav{padding-bottom:0}
+}
+@media(min-width:760px){.hsearch{display:none}}
+@media(max-width:759px){body:has(#plist) #app form.search{display:none}}
+html body .grid.rail.big .card.fl .flpr{padding-right:80px}
+</style>
 </head>
 <body>
 <div id="splash" aria-hidden="true"><b>MUSLIM SHOP</b><i></i><small>АТЫРАУ • РЫНОК ДИНА • БУТИК 24</small></div>
@@ -889,8 +975,25 @@ html body .grid.rail.big .card.v2 .cb{padding:14px 16px 16px}
   </div>
 </header>
 
+<form class="hsearch" data-form="search" role="search" id="hsearch"><input type="search" name="q" id="hq" placeholder="Поиск товаров" aria-label="Поиск" autocomplete="off"><button type="submit" aria-label="Найти"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></button></form>
 <div id="drawer"><div class="shade" data-act="closemenu"></div><nav id="drawernav"></nav></div>
 <main id="app" class="wrap"><noscript><section><h1>MUSLIM SHOP — Купить халяль товары и витамины iHerb в Атырау | Бутик №24</h1><p>В MUSLIM SHOP в Атырау вы можете купить оригинальные халяль-витамины iHerb, БАДы для мужского и женского здоровья, натуральный мёд и мусульманские ароматы. Мы находимся в г. Атырау, ТД «Дина Байзар», Бутик №24. Работаем ежедневно с 10:00 до 19:00. Быстрая доставка по городу Атырау и доставка по Казахстану.</p></section></noscript></main>
+<nav id="bnav" aria-label="Навигация">
+ <a href="#/" data-r="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span data-ru="Главная" data-kk="Басты">Главная</span></a>
+ <a href="#/catalog" data-r="catalog"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span data-ru="Каталог" data-kk="Каталог">Каталог</span></a>
+ <a href="#/cart" data-r="cart"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.5L21 8H6.2"/><circle cx="10" cy="20.5" r="1.3"/><circle cx="17" cy="20.5" r="1.3"/></svg><i id="bnc"></i><span data-ru="Корзина" data-kk="Себет">Корзина</span></a>
+ <a href="#/favorites" data-r="favorites"><svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3 5.5 6.3 5.5c2 0 3.7 1.1 5.7 3.3 2-2.2 3.7-3.3 5.7-3.3 3.3 0 5.1 3.1 3.8 6.3C19.5 16.4 12 21 12 21z"/></svg><span data-ru="Избранное" data-kk="Таңдаулы">Избранное</span></a>
+ <a href="#" data-r="wa" id="bnwa" target="_blank" rel="noopener"><svg viewBox="0 0 24 24"><path d="M4 20l1.3-4A8 8 0 1 1 8 18.7z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 .8a4 4 0 0 1-2-2l.8-1-1-2z"/></svg><span>WhatsApp</span></a>
+</nav>
+<script type="module">
+function bn(){const h=location.hash||'#/';const r=h.startsWith('#/catalog')?'catalog':h.startsWith('#/cart')?'cart':h.startsWith('#/favorites')?'favorites':(h==='#/'||h==='#'||h==='')?'home':'';
+ document.querySelectorAll('#bnav a').forEach(a=>a.classList.toggle('on',a.dataset.r===r));
+ const kk=(document.documentElement.lang||'').startsWith('kk');document.querySelectorAll('#bnav span[data-ru]').forEach(s=>s.textContent=kk?s.dataset.kk:s.dataset.ru);
+ const hq=document.getElementById('hq');if(hq){hq.placeholder=kk?'Тауар іздеу':'Поиск товаров';const m=h.match(/[?&]q=([^&]*)/);if(document.activeElement!==hq)hq.value=m?decodeURIComponent(m[1]):''}
+ document.body.classList.toggle('noBnav',h.startsWith('#/product')||h.startsWith('#/admin')||h.startsWith('#/checkout'));}
+addEventListener('hashchange',()=>setTimeout(bn,50));setTimeout(bn,300);setInterval(bn,1500);
+try{const w=document.getElementById('bnwa');w.href='https://wa.me/77781754241';}catch(e){}
+</script>
 <div id="foot"></div>
 <div id="toast" role="status"></div>
 
@@ -1674,6 +1777,7 @@ function updateBadge(){
   favBadge();
   const n=cart.reduce((s,i)=>s+i.q,0),b=$('#cartcount');
   b.textContent=n;b.style.display=n?'flex':'none';
+  const bb=document.getElementById('bnc');if(bb){bb.textContent=n;bb.style.display=n?'flex':'none'}
 }
 function addToCart(id,q=1){
   const p=prodById(id);if(!p||p.status!=='in')return;
@@ -1690,15 +1794,17 @@ const stockHtml=p=>p.status==='in'?`<div class="stock in">${t('in')}</div>`:`<di
 const priceHtml=p=>`<div class="price">${money(p.price)}${p.old>p.price?`<span class="old">${money(p.old)}</span>`:''}</div>`;
 const cleanName=s=>String(s||'').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu,'').replace(/\s{2,}/g,' ').trim()||String(s||'');
 function card(p){
-  return `<article class="card v2${p.status!=='in'?' is-out':''}">
+  const out=p.status!=='in',disc=p.old>p.price?Math.round((1-p.price/p.old)*100):0;
+  const href=`#/product/${esc(p.slug)}`;
+  return `<article class="card fl${out?' is-out':''}"><div class="flimg">
+    <a class="flph" href="${href}" aria-label="${esc(L(p.name))}">${p.img?`<img src="${esc(thSrc(p))}" alt="${esc(L(p.name))}" loading="lazy" decoding="async">`:`<span class="noimg">${esc((L(p.name)||'M').charAt(0).toUpperCase())}</span>`}</a>
     <button type="button" class="favbtn${favHas(p.id)?' on':''}" data-act="fav" data-id="${esc(p.id)}" aria-label="${t('fav_add')}" aria-pressed="${favHas(p.id)}">${HEART}</button>
-    <a href="#/product/${esc(p.slug)}" aria-label="${esc(L(p.name))}">${imgBox(p,'ph',1)}</a>
-    <div class="cb">
-      <a class="cn" href="#/product/${esc(p.slug)}">${esc(cleanName(L(p.name)))}</a>
-      ${priceHtml(p)}${stockHtml(p)}
-      <div class="row">
-        <button class="btn sm" data-act="add" data-id="${esc(p.id)}" ${p.status!=='in'?'disabled':''}>${p.status==='in'?'<svg class="cico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.5L21 8H6.2"/><circle cx="10" cy="20.5" r="1.3"/><circle cx="17" cy="20.5" r="1.3"/></svg>'+t('tocart'):t('out')}</button>
-      </div>
+    <button type="button" class="flcart" data-act="add" data-id="${esc(p.id)}" ${out?'disabled':''} aria-label="${t('tocart')}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.5L21 8H6.2"/><circle cx="10" cy="20.5" r="1.3"/><circle cx="17" cy="20.5" r="1.3"/></svg></button></div>
+    <div class="flb">
+      <div class="flpr"><b>${money(p.price)}</b>${disc?`<s>${money(p.old)}</s>`:''}</div>
+      ${(disc||p.isNew)?`<div class="flbd">${p.isNew?`<span class="bn">${t('new_')}</span>`:''}${disc?`<span class="bd">−${disc}%</span>`:''}</div>`:''}
+      <a class="flnm" href="${href}">${esc(cleanName(L(p.name)))}</a>
+      <div class="flst ${out?'out':'in'}">${out?t('out'):t('in')}</div>
     </div></article>`;
 }
 function searchBox(q=''){
@@ -1900,7 +2006,7 @@ function viewCatalog(q){
   return `<h1 style="margin-top:16px">${t('catalog')}</h1>
   ${searchBox(CQ.q)}
   <div class="chips" role="navigation" aria-label="${t('cats')}">${chips}</div>
-  <details class="filters-wrap" open><summary class="btn sm line" style="list-style:none;margin:8px 0">${t('filters')} / ${t('sort')}</summary>
+  <details class="filters-wrap"><summary class="btn sm line" style="list-style:none;margin:8px 0">${t('filters')} / ${t('sort')}</summary>
    <div class="filters" id="filters">
     <div><label for="f-sort">${t('sort')}</label><select id="f-sort" data-f="sort">
       <option value="pop">${t('s_pop')}</option><option value="asc">${t('s_asc')}</option><option value="desc">${t('s_desc')}</option><option value="new">${t('s_new')}</option></select></div>
