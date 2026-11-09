@@ -936,6 +936,30 @@ html[data-theme="dark"] body .card.fl{border-radius:16px;overflow:hidden}
 html[data-theme="dark"] .hsearch{background:#141517}
 html body:not([data-x]) .hsearch{background:var(--bg,#f4f2ee)}
 html[data-theme="dark"] body .hsearch{background:#141517}
+/* подсказки поиска */
+form[data-form="search"]{position:relative}
+.hsearch{position:sticky}
+.sgbox{display:none;position:absolute;left:0;right:0;top:100%;z-index:60;background:#fff;color:#111;border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.25);padding:8px;max-height:70vh;overflow:auto;margin-top:4px}
+.hsearch .sgbox{left:14px;right:14px}
+.sgbox.on{display:block}
+.sgt{font-size:13px;color:#777;padding:6px 8px}
+.sgt b{color:#111}
+.sgchips{display:flex;flex-wrap:wrap;gap:6px;padding:4px 6px 8px}
+.sgc{display:inline-block;padding:7px 12px;border-radius:18px;background:#F2F2F2;color:#111;text-decoration:none;font-size:14px;font-weight:700}
+.sgc.sgcat{background:#FFF4CC}
+.sgi{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;text-decoration:none;color:#111}
+.sgi:active,.sgi:hover{background:#F5F5F5}
+.sgi img,.sgimg{width:44px;height:44px;object-fit:cover;border-radius:8px;flex:none;background:#eee}
+.sgn{flex:1;min-width:0;font-size:14px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sgi b{font-size:14px;white-space:nowrap}
+.sgall{display:block;text-align:center;padding:12px;font-weight:800;color:#111;text-decoration:none;border-top:1px solid #eee;margin-top:4px}
+html[data-theme="dark"] .sgbox{background:#1E1E20;color:#eee}
+html[data-theme="dark"] .sgi,html[data-theme="dark"] .sgall{color:#eee}
+html[data-theme="dark"] .sgt b{color:#fff}
+html[data-theme="dark"] .sgi:hover,html[data-theme="dark"] .sgi:active{background:#2A2A2D}
+html[data-theme="dark"] .sgc{background:#2C2C2F;color:#eee}
+html[data-theme="dark"] .sgc.sgcat{background:#3A3220;color:#E3C285}
+html[data-theme="dark"] .sgall{border-top-color:#333}
 /* нижнее меню */
 #bnav{display:none}
 @media(max-width:759px){
@@ -2047,36 +2071,69 @@ function lev1(a,b,lim){
   for(let i=1;i<=m;i++){const cur=[i];let mn=i;for(let j=1;j<=n;j++){const v=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));cur[j]=v;if(v<mn)mn=v}if(mn>lim)return false;prev=cur}
   return prev[n]<=lim;
 }
+/* синонимы RU / KZ / EN: каждое слово ищется и по своим переводам */
+const SYN_RAW=[
+ ['витамин','дәрумен','vitamin','витамен'],['мед','медов','бал','honey'],['дет','балалар','балаға','kids','child'],
+ ['женщ','женск','әйел','women','woman','қыз'],['мужчин','мужск','ерлер','ер адам','men'],['волос','шаш','hair'],
+ ['кож','тері','skin'],['сон','ұйқы','sleep','бессон'],['стресс','күйзел','нерв','жүйке'],['иммун','immun','иммунитет'],
+ ['желез','темір','iron','гемоглоб'],['масло','май','oil'],['тмин','қара зере','қара сыйыр','nigella','black seed','qara'],
+ ['коллаген','collagen','колаген'],['омега','omega','рыбий жир','балық май','fish oil'],['похуд','арықта','салмақ','slim','diet','стройн','жиросжиг'],
+ ['сустав','буын','joint'],['сердц','жүрек','heart'],['памят','memory','зейін'],['кальци','calcium'],['магни','magnesium'],['цинк','zinc'],
+ ['кофе','coffee','кофі'],['чай','шай','tea'],['финик','құрма','date'],['четк','тәспі','тасбих'],['коран','құран','quran','koran'],
+ ['коврик','жайнамаз','намаз'],['дух','атыр','парфюм','иіс су','perfume','масляные духи'],['мисвак','misvak','miswak'],
+ ['зрени','көз','eye','vision'],['печен','бауыр','liver'],['беремен','жүкті','pregnan'],['энерг','күш','energy','сила'],
+ ['пробиот','probiot'],['биотин','biotin'],['хиджаб','орамал','hijab'],['мыло','сабын','soap'],['крем','cream'],['сироп','шәрбат','syrup'],
+ ['капсул','capsul'],['порош','ұнтақ','powder'],['кост','сүйек','bone'],['зуб','тіс','teeth'],['простуд','суық тию','cold']
+];
+const SYN=SYN_RAW.map(g=>g.map(w=>sNorm(w)).filter(Boolean));
+function synAlts(n){
+  const out=new Set();
+  for(const g of SYN){if(g.some(w=>w.length>=3?(n.startsWith(w)||(n.length>=4&&w.startsWith(n))):n===w))g.forEach(w=>{if(w!==n)out.add(w)})}
+  return [...out].slice(0,12).map(x=>({n:x,k:sKey(x)}));
+}
 function sTokens(q){
   let w=sNorm(q).split(' ').filter(Boolean);
   const f=w.filter(x=>x.length>=2||/\d/.test(x));if(f.length)w=f;
-  return w.map(x=>({n:x,k:sKey(x)})).filter(x=>x.n);
+  return w.map(x=>({n:x,k:sKey(x),alts:synAlts(x)})).filter(x=>x.n);
 }
 function sRun(list,q,o){
   const toks=sTokens(q);if(!toks.length)return list.slice();
   const out=[];
   for(const p of list){
     const ix=sIdx(p);let score=0,ok=true;
-    for(const t of toks){
+    for(const t0 of toks){
       let best=0;
-      if(t.n.length<2&&!/\d/.test(t.n)){if((' '+ix.name.n).includes(' '+t.n))score+=100;else{ok=false;break}continue}
-      const test=(f,pts,ws)=>{
-        if(f.n.includes(t.n)||(t.k&&f.k.includes(t.k))){best=Math.max(best,((' '+f.n).includes(' '+t.n)||(t.k&&(' '+f.k).includes(' '+t.k)))?pts+(ws||0):pts);return true}
-        return false;
-      };
-      if(!test(ix.name,100,50)&&!test(ix.sku,80,0)&&!test(ix.cat,40,0)&&!(o&&o.noDesc)&&!test(ix.desc,10,5)){
-        if(o&&o.fuzzy&&t.k.length>=4){
-          const lim=t.k.length>=7?2:1;
-          if(ix.name.k.split(' ').some(w=>w.length>=3&&lev1(t.k,w,lim)))best=Math.max(best,60);
+      if(t0.n.length<2&&!/\d/.test(t0.n)){if((' '+ix.name.n).includes(' '+t0.n))score+=100;else{ok=false;break}continue}
+      const vars=[t0].concat(t0.alts||[]);
+      for(let vi=0;vi<vars.length;vi++){
+        const t=vars[vi],k=vi?0.9:1;
+        const test=(f,pts,ws,strict)=>{
+          const sp=' '+f.n+' ';
+          if(vi||strict){
+            const hit=t.n.length<=3?sp.includes(' '+t.n+' '):sp.includes(' '+t.n);
+            if(hit){best=Math.max(best,(pts+(ws||0))*k);return true}
+            return false;
+          }
+          if(f.n.includes(t.n)){const v=(' '+f.n).includes(' '+t.n)?pts+(ws||0):pts;best=Math.max(best,v*k);return true}
+          if(t.k&&t.k.length>=3&&f.k.includes(t.k)){const v=(' '+f.k).includes(' '+t.k)?pts+(ws||0):pts;best=Math.max(best,v*k*0.7);return true}
+          return false;
+        };
+        if(!test(ix.name,100,50)&&!test(ix.sku,80,0)&&!test(ix.cat,40,0)&&!(o&&o.noDesc)&&!test(ix.desc,10,5,1)){
+          if(!vi&&o&&o.fuzzy&&t.k.length>=4){
+            const lim=t.k.length>=7?2:1;
+            if(ix.name.k.split(' ').some(w=>w.length>=3&&lev1(t.k,w,lim)))best=Math.max(best,60);
+          }
         }
       }
       if(!best){ok=false;break}
       score+=best;
     }
-    if(ok)out.push({p,score});
+    if(ok)out.push({p,score:score+(p.status==='in'?5:0)});
   }
   out.sort((a,b)=>b.score-a.score);
-  return out.map(x=>x.p);
+  const nt=toks.length;let res=out;
+  if(out.length&&out.filter(x=>x.score>=40*nt).length>=3)res=out.filter(x=>x.score>=30*nt);
+  return res.map(x=>x.p);
 }
 function searchRank(list,q,o){
   let r=sRun(list,q,o);
@@ -2088,6 +2145,37 @@ function searchRank(list,q,o){
   if(r.length)return {list:r,note:'~'};
   return {list:[],note:''};
 }
+/* ============ Подсказки в поиске ============ */
+const SGQ={ru:['Витамины','Коллаген','Омега-3','Масло тмина','Мёд','Для детей','Для волос','Сон'],kk:['Дәрумендер','Коллаген','Омега-3','Қара зере майы','Бал','Балаларға','Шашқа','Ұйқы']};
+function sgBox(inp){
+  const f=inp.closest('form');if(!f)return null;
+  let b=f.querySelector('.sgbox');if(!b){b=document.createElement('div');b.className='sgbox';b.setAttribute('role','listbox');f.appendChild(b)}
+  return b;
+}
+function sgHide(){document.querySelectorAll('.sgbox').forEach(b=>{b.classList.remove('on');b.innerHTML=''})}
+function sgShow(inp){
+  if(!DB.loaded)return;
+  const b=sgBox(inp);if(!b)return;
+  const q=inp.value.trim(),kk=lang==='kk';
+  let h='';
+  if(!q){
+    h=`<div class="sgt">${kk?'Жиі іздейді':'Часто ищут'}</div><div class="sgchips">${(kk?SGQ.kk:SGQ.ru).map(x=>`<a class="sgc" href="#/catalog?q=${encodeURIComponent(x)}">${esc(x)}</a>`).join('')}</div>`;
+  }else{
+    const r=searchRank(visible(),q,{noDesc:false});const list=r.list;
+    const cats=DB.cats.filter(c=>sRun([{name:c.name,sku:'',desc:{},specs:{},cat:''}],q,{noDesc:true}).length&&visible().some(p=>p.cat===c.id)).slice(0,3);
+    if(r.note&&r.note!=='~')h+=`<div class="sgt">${kk?'Мүмкін:':'Возможно, вы искали:'} <b>${esc(r.note)}</b></div>`;
+    if(cats.length)h+=`<div class="sgchips">${cats.map(c=>`<a class="sgc sgcat" href="#/catalog?cat=${esc(c.id)}">${esc(L(c.name))}</a>`).join('')}</div>`;
+    h+=list.slice(0,6).map(p=>`<a class="sgi" href="#/product/${esc(p.slug)}">${p.img?`<img src="${esc(thSrc(p))}" alt="" loading="lazy">`:'<span class="sgimg"></span>'}<span class="sgn">${esc(cleanName(L(p.name)))}</span><b>${money(p.price)}</b></a>`).join('');
+    h+=list.length?`<a class="sgall" href="#/catalog?q=${encodeURIComponent(q)}">${kk?'Барлық нәтиже':'Все результаты'} (${list.length}) ›</a>`:`<div class="sgt">${kk?'Ештеңе табылмады. WhatsApp-қа жазыңыз — табамыз!':'Ничего не нашли. Напишите в WhatsApp — найдём!'}</div>`;
+  }
+  b.innerHTML=h;b.classList.add('on');
+}
+document.addEventListener('focusin',e=>{const el=e.target;if(el&&el.matches&&el.matches('form[data-form="search"] input[name="q"]'))sgShow(el)});
+document.addEventListener('input',e=>{const el=e.target;if(el&&el.matches&&el.matches('form[data-form="search"] input[name="q"]')){clearTimeout(window.__sg);window.__sg=setTimeout(()=>sgShow(el),120)}});
+document.addEventListener('focusout',e=>{const el=e.target;if(el&&el.matches&&el.matches('form[data-form="search"] input[name="q"]'))setTimeout(()=>{if(!document.activeElement||!document.activeElement.closest('.sgbox'))sgHide()},200)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')sgHide()});
+addEventListener('hashchange',()=>{sgHide();const a=document.activeElement;if(a&&a.id==='hq')a.blur()});
+document.addEventListener('submit',e=>{if(e.target.closest&&e.target.closest('form[data-form="search"]')){sgHide();const i=e.target.querySelector('input');if(i)i.blur()}},true);
 function updateCatalog(){
   const s=$('#f-sort');if(s)s.value=CQ.sort;
   let arr=visible();
