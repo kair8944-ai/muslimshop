@@ -956,6 +956,14 @@ html[data-theme="dark"] body .hsearch{background:#141517}
 @media(min-width:760px){.hsearch{display:none}}
 @media(max-width:759px){body:has(#plist) #app form.search{display:none}}
 html body .grid.rail.big .card.fl .flpr{padding-right:80px}
+/* v2: фото на всю ширину без белых полей, карточка длиннее */
+html body .card.fl .flph,html[data-theme="dark"] body .card.fl .flph{aspect-ratio:3/4;background:transparent}
+html body .card.fl .flph img{object-fit:cover}
+html body .grid.rail.big .card.fl .flph{aspect-ratio:3/4;border-radius:20px 20px 0 0}
+html body .grid.rail.big .card.fl .flnm{-webkit-line-clamp:3}
+html body .card.fl .flnm{-webkit-line-clamp:3}
+html body .grid.rail.big .card.fl .flb{gap:10px;padding:18px 16px 22px}
+html body .grid.rail.big .card.fl .flcart{bottom:-30px}
 </style>
 </head>
 <body>
