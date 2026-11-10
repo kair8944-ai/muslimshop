@@ -1288,7 +1288,7 @@ function ghSeoFiles(dir,map){
       '<div class="stock'+(d.inStock===false?' out':'')+'">'+(d.inStock===false?'Нет в наличии':'В наличии')+'</div>'+
       '<a class="btn gold" href="'+SITE+'#/product/'+encodeURIComponent(id)+'">Открыть в магазине и добавить в корзину</a><a class="btn dark" href="'+esc(wa)+'">Заказать в WhatsApp</a>'+
       (d.description?'<h2>Описание</h2><div class="box">'+esc(String(d.description).trim())+'</div>':'')+
-      (d.specs?'<h2>Характеристики</h2><div class="box">'+esc(String(d.specs).trim())+'</div>':'')+'</article>'+foot;
+      (false&&d.specs?'<h2>Характеристики</h2><div class="box">'+esc(String(d.specs).trim())+'</div>':'')+'</article>'+foot;
     files.push({path:dir+'p/'+id+'.html',content:html});
     const lm=d.updatedAt&&d.updatedAt.seconds?new Date(d.updatedAt.seconds*1000).toISOString().slice(0,10):(d.createdAt&&d.createdAt.seconds?new Date(d.createdAt.seconds*1000).toISOString().slice(0,10):today);
     urls.push({loc:url,mod:lm});
@@ -2063,7 +2063,7 @@ function sIdx(p){
   if(p._sx)return p._sx;
   const cat=DB.cats.find(c=>c.id===p.cat);
   const mk=x=>({n:sNorm(x),k:sKey(x)});
-  return p._sx={name:mk((p.name.ru||'')+' '+(p.name.kk||'')),sku:mk(p.sku||''),cat:mk(cat?((cat.name.ru||'')+' '+(cat.name.kk||'')):''),desc:mk((p.desc.ru||'')+' '+(p.desc.kk||'')+' '+(p.specs.ru||'')+' '+(p.specs.kk||''))};
+  return p._sx={name:mk((p.name.ru||'')+' '+(p.name.kk||'')),sku:mk(p.sku||''),cat:mk(cat?((cat.name.ru||'')+' '+(cat.name.kk||'')):''),desc:mk((p.desc.ru||'')+' '+(p.desc.kk||''))};
 }
 function lev1(a,b,lim){
   if(Math.abs(a.length-b.length)>lim)return false;
@@ -2233,7 +2233,7 @@ function viewProduct(slug){
     </div>
   </section>
   ${desc?`<section id="descsec" style="padding-top:0;scroll-margin-top:84px"><h2>${t('desc')}</h2><div class="desc">${esc(desc)}</div></section>`:(p.lite&&(p.hasDesc||p.hasSp)?`<section style="padding-top:0"><div class="note">${FULLERR[p.id]?'Не удалось загрузить описание: '+esc(FULLERR[p.id]):'Загрузка описания…'}</div></section>`:'')}
-  ${rows.length?`<section style="padding-top:0"><h2>${t('specs')}</h2><table class="specs">${rows.map(r=>`<tr>${r[0]?`<td>${esc(r[0])}</td><td>${esc(r[1])}</td>`:`<td colspan="2">${esc(r[1])}</td>`}</tr>`).join('')}</table></section>`:''}
+  ${false&&rows.length?`<section style="padding-top:0"><h2>${t('specs')}</h2><table class="specs">${rows.map(r=>`<tr>${r[0]?`<td>${esc(r[0])}</td><td>${esc(r[1])}</td>`:`<td colspan="2">${esc(r[1])}</td>`}</tr>`).join('')}</table></section>`:''}
   <div class="spacer"></div>
   <div class="sticky-buy"><div>${priceHtml(p)}</div><button class="btn gold" data-act="padd" data-id="${esc(p.id)}" ${p.status!=='in'?'disabled':''}>${p.status==='in'?t('tocart'):t('out')}</button></div>`;
 }
@@ -2430,7 +2430,7 @@ async function buildLite(){
   await loadData();saveCache();render();toast('Лёгкий каталог готов: '+n);
 }
 let TR_OUT='';
-const needTr=()=>DB.products.filter(p=>!p.name.kk||(p.lite?((p.hasDesc&&!p.hasDescKz)||(p.hasSp&&!p.hasSpKz)):((p.desc.ru&&!p.desc.kk)||(p.specs.ru&&!p.specs.kk))));
+const needTr=()=>DB.products.filter(p=>!p.name.kk||(p.lite?(p.hasDesc&&!p.hasDescKz):(p.desc.ru&&!p.desc.kk)));
 async function trSave(){
   const raw=(($('#trin')||{}).value||'').trim().replace(/^```(?:json)?\s*|\s*```$/g,'');
   let arr;try{arr=JSON.parse(raw)}catch(e){toast('Не удалось прочитать перевод');return}
@@ -2653,8 +2653,6 @@ function adminForm(p){
    <div><label for="f-sku">Артикул</label><input id="f-sku" name="sku" value="${esc(p.sku||'')}"></div>
    <div><label for="f-dr">Описание (RU)</label><textarea id="f-dr" name="dr">${esc(p.desc.ru||'')}</textarea></div>
    <div><label for="f-dk">Описание (KZ), по желанию</label><textarea id="f-dk" name="dk">${esc(p.desc.kk||'')}</textarea></div>
-   <div><label for="f-sr">Характеристики (RU): по строке, «Название: значение»</label><textarea id="f-sr" name="sr">${esc(p.specs.ru||'')}</textarea></div>
-   <div><label for="f-sk">Характеристики (KZ), по желанию</label><textarea id="f-sk" name="sk">${esc(p.specs.kk||'')}</textarea></div>
    <div class="checks"><label><input type="checkbox" name="isNew" ${p.isNew?'checked':''}> Новинка</label><label><input type="checkbox" name="popular" ${p.popular?'checked':''}> Популярный</label><label><input type="checkbox" name="featured" ${p.featured?'checked':''}> Рекомендуемый</label></div>
    <button class="btn gold block" type="submit">СОХРАНИТЬ</button>
    <button class="btn line block" type="button" data-act="acancel">Отмена</button>
@@ -3043,7 +3041,7 @@ async function handleForm2(f){
     p.name={ru:String(fd.get('nr')).trim(),kk:String(fd.get('nk')).trim()};
     p.cat=String(fd.get('cat')||'');p.price=Number(fd.get('price'))||0;p.old=Number(fd.get('old'))||0;
     p.status=fd.get('status');p.qty=Number(fd.get('qty'))||0;p.sku=String(fd.get('sku')).trim();
-    p.desc={ru:String(fd.get('dr')),kk:String(fd.get('dk'))};p.specs={ru:String(fd.get('sr')),kk:String(fd.get('sk'))};
+    p.desc={ru:String(fd.get('dr')),kk:String(fd.get('dk'))};p.specs=p.specs||{ru:'',kk:''};
     p.isNew=fd.get('isNew')?1:0;p.popular=fd.get('popular')?1:0;p.featured=fd.get('featured')?1:0;
     if(!p.name.ru){toast('Укажите название товара');return}
     if(p.price<=0){toast('Укажите цену товара');return}
@@ -4148,7 +4146,7 @@ function tgParts(p,carded,level){
   if(site){
     d=d.trim();
     const sp=String(p.specs&&p.specs.ru||'').replace(/\r/g,'').trim();
-    if(sp)d+=(d?'\n\n':'')+'Характеристики:\n'+sp;
+
   }
   else if(level==='full')d=d.replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
   else if(level==='mid'){d=d.replace(/\s+/g,' ').trim();if(d.length>220)d=d.slice(0,220).replace(/\s+\S*$/,'')+'…'}
