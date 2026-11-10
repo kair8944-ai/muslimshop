@@ -2711,7 +2711,10 @@ function parse(){
   return {path,q};
 }
 function render(){try{renderInner()}catch(e){console.error(e);window.dispatchEvent(new ErrorEvent('error',{message:'экран не отрисовался: '+(e&&e.message||e)}))}}
-let RESTORE_Y=null,__ru=0,__sv=0;
+let RESTORE_Y=null,__ru=0,__sv=0,RESTORE_RX=null,LAST_RH=null,NAV_FLAG=false,ADM_LIST_Y=0,PREV_H=null;
+try{const s0=history.state;if(s0&&typeof s0.y==='number'&&s0.y>0){RESTORE_Y=s0.y;RESTORE_RX=s0.rx||null}}catch(e){}
+const railsX=()=>[...document.querySelectorAll('#app .grid.rail')].map(r=>Math.round(r.scrollLeft));
+function applyRX(rx){if(!rx||!rx.length)return;let n=0;const f=()=>{const rs=document.querySelectorAll('#app .grid.rail');rs.forEach((r,i)=>{if(rx[i]!=null)r.scrollLeft=rx[i]});if(++n<6)setTimeout(f,150)};f()}
 function restoreY(y){
   const id=++__ru;let n=0,ok=0,stop=false;
   const de=document.documentElement;de.style.overflowAnchor='none';
@@ -2726,7 +2729,7 @@ function restoreY(y){
   go();
 }
 try{history.scrollRestoration='manual'}catch(e){}
-window.addEventListener('scroll',()=>{clearTimeout(__sv);__sv=setTimeout(()=>{try{const y=Math.round(window.scrollY),st=history.state||{};if(st.y!==y)history.replaceState(Object.assign({},st,{y}),'')}catch(e){}},120)},{passive:true});
+window.addEventListener('scroll',()=>{clearTimeout(__sv);__sv=setTimeout(()=>{try{const y=Math.round(window.scrollY),st=history.state||{};history.replaceState(Object.assign({},st,{y,rx:railsX()}),'')}catch(e){}},120)},{passive:true});
 const catUrl=()=>{const p=[];if(CQ.cat)p.push('cat='+encodeURIComponent(CQ.cat));if(CQ.q)p.push('q='+encodeURIComponent(CQ.q));if(CQ.sort&&CQ.sort!=='pop')p.push('sort='+CQ.sort);if(CQ.min!==''&&CQ.min!=null)p.push('min='+encodeURIComponent(CQ.min));if(CQ.max!==''&&CQ.max!=null)p.push('max='+encodeURIComponent(CQ.max));if(CQ.stock)p.push('stock=1');if(CQ.neu)p.push('neu=1');if(CQ.pop)p.push('pop=1');return '#/catalog'+(p.length?'?'+p.join('&'):'')};
 const saveCatUrl=()=>{try{history.replaceState(history.state,'',catUrl())}catch(e){}};
 let ADM_PUSHED=0,ADM_IGN=0,ADM_FORCE=false,EDIT_DIRTY=false,LAST_Y=0;
@@ -2744,7 +2747,7 @@ function admSync(){
 function admCloseTop(){
   if(editing)editing=null;else if(catEditing)catEditing=null;else if(adminView!=='products')adminView='products';
   EDIT_DIRTY=false;
-  const st=history.state;RESTORE_Y=(st&&typeof st.y==='number'&&st.y>0)?st.y:null;
+  const st=history.state;RESTORE_Y=(st&&typeof st.y==='number'&&st.y>0)?st.y:(ADM_LIST_Y||null);
   render();
 }
 const ADM_ASK='Выйти без сохранения? Изменения в этой карточке пропадут.';
@@ -2778,8 +2781,9 @@ function renderInner(){
   else html=viewHome();
   app.innerHTML=html;if(after)after();
   renderChrome();ymHit();try{statHit()}catch(e){}
-  const ry=RESTORE_Y;RESTORE_Y=null;
-  if(!keep&&!(path==='/admin'&&editing)){if(ry!=null)restoreY(ry);else window.scrollTo(0,0)}
+  const ry=RESTORE_Y,rrx=RESTORE_RX;RESTORE_Y=null;RESTORE_RX=null;
+  const rh=location.hash||'#/',same=(rh===LAST_RH&&!NAV_FLAG);NAV_FLAG=false;LAST_RH=rh;
+  if(!keep&&!(path==='/admin'&&editing)){if(ry!=null){restoreY(ry);applyRX(rrx)}else if(!same)window.scrollTo(0,0)}
   if(!keep&&ry==null&&q.go==='desc'&&path.startsWith('/product/')){
     const go=()=>{const e=document.getElementById('descsec')||document.querySelector('table.specs');if(!e)return null;const y=Math.max(0,Math.round(e.getBoundingClientRect().top+window.scrollY-84));window.scrollTo(0,y);return y};
     requestAnimationFrame(()=>{const y=go();if(y!=null)setTimeout(()=>{if(Math.abs(window.scrollY-y)<6)go()},450)});
@@ -2804,14 +2808,17 @@ function renderChrome(){
   updateBadge();
   try{waFab()}catch(e){}
 }
-window.addEventListener('hashchange',()=>{ROUTE=null;closeMenu();const st=history.state;RESTORE_Y=(st&&typeof st.y==='number'&&st.y>0)?st.y:null;render()});
+window.addEventListener('hashchange',()=>{ROUTE=null;closeMenu();NAV_FLAG=true;PREV_H=null;const st=history.state;RESTORE_Y=(st&&typeof st.y==='number'&&st.y>0)?st.y:null;RESTORE_RX=st&&st.rx||null;render()});
 /* внутренние ссылки обрабатываем сами: в окнах предпросмотра (iframe) обычный переход по #-ссылке ломает страницу */
 document.addEventListener('click',e=>{
   const a=e.target.closest('a[href^="#/"]');
   if(!a||a.dataset.act==='goto'||e.defaultPrevented)return;
   e.preventDefault();closeMenu();
-  const h=a.getAttribute('href');ROUTE=h.slice(1);
-  try{history.replaceState(Object.assign({},history.state||{},{y:Math.round(window.scrollY)}),'')}catch(x){}
+  const h=a.getAttribute('href');
+  if(PREV_H&&h===PREV_H&&!a.closest('#bnav')){try{history.back();return}catch(x){}}
+  ROUTE=h.slice(1);NAV_FLAG=true;
+  try{history.replaceState(Object.assign({},history.state||{},{y:Math.round(window.scrollY),rx:railsX()}),'')}catch(x){}
+  PREV_H=location.hash||'#/';
   try{history.pushState({n:1},'',h)}catch(x){try{location.hash=h}catch(y){}}
   render();
 });
@@ -2945,14 +2952,14 @@ document.addEventListener('click',e=>{
       }).catch(err=>showFail(fbErrText(err),'Категория не сохранена'));
       break}
     case 'acat-new':catEditing={_new:1,id:'',main:0,name:{ru:'',kk:''}};EDIT_DIRTY=false;render();window.scrollTo(0,0);break;
-    case 'acat-edit':{const c=DB.cats.find(x=>x.id===id);if(c){catEditing=JSON.parse(JSON.stringify(c));EDIT_DIRTY=false;render();window.scrollTo(0,0)}break}
+    case 'acat-edit':{ADM_LIST_Y=LAST_Y;const c=DB.cats.find(x=>x.id===id);if(c){catEditing=JSON.parse(JSON.stringify(c));EDIT_DIRTY=false;render();window.scrollTo(0,0)}break}
     case 'acat-cancel':admExit();break;
     case 'acat-up':moveCat(id,-1).then(render).catch(err=>showFail(fbErrText(err),'Не удалось переставить'));break;
     case 'acat-down':moveCat(id,1).then(render).catch(err=>showFail(fbErrText(err),'Не удалось переставить'));break;
     case 'acat-del':askDeleteCat(id);break;
     case 'acat-import':importCats().catch(err=>showFail(fbErrText(err),'Не удалось скопировать'));break;
     case 'anew':editing=blankProduct();EDIT_DIRTY=false;render();break;
-    case 'aedit':{toast('Открываю…');getFull(id).then(p=>{editing=JSON.parse(JSON.stringify(p));EDIT_DIRTY=false;render()}).catch(err=>toast('Ошибка: '+(err&&err.message||err)));break}
+    case 'aedit':{ADM_LIST_Y=LAST_Y;toast('Открываю…');getFull(id).then(p=>{editing=JSON.parse(JSON.stringify(p));EDIT_DIRTY=false;render()}).catch(err=>toast('Ошибка: '+(err&&err.message||err)));break}
     case 'acancel':admExit();break;
     case 'ahide':setHidden(id).catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'asel-demo':DB.products.filter(isDemo).forEach(p=>SEL.add(p.id));render();toast('Отмечено демо-товаров: '+DB.products.filter(isDemo).length);break;
@@ -3023,7 +3030,7 @@ async function handleForm2(f){
     const isNew=!!c._new;
     try{
       await saveCategory(c,nr,nk,mn);try{await touchMeta()}catch(e){}
-      catEditing=null;render();window.scrollTo(0,0);
+      catEditing=null;render();if(isNew)window.scrollTo(0,0);else restoreY(ADM_LIST_Y);
       openDone('<div class="doneico"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><h2>'+(isNew?'Категория добавлена':'Категория сохранена')+'</h2><p class="donename">'+esc(nr)+'</p><div class="doneacts"><button class="btn gold block" type="button" data-done="close">Готово</button></div>','');
     }catch(err){
       if(btn){btn.disabled=false;btn.textContent=lbl||'СОХРАНИТЬ'}
@@ -3058,7 +3065,7 @@ async function handleForm2(f){
       if(!warn){try{await touchMeta()}catch(e){}}
       delete FULLC[sid];delete FULLERR[sid];
       localPut(sid,p,rec);
-      editing=null;render();window.scrollTo(0,0);
+      editing=null;render();if(isNew)window.scrollTo(0,0);else restoreY(ADM_LIST_Y);
       showDone({isNew,p,sid,warn});
     }catch(err){
       if(btn){btn.disabled=false;btn.textContent=lbl||'СОХРАНИТЬ'}
