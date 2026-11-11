@@ -1241,7 +1241,7 @@ function ghCatalogObj(imgPath){
   return {v:4,updated:new Date().toISOString(),thumbs:(GH.thumbs||[]),categories:cats,products:prods};
 }
 function thRel(rel){const m=/^img\/([^\/]+)\.(jpe?g|png|webp|gif)$/i.exec(String(rel||''));return m?'img/t/'+m[1]+'.jpg':''}
-const makeTh=src=>new Promise(res=>{const im=new Image();let done=false;const f=v=>{if(!done){done=true;res(v)}};im.onload=()=>{try{const W=360,sc=W/im.naturalWidth,H=Math.round(im.naturalHeight*sc);const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,W,H);x.imageSmoothingQuality='high';x.drawImage(im,0,0,W,H);f(c.toDataURL('image/jpeg',0.82).split(',')[1])}catch(e){f(null)}};im.onerror=()=>f(null);setTimeout(()=>f(null),20000);im.src=src});
+const makeTh=src=>new Promise(res=>{const im=new Image();let done=false;const f=v=>{if(!done){done=true;res(v)}};im.onload=()=>{try{const W=360,sc=W/im.naturalWidth,H=Math.round(im.naturalHeight*sc);const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,W,H);x.imageSmoothingQuality='high';x.drawImage(im,0,0,W,H);f(c.toDataURL('image/jpeg',0.82).split(',')[1])}catch(e){f(null)}};im.onerror=()=>f(null);setTimeout(()=>f(null),20000);im.src=(typeof src==='string'&&!src.startsWith('data:'))?src+(src.includes('?')?'&':'?')+'nc='+Date.now():src});
 const imgOk=src=>new Promise(res=>{if(!src||typeof src!=='string'){res(false);return}const im=new Image();let done=false;const f=v=>{if(!done){done=true;res(v)}};im.onload=()=>f(im.naturalWidth>0);im.onerror=()=>f(false);setTimeout(()=>f(false),12000);im.src=src});
 async function ghDataFile(s){
   const m=/^data:([^;,]+)([^,]*),([\s\S]*)$/.exec(s);if(!m)return null;
@@ -2622,6 +2622,7 @@ document.addEventListener('change',e=>{if(e.target&&e.target.id==='admcat'){admi
 function adminList(){
   return `<button class="btn gold block" data-act="anew" style="margin-bottom:12px">+ ДОБАВИТЬ ТОВАР</button>
   <button class="btn line block" data-act="acats" style="margin-bottom:12px">Категории (${DB.cats.length})</button>
+  <button class="btn line block" data-act="athreset" style="margin-bottom:12px">🔄 Обновить лёгкие фото${SEL.size?' (выбрано: '+SEL.size+')':''}</button>
   <button class="btn line block" data-act="astats" style="margin-bottom:12px">📊 Товары и посещения</button>
   <button class="btn line block" data-act="gh-publish" style="margin-bottom:12px">🔍 Опубликовать и обновить страницы для поиска</button>
   ${faPanel()}
@@ -2891,6 +2892,12 @@ document.addEventListener('click',e=>{
     case 'gh-publish':ghPublish();break;
     case 'gh-dl':ghDownload();break;
     case 'alogout':signOut(fauth).then(()=>{editing=null;catEditing=null;adminView='products';render()});break;
+    case 'athreset':{if(!GH.cols||!GH.cols.products){toast('Каталог ещё загружается, попробуйте через минуту');break}
+      const sel=SEL.size?[...SEL]:null;const ids=Object.keys(GH.cols.products).filter(k=>!sel||sel.includes(k));
+      if(!confirm(sel?('Пересоздать лёгкие фото для выбранных товаров ('+ids.length+')?'):('Пересоздать лёгкие фото для всех товаров ('+ids.length+')?\nНужно, если вы заменили фото на GitHub. Лучше по Wi-Fi.')))break;
+      const drop=new Set(ids.map(k=>thRel((GH.cols.products[k].images||[])[0])).filter(Boolean));
+      GH.thumbs=(GH.thumbs||[]).filter(t=>!drop.has(t));try{localStorage.removeItem('ms_thfail')}catch(e){}
+      GH.thNeed=drop.size;ghBar();toast('Готово. Нажмите «Опубликовать» внизу');break}
     case 'acats':adminView='cats';catEditing=null;render();window.scrollTo(0,0);break;
     case 'acats-back':admExit();break;
     case 'astats':adminView='stats';render();window.scrollTo(0,0);stLoad();break;
