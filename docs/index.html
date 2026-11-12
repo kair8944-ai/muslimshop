@@ -3882,12 +3882,12 @@ function vdAutoPal(im,fallback){
   }catch(e){return fallback}
 }
 /* карточка товара: белая плашка со скруглением и мягкой тенью, рисуется один раз */
-const VD_CARD={single:[720,760],set:[700,760]};
+const VD_CARD={single:[720,760],set:[700,760],big:[900,1200]};
 function vdSprite(im,box,pal){
   const src=vdTrim(im),[cw,ch]=box,pad=70,cv=document.createElement('canvas');cv.width=cw+pad*2;cv.height=ch+pad*2+40;
   const c=cv.getContext('2d');c.imageSmoothingQuality='high';const R=40;
   c.save();c.shadowColor=pal.light?'rgba(0,0,0,.16)':'rgba(0,0,0,.42)';c.shadowBlur=pal.light?34:46;c.shadowOffsetY=16;c.fillStyle='#fff';sgRR(c,pad,pad,cw,ch,R);c.fill();c.restore();
-  const ip=Math.round(Math.min(cw,ch)*.07),sc=Math.min((cw-ip*2)/src.width,(ch-ip*2)/src.height),dw=Math.round(src.width*sc),dh=Math.round(src.height*sc);
+  const ip=cw>=880?0:Math.round(Math.min(cw,ch)*.07),sc=Math.min((cw-ip*2)/src.width,(ch-ip*2)/src.height),dw=Math.round(src.width*sc),dh=Math.round(src.height*sc);
   c.save();sgRR(c,pad,pad,cw,ch,R);c.clip();c.drawImage(sgScale(src,dw,dh),pad+(cw-dw)/2,pad+(ch-dh)/2,dw,dh);c.restore();
   c.strokeStyle=pal.light?'rgba(0,0,0,.08)':pal.acc;c.lineWidth=pal.light?2:4;sgRR(c,pad,pad,cw,ch,R);c.stroke();
   return {cv,dw:cw,dh:ch,pad,R};
@@ -3901,7 +3901,7 @@ async function vdAssets(){
   const main=await sgLoad(srcs[sel[0]]||srcs[0]);
   const base=VD_PALS[VD_TPLPAL[tpl]]||VD_PALS.emerald;
   const pal=VD.col==='auto'?vdAutoPal(main,base):VD.col==='tpl'?base:(VD_PALS[VD.col]||base);
-  const box=tpl==='set'?VD_CARD.set:VD_CARD.single;
+  const box=tpl==='set'?(VD.multi?VD_CARD.big:VD_CARD.set):VD_CARD.single;
   const items=[{p,spr:vdSprite(main,box,pal)}];
   const slides=[items[0].spr];
   if(tpl!=='set'){for(const i of sel.slice(1,5)){try{slides.push(vdSprite(await sgLoad(srcs[i]),box,pal))}catch(e){}}}
@@ -3919,7 +3919,7 @@ async function vdAssets(){
   let dur=tpl==='set'?items.length*(VD.multi?3:2.6)+3.2:Math.max(8,Math.min(15,VD.dur||12));
   if(tpl!=='set'&&slides.length>1)dur=Math.max(dur,Math.min(15,1.3+slides.length*2.2+5));
   const T=VD_T[lang],badge=(String(VD.badge||'').trim()||T[tpl]).toUpperCase();
-  return {seg:(tpl==='set'&&VD.multi)?3:2.6,o:Object.assign({},VD.opt),p,tpl,lang,pal,logo,items,slides,parts,old,dur,end:dur-3,pts:VD.pts.map(x=>String(x||'').trim()).filter(Boolean).slice(0,3),showPrice:VD.price&&p.price>0,T,badge:VD_EMO[tpl]+' '+badge,
+  return {big:tpl==='set'&&!!VD.multi,seg:(tpl==='set'&&VD.multi)?3:2.6,o:Object.assign({},VD.opt),p,tpl,lang,pal,logo,items,slides,parts,old,dur,end:dur-3,pts:VD.pts.map(x=>String(x||'').trim()).filter(Boolean).slice(0,3),showPrice:VD.price&&p.price>0,T,badge:VD_EMO[tpl]+' '+badge,
     cat:VD.multi?'':(()=>{const o=(DB.cats.find(x=>x.id===p.cat)||{}).name;return o?String((lang==='kk'&&o.kk)||o.ru||o.kk||'').toUpperCase():''})()};
 }
 const VD_SERIF='"Playfair Display",Georgia,"Times New Roman",serif',VD_SANS='"PT Sans","Segoe UI",Arial,sans-serif';
@@ -3999,10 +3999,10 @@ function vdFrame(c,A,t){
       const G=A.seg||2.6,s0=.3+i*G,kin=vdEo(vdPr(t,s0,s0+.55)),kout=i===A.items.length-1?0:vdEo(vdPr(t,s0+G-.45,s0+G));
       if(kin<=0||kout>=1)return;const ox=(1-kin)*1100-kout*1100;
       c.save();c.translate(ox,0);
-      vdDrawSpr(c,it.spr,540,740+Math.sin(t*2)*8,1,1,t);
-      c.fillStyle=P.txt;const N=vdNameLines(c,vdName(it.p,A.lang),860,60);N.l.forEach((l,j)=>c.fillText(l,540,1290+j*N.f*1.18));
-      if(A.showPrice&&it.p.price>0)vdPill(c,money(it.p.price),540,1290+N.l.length*N.f*1.18+10,'700 76px '+VD_SANS,P.acc,P.accTxt,60,116);
-      c.fillStyle=P.sub;c.font='700 34px '+VD_SANS;c.fillText((i+1)+' / '+A.items.length,540,1700);
+      const BG=A.big,ny=BG?1520:1290;vdDrawSpr(c,it.spr,540,(BG?842:740)+Math.sin(t*2)*(BG?5:8),1,1,t);
+      c.fillStyle=P.txt;const N=vdNameLines(c,vdName(it.p,A.lang),BG?960:860,BG?54:60);N.l.forEach((l,j)=>c.fillText(l,540,ny+j*N.f*1.18));
+      if(A.showPrice&&it.p.price>0)vdPill(c,money(it.p.price),540,ny+N.l.length*N.f*1.18-(BG?18:-10),BG?'700 64px '+VD_SANS:'700 76px '+VD_SANS,P.acc,P.accTxt,BG?50:60,BG?98:116);
+      c.fillStyle=P.sub;c.font='700 34px '+VD_SANS;c.fillText((i+1)+' / '+A.items.length,540,BG?1830:1700);
       c.restore();
     });
     vdEnd(c,A,t);return;
