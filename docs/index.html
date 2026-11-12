@@ -2160,8 +2160,9 @@ function sgBox(inp){
   return b;
 }
 function sgHide(){document.querySelectorAll('.sgbox').forEach(b=>{b.classList.remove('on');b.innerHTML=''})}
+let SG_OFF=0;
 function sgShow(inp){
-  if(!DB.loaded)return;
+  if(!DB.loaded||SG_OFF||document.activeElement!==inp||!inp.isConnected)return;
   const b=sgBox(inp);if(!b)return;
   const q=inp.value.trim(),kk=lang==='kk';
   let h='';
@@ -2181,6 +2182,12 @@ document.addEventListener('focusin',e=>{const el=e.target;if(el&&el.matches&&el.
 document.addEventListener('input',e=>{const el=e.target;if(el&&el.matches&&el.matches('form[data-form="search"] input[name="q"]')){clearTimeout(window.__sg);window.__sg=setTimeout(()=>sgShow(el),120)}});
 document.addEventListener('focusout',e=>{const el=e.target;if(el&&el.matches&&el.matches('form[data-form="search"] input[name="q"]'))setTimeout(()=>{if(!document.activeElement||!document.activeElement.closest('.sgbox'))sgHide()},200)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')sgHide()});
+document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('.sgbox a');if(!a)return;e.preventDefault();e.stopPropagation();clearTimeout(window.__sg);SG_OFF=1;sgHide();
+  const i=document.querySelector('form[data-form="search"] input[name="q"]:focus')||document.activeElement;if(i&&i.blur)i.blur();
+  const h=a.getAttribute('href');try{history.replaceState(Object.assign({},history.state||{},{y:window.scrollY}),'')}catch(_){}
+  if(location.hash===h)render();else location.hash=h;
+  const top=()=>{sgHide();window.scrollTo({top:0,left:0,behavior:'instant'})};requestAnimationFrame(top);setTimeout(top,250);setTimeout(()=>{top();SG_OFF=0},600)},true);
+document.addEventListener('pointerdown',e=>{if(e.target.closest&&e.target.closest('.sgbox'))e.preventDefault()},true);
 addEventListener('hashchange',()=>{sgHide();const a=document.activeElement;if(a&&a.id==='hq')a.blur()});
 document.addEventListener('submit',e=>{if(e.target.closest&&e.target.closest('form[data-form="search"]')){sgHide();const i=e.target.querySelector('input');if(i)i.blur()}},true);
 function updateCatalog(){
