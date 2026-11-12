@@ -996,6 +996,39 @@ html body .card.fl .flnm{-webkit-line-clamp:3}
 html body .grid.rail.big .card.fl .flb{gap:10px;padding:18px 16px 22px}
 html body .grid.rail.big .card.fl .flcart{bottom:-30px}
 </style>
+<style id="pvcss">
+/* ===== Карточка товара поверх списка + фото на весь экран ===== */
+#pv{position:fixed;inset:0;z-index:90;background:var(--bg,#FAF8F4);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+#pv.pvan{animation:pvUp .38s cubic-bezier(.2,.85,.25,1) both}
+#pv.pvout{animation:pvDown .28s cubic-bezier(.5,0,.75,0) both;pointer-events:none}
+@keyframes pvUp{from{transform:translate3d(0,100%,0)}to{transform:none}}
+@keyframes pvDown{from{transform:none}to{transform:translate3d(0,100%,0)}}
+#pvdim{position:fixed;inset:0;z-index:89;background:#000;opacity:0;pointer-events:none;transition:opacity .3s}
+body.pvOn #pvdim{opacity:.35}
+.pvbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:10px;padding:6px 8px;padding-top:calc(6px + env(safe-area-inset-top,0px));background:rgba(250,248,244,.9);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid var(--line,#e8e4dc)}
+.pvback{display:flex;align-items:center;gap:2px;border:0;background:none;font:inherit;font-weight:700;color:inherit;padding:10px 12px 10px 6px;border-radius:12px;cursor:pointer}
+.pvback svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.pvt{margin-left:auto;margin-right:10px;font-weight:800;letter-spacing:.08em;font-size:14px;opacity:.65}
+#pv .pvin{padding-bottom:24px}
+#pv .crumbs{display:none}
+html[data-theme="dark"] .pvbar{background:rgba(25,23,21,.88);border-bottom-color:#2c2a26}
+.pp .ph{cursor:zoom-in}
+#lb{position:fixed;inset:0;z-index:200;touch-action:none;-webkit-user-select:none;user-select:none}
+#lb .lbbg{position:absolute;inset:0;background:#000;opacity:0;transition:opacity .3s}
+#lb.on .lbbg{opacity:1}
+#lb .lbtrack{position:absolute;inset:0;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;touch-action:pan-x;overscroll-behavior:contain}
+#lb .lbtrack::-webkit-scrollbar{display:none}
+#lb .lbs{flex:0 0 100%;height:100%;scroll-snap-align:center;scroll-snap-stop:always;background:center/contain no-repeat}
+#lb .lbs img{display:block;width:100%;height:100%;object-fit:contain}
+#lb.fly .lbtrack{opacity:0}
+#lb .lbfly{position:fixed;transform-origin:0 0;object-fit:cover;z-index:2;margin:0;max-width:none}
+#lb .lbx{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));right:12px;width:46px;height:46px;border-radius:50%;border:0;background:rgba(255,255,255,.18);color:#fff;font-size:30px;line-height:46px;padding:0;z-index:3;opacity:0;transition:opacity .3s;cursor:pointer}
+#lb .lbn{position:absolute;top:calc(22px + env(safe-area-inset-top,0px));left:0;right:0;text-align:center;color:#fff;font-weight:700;font-size:15px;z-index:3;opacity:0;transition:opacity .3s;pointer-events:none}
+#lb .lbmore{position:absolute;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:3;border:0;border-radius:999px;padding:14px 24px;font:inherit;font-weight:700;background:var(--gold,#c9a24a);color:#111;box-shadow:0 8px 24px rgba(0,0,0,.35);white-space:nowrap;opacity:0;transition:opacity .3s;cursor:pointer}
+#lb.on .lbx,#lb.on .lbn,#lb.on .lbmore{opacity:1}
+#lb.out .lbtrack,#lb.out .lbx,#lb.out .lbn,#lb.out .lbmore{opacity:0;transition:opacity .2s}
+@media (prefers-reduced-motion:reduce){#pv.pvan,#pv.pvout{animation-duration:.01s}}
+</style>
 </head>
 <body>
 <div id="splash" aria-hidden="true"><b>MUSLIM SHOP</b><i></i><small>АТЫРАУ • РЫНОК ДИНА • БУТИК 24</small></div>
@@ -1029,7 +1062,7 @@ function bn(){const h=location.hash||'#/';const r=h.startsWith('#/catalog')?'cat
  document.querySelectorAll('#bnav a').forEach(a=>a.classList.toggle('on',a.dataset.r===r));
  const kk=(document.documentElement.lang||'').startsWith('kk');document.querySelectorAll('#bnav span[data-ru]').forEach(s=>s.textContent=kk?s.dataset.kk:s.dataset.ru);
  const hq=document.getElementById('hq');if(hq){hq.placeholder=kk?'Тауар іздеу':'Поиск товаров';const m=h.match(/[?&]q=([^&]*)/);if(document.activeElement!==hq)hq.value=m?decodeURIComponent(m[1]):''}
- document.body.classList.toggle('noBnav',h.startsWith('#/product')||h.startsWith('#/admin')||h.startsWith('#/checkout'));}
+ document.body.classList.toggle('noBnav',(h.startsWith('#/product')&&!document.body.classList.contains('pvOn'))||h.startsWith('#/admin')||h.startsWith('#/checkout'));}
 addEventListener('hashchange',()=>setTimeout(bn,50));setTimeout(bn,300);setInterval(bn,1500);
 try{const w=document.getElementById('bnwa');w.href='https://wa.me/77781754241';}catch(e){}
 </script>
@@ -2777,11 +2810,114 @@ window.addEventListener('popstate',()=>{
   }
 });
 document.addEventListener('click',()=>{LAST_Y=window.scrollY},true);
+/* ===== Карточка товара поверх списка (список не перерисовывается, место сохраняется) ===== */
+const PV={open:false,base:null};
+const pvCan=()=>DB.loaded&&!PV.open&&LAST_RH&&!/^#\/(product\/|admin)/.test(LAST_RH)&&!!$('#app')&&$('#app').children.length>0;
+function pvDim(){let d=document.getElementById('pvdim');if(!d){d=document.createElement('div');d.id='pvdim';document.body.appendChild(d)}return d}
+function pvRender(path,q){
+  const html=viewProduct(safeDec(path.slice(9)));
+  let el=document.getElementById('pv');const first=!PV.open||!el;
+  if(first){
+    if(el)el.remove();
+    pvDim();
+    el=document.createElement('div');el.id='pv';el.setAttribute('role','dialog');el.setAttribute('aria-modal','true');
+    document.body.appendChild(el);PV.open=true;PV.base=PREV_H||LAST_RH;
+    void el.offsetWidth;document.body.classList.add('pvOn');
+  }
+  const newP=el.dataset.path!==path,bk=lang==='kk'?'Артқа':'Назад';
+  el.innerHTML=`<div class="pvbar"><button type="button" class="pvback" data-act="pvback" aria-label="${bk}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg><span>${bk}</span></button><div class="pvt">MUSLIM SHOP</div></div><div class="wrap pvin">${html}</div>`;
+  el.dataset.path=path;
+  if(first){el.classList.add('pvan');el.addEventListener('animationend',()=>el.classList.remove('pvan'),{once:true})}
+  else if(newP)el.scrollTop=0;
+  LAST_RH=location.hash||'#/';NAV_FLAG=false;RESTORE_Y=null;RESTORE_RX=null;
+  renderChrome();try{ymHit()}catch(e){}try{statHit()}catch(e){}
+  if(q&&q.go==='desc')requestAnimationFrame(()=>setTimeout(()=>{const d=el.querySelector('#descsec');if(d)el.scrollTo({top:Math.max(0,d.offsetTop-64),behavior:'smooth'})},first?380:0));
+}
+function pvClose(anim){
+  const el=document.getElementById('pv');PV.open=false;PV.base=null;document.body.classList.remove('pvOn');
+  if(!el)return;
+  if(!anim){el.remove();return}
+  el.classList.remove('pvan');el.classList.add('pvout');
+  let gone=false;const rm=()=>{if(!gone){gone=true;el.remove()}};
+  el.addEventListener('animationend',rm,{once:true});setTimeout(rm,500);
+}
+function pvSyncFav(){document.querySelectorAll('#app .favbtn').forEach(b=>{const on=favHas(b.dataset.id);b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)})}
+
+/* ===== Фото на весь экран ===== */
+let LB=null;
+function lbImgs(p){const f=FULLC[p.id]||p;let a=(f.images&&f.images.length?f.images:(p.images&&p.images.length?p.images:[p.img])).filter(Boolean);return a.length?a:[p.img]}
+function lbFit(ar,bw,bh){let w=bw,h=w/ar;if(h>bh){h=bh;w=h*ar}return {w,h,x:(bw-w)/2,y:(bh-h)/2}}
+function lbOpen(imgs,start,srcImg,more){
+  if(LB||!imgs.length)return;
+  const kk=lang==='kk',o=document.createElement('div');o.id='lb';
+  const th=srcImg&&srcImg.currentSrc;
+  o.innerHTML=`<div class="lbbg"></div><div class="lbtrack">${imgs.map((s,i)=>`<div class="lbs"${i===start&&th?` style="background-image:url('${esc(th)}')"`:''}><img src="${esc(s)}" alt="" decoding="async"></div>`).join('')}</div><button type="button" class="lbx" aria-label="${kk?'Жабу':'Закрыть'}">×</button>${imgs.length>1?`<div class="lbn"><span>${start+1}</span> / ${imgs.length}</div>`:''}${more?`<button type="button" class="lbmore">${kk?'Тауар туралы толығырақ':'Подробнее о товаре'}  →</button>`:''}`;
+  document.body.appendChild(o);
+  const tr=o.querySelector('.lbtrack');tr.scrollLeft=start*tr.clientWidth;
+  LB={o,tr,start,srcImg,more,next:null};
+  try{history.pushState(Object.assign({},history.state||{},{lb:1}),'',location.href)}catch(e){}
+  const r=srcImg&&srcImg.getBoundingClientRect();
+  if(r&&r.width>0&&srcImg.complete&&srcImg.naturalWidth&&o.animate){
+    const f=lbFit(srcImg.naturalWidth/srcImg.naturalHeight,innerWidth,innerHeight);
+    const fly=document.createElement('img');fly.src=th||srcImg.src;fly.className='lbfly';
+    fly.style.cssText=`left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px`;
+    o.appendChild(fly);o.classList.add('fly');
+    const a=fly.animate([{transform:`translate(${r.left-f.x}px,${r.top-f.y}px) scale(${r.width/f.w},${r.height/f.h})`,borderRadius:'14px'},{transform:'none',borderRadius:'0px'}],{duration:340,easing:'cubic-bezier(.2,.85,.25,1)'});
+    a.onfinish=a.oncancel=()=>{o.classList.remove('fly');fly.remove()};
+  }
+  requestAnimationFrame(()=>o.classList.add('on'));
+  const n=o.querySelector('.lbn span');
+  tr.addEventListener('scroll',()=>{if(n)n.textContent=Math.round(tr.scrollLeft/Math.max(1,tr.clientWidth))+1},{passive:true});
+  const back=()=>{try{history.back()}catch(e){lbFinish()}};
+  o.querySelector('.lbx').addEventListener('click',e=>{e.stopPropagation();back()});
+  const mb=o.querySelector('.lbmore');if(mb)mb.addEventListener('click',e=>{e.stopPropagation();if(LB)LB.next=more;back()});
+  /* смахнуть вниз — закрыть, тап — закрыть */
+  let sx=0,sy=0,dy=0,mode=0,cur=null;const bg=o.querySelector('.lbbg');
+  tr.addEventListener('touchstart',e=>{if(e.touches.length!==1){mode=-1;return}sx=e.touches[0].clientX;sy=e.touches[0].clientY;dy=0;mode=0;cur=tr.children[Math.round(tr.scrollLeft/Math.max(1,tr.clientWidth))]},{passive:true});
+  tr.addEventListener('touchmove',e=>{if(mode<0||e.touches.length!==1)return;const x=e.touches[0].clientX-sx,y=e.touches[0].clientY-sy;
+    if(mode===0&&(Math.abs(x)>8||Math.abs(y)>8))mode=Math.abs(y)>Math.abs(x)*1.2?1:-1;
+    if(mode===1&&cur){dy=Math.max(-60,y);cur.style.transition='none';cur.style.transform=`translateY(${dy}px) scale(${1-Math.min(.25,Math.abs(dy)/1200)})`;bg.style.transition='none';bg.style.opacity=String(Math.max(.2,1-Math.abs(dy)/450))}},{passive:true});
+  tr.addEventListener('touchend',()=>{if(mode===1&&cur){if(dy>110){back();return}cur.style.transition='transform .25s';cur.style.transform='';bg.style.transition='';bg.style.opacity=''}mode=0},{passive:true});
+  tr.addEventListener('click',()=>back());
+}
+function lbFinish(){
+  if(!LB)return;const {o,tr,start,srcImg,next}=LB;LB=null;
+  const idx=Math.round(tr.scrollLeft/Math.max(1,tr.clientWidth)),sl=tr.children[idx],img=sl&&sl.querySelector('img');
+  const r=!next&&srcImg&&idx===start&&srcImg.isConnected?srcImg.getBoundingClientRect():null;
+  o.classList.remove('on');
+  let gone=false;const rm=()=>{if(!gone){gone=true;o.remove()}};
+  if(r&&r.width>0&&r.bottom>0&&r.top<innerHeight&&img&&img.animate){
+    const ib=sl.getBoundingClientRect(),ar=(img.naturalWidth&&img.naturalHeight)?img.naturalWidth/img.naturalHeight:(r.width/r.height),f=lbFit(ar,ib.width,ib.height);
+    const x=ib.left+f.x,y=ib.top+f.y;
+    img.style.transformOrigin=`${f.x}px ${f.y}px`;
+    const a=img.animate([{transform:sl.style.transform?'none':'none'},{transform:`translate(${r.left-x}px,${r.top-y}px) scale(${r.width/f.w},${r.height/f.h})`}],{duration:280,easing:'cubic-bezier(.3,.7,.3,1)',fill:'forwards'});
+    sl.style.transform='';sl.style.backgroundImage='none';
+    o.querySelectorAll('.lbx,.lbn,.lbmore').forEach(b=>b.style.opacity='0');
+    a.onfinish=a.oncancel=rm;setTimeout(rm,600);
+  }else{o.classList.add('out');setTimeout(rm,240)}
+  if(next)setTimeout(()=>{const a=document.createElement('a');a.href=next;a.style.display='none';document.body.appendChild(a);a.click();a.remove()},30);
+}
+window.addEventListener('popstate',()=>{if(LB)lbFinish()});
+window.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(LB||PV.open){try{history.back()}catch(x){}}});
+document.addEventListener('click',e=>{
+  if(e.defaultPrevented||e.button>0||e.metaKey||e.ctrlKey||e.shiftKey)return;
+  const a=e.target.closest('a.flph,.pp .ph');if(!a)return;
+  const im=a.querySelector('img');if(!im)return;
+  if(a.matches('.pp .ph')){if(!CUR)return;e.preventDefault();e.stopPropagation();const imgs=lbImgs(CUR),s=im.getAttribute('src');lbOpen(imgs,Math.max(0,imgs.indexOf(s)),im,null);return}
+  const m=(a.getAttribute('href')||'').match(/^#\/product\/(.+)$/);if(!m)return;
+  const p=prod(safeDec(m[1]));if(!p||!p.img)return;
+  e.preventDefault();e.stopPropagation();
+  lbOpen(lbImgs(p),0,im,a.getAttribute('href'));
+},true);
+
 function renderInner(){
   const {path,q}=parse();const app=$('#app');
   document.title='MUSLIM SHOP — Атырау';
   let html='',after=null;
   const keep=KEEP;KEEP=false;
+  {const isP=path.startsWith('/product/');
+   if(isP&&(PV.open||pvCan())){pvRender(path,q);return}
+   if(PV.open){const bk=(location.hash||'#/')===PV.base;pvClose(bk);if(bk){LAST_RH=location.hash||'#/';NAV_FLAG=false;RESTORE_Y=null;RESTORE_RX=null;renderChrome();pvSyncFav();return}}}
   if(!DB.loaded&&(path==='/catalog'||path.startsWith('/product/')||path==='/cart'||path==='/favorites'))html='<div class="note" style="margin-top:20px">Загрузка…</div>';
   else if(path==='/'||path==='')html=viewHome();
   else if(path==='/catalog'){html=viewCatalog(q);after=updateCatalog}
@@ -2989,6 +3125,7 @@ document.addEventListener('click',e=>{
     case 'adel-sel':removeSelected().catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'adel':removeProduct(id).catch(err=>toast('Ошибка: '+(err&&err.message||err)));break;
     case 'rmimg':EDIT_DIRTY=true;editing.images.splice(Number(id),1);editing.img=editing.images[0]||'';refreshImgs();break;
+    case 'pvback':{try{history.back()}catch(e){}break}
     case 'gal':{const k=Number(id),im=$('.pp .ph img');if(im&&CUR&&CUR.images[k]){im.src=CUR.images[k];document.querySelectorAll('.thumbs button').forEach((x,n)=>x.classList.toggle('on',n===k))}break}
   }
 });
