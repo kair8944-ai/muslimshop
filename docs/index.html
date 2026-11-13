@@ -1463,7 +1463,16 @@ const SICO={
 };
 const sico=k=>'<span class="sico">'+SICO[k]+'</span>';
 let toastT;
-function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toastT);toastT=setTimeout(()=>t.style.display='none',2600)}
+function toast(m){const el=$('#toast');if(!el)return;m=String(m==null?'':m);
+  const bad=/^(Ошибка|Не |Нельзя|Сломанных|Firebase не|Другая база)/i.test(m),ok=!bad&&/(Добавлено|добавлен|қосылды|Готово|Скопировано|Записано|восстановлены|Удалено|Товар скрыт|снова виден)/i.test(m);
+  const toCart=/^(Добавлено в корзину|Себетке қосылды)$/.test(m);
+  el.className='tst'+(bad?' tbad':ok?' tok':'');el.innerHTML='';
+  if(bad||ok){const i=document.createElement('span');i.className='tic';i.textContent=bad?'!':'✓';el.appendChild(i)}
+  const x=document.createElement('span');x.className='ttx';x.textContent=m;el.appendChild(x);
+  if(toCart){const a=document.createElement('a');a.className='tgo';a.href='#/cart';a.textContent=(/қосылды/.test(m)?'Себет':'Корзина')+' →';el.appendChild(a)}
+  el.onclick=e=>{if(e.target.closest('.tgo'))return;el.classList.remove('on');setTimeout(()=>{if(!el.classList.contains('on'))el.style.display='none'},250)};
+  el.style.display='flex';void el.offsetWidth;el.classList.add('on');clearTimeout(toastT);
+  toastT=setTimeout(()=>{el.classList.remove('on');setTimeout(()=>{if(!el.classList.contains('on'))el.style.display='none'},250)},Math.min(7000,2400+m.length*45))}
 
 /* ============ Яндекс.Метрика (устройства владельца не считаются) ============ */
 const YM_ID=113482446;
@@ -5201,6 +5210,21 @@ html[data-theme="dark"] .search button,html[data-theme="dark"] body .search butt
 html[data-theme="dark"] .btn.wa,html[data-theme="dark"] body .btn.wa,html[data-theme="dark"] body .hero2 .btn.wa,html[data-theme="dark"] .btn.wa:hover{color:#06351a}
 html[data-theme="dark"] a.btn.line[href*="wa.me"],html[data-theme="dark"] a.btn.line[href*="whatsapp"]{color:#06351a}
 
+
+/* уведомления (toast): одинаково аккуратные во всех темах */
+html body #toast{position:fixed!important;top:auto!important;bottom:calc(20px + env(safe-area-inset-bottom,0px))!important;left:50%!important;right:auto!important;height:auto!important;min-height:0!important;width:max-content!important;max-width:min(92vw,440px)!important;box-sizing:border-box;
+ transform:translate(-50%,14px)!important;opacity:0;transition:opacity .22s ease,transform .22s ease;
+ display:none;align-items:center;gap:10px;padding:12px 16px!important;border-radius:16px!important;
+ background:rgba(26,24,21,.96)!important;color:#fff!important;border:1px solid rgba(201,162,77,.55)!important;border-left:1px solid rgba(201,162,77,.55)!important;
+ box-shadow:0 10px 30px rgba(0,0,0,.35),0 2px 6px rgba(0,0,0,.25);font:600 15px/1.35 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif!important;text-align:left;z-index:10050!important;
+ -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);cursor:pointer;-webkit-tap-highlight-color:transparent}
+html body:not(.noBnav) #toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))!important}
+html body #toast.on{opacity:1;transform:translate(-50%,0)!important}
+#toast .tic{flex:0 0 26px;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:800 15px/1 system-ui,sans-serif;background:#C9A24D;color:#1a1815}
+#toast.tbad{border-color:rgba(229,115,115,.7)!important}
+#toast.tbad .tic{background:#E57373;color:#fff}
+#toast .ttx{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;color:#fff}
+#toast .tgo{flex:0 0 auto;margin-left:4px;padding:7px 12px;border-radius:999px;background:#C9A24D;color:#1a1815!important;font-weight:800;font-size:14px;text-decoration:none;white-space:nowrap}
 </style>
 <script>
 (function(){
