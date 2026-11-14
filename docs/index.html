@@ -2693,6 +2693,8 @@ function adminList(){
   <div class="two" style="margin-bottom:8px"><button class="btn sm line" data-act="asel-dup">🧹 Отметить дубликаты</button><button class="btn sm line" data-act="asel-demo">Отметить демо-товары</button></div>
   <button class="btn sm gold block" data-act="tg-bulk" style="margin-bottom:8px">✈ Отправить отмеченные в Telegram</button>
   <button class="btn sm gold block" id="vdmsel" data-act="vdmulti" style="margin-bottom:10px">${vdmLabel()}</button>
+  <button class="btn sm gold block" data-act="vdauto" style="margin-bottom:6px">🎲 Авто-сторис: 18 товаров без повторов</button>
+  <div class="note" style="margin:0 0 10px;font-size:13px;display:flex;gap:8px;align-items:center;justify-content:space-between"><span id="vdautonote">${autoNote()}</span><button type="button" class="btn sm line" data-act="vdautoreset">Начать заново</button></div>
   <button class="btn sm block" id="delsel" data-act="adel-sel" style="margin-bottom:14px">${selLabel()}</button>
   <div id="admlist">${admRows()}</div>`;
 }
@@ -3087,6 +3089,8 @@ document.addEventListener('click',e=>{
     case 'story':storyOpen(id);break;
     case 'reel':reelOpen(id);break;
     case 'vdmulti':vdMultiOpen([...SEL]);break;
+    case 'vdauto':vdAuto();break;
+    case 'vdautoreset':LS.set('ms_auto_used',[]);{const n=$('#vdautonote');if(n)n.textContent=autoNote()}toast('Круг начат заново');break;
     case 'video':videoOpen(id);break;
     case 'tg-fmt':tgSet('fmt',id);break;
     case 'tg-cap':tgSet('cap',id);break;
@@ -4253,6 +4257,23 @@ function vdOpen0(){
     else{const i=e.target.closest('[data-vdp]');if(!i)return;VD.pts[+i.dataset.vdp]=i.value}
     clearTimeout(pt);pt=setTimeout(()=>{if(!VD.busy)vdRebuild()},600)});
   document.body.appendChild(m);vdUI();
+}
+/* Авто-сторис: 18 случайных товаров с фото и в наличии, без повторов, пока не пройдёт весь каталог */
+const AUTO_SKIP=/themra|epimedyum|q7\s*gold|maximum\s*power/i;
+const autoPool=()=>DB.products.filter(p=>p.status!=='out'&&p.status!=='hidden'&&!isDemo(p)&&(p.img||(p.images&&p.images[0]))&&!AUTO_SKIP.test((p.name.ru||'')+' '+(p.name.kk||''))).map(p=>p.id);
+const autoNote=()=>{const pool=autoPool(),used=new Set(LS.get('ms_auto_used',[])||[]);const left=pool.filter(id=>!used.has(id)).length;return 'Ещё не было в сторис: '+left+' из '+pool.length+'.'};
+const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+async function vdAuto(){
+  const pool=autoPool();if(!pool.length){toast('Нет товаров с фото в наличии');return}
+  let used=(LS.get('ms_auto_used',[])||[]).filter(id=>pool.includes(id));
+  let fresh=shuf(pool.filter(id=>!used.includes(id)));
+  let pick=fresh.slice(0,VD_PER),round=false;
+  if(pick.length<VD_PER){round=true;used=[];const rest=shuf(pool.filter(id=>!pick.includes(id)));const add=rest.slice(0,VD_PER-pick.length);used=add.slice();pick=pick.concat(add)}
+  else used=used.concat(pick);
+  LS.set('ms_auto_used',used);
+  const n=$('#vdautonote');if(n)n.textContent=autoNote();
+  toast(round?'Весь каталог уже был, начат новый круг':'Выбрано '+pick.length+' новых товаров');
+  await vdMultiOpen(pick);
 }
 async function vdMultiOpen(ids){
   ids=ids.filter(id=>{const q=DB.products.find(x=>x.id===id);return q&&(q.img||(q.images&&q.images[0]))});
