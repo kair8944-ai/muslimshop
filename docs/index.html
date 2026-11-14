@@ -3089,7 +3089,7 @@ document.addEventListener('click',e=>{
     case 'story':storyOpen(id);break;
     case 'reel':reelOpen(id);break;
     case 'vdmulti':vdMultiOpen([...SEL]);break;
-    case 'vdauto':vdAuto();break;
+    case 'vdauto':vdAutoStory();break;
     case 'vdautoreset':LS.set('ms_auto_used',[]);{const n=$('#vdautonote');if(n)n.textContent=autoNote()}toast('Круг начат заново');break;
     case 'video':videoOpen(id);break;
     case 'tg-fmt':tgSet('fmt',id);break;
@@ -4263,7 +4263,7 @@ const AUTO_SKIP=/themra|epimedyum|q7\s*gold|maximum\s*power/i;
 const autoPool=()=>DB.products.filter(p=>p.status!=='out'&&p.status!=='hidden'&&!isDemo(p)&&(p.img||(p.images&&p.images[0]))&&!AUTO_SKIP.test((p.name.ru||'')+' '+(p.name.kk||''))).map(p=>p.id);
 const autoNote=()=>{const pool=autoPool(),used=new Set(LS.get('ms_auto_used',[])||[]);const left=pool.filter(id=>!used.has(id)).length;return 'Ещё не было в сторис: '+left+' из '+pool.length+'.'};
 const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
-async function vdAuto(){
+async function vdAutoStory(){
   const pool=autoPool();if(!pool.length){toast('Нет товаров с фото в наличии');return}
   let used=(LS.get('ms_auto_used',[])||[]).filter(id=>pool.includes(id));
   let fresh=shuf(pool.filter(id=>!used.includes(id)));
