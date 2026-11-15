@@ -5014,6 +5014,96 @@ function waFab(){
   a.href='https://wa.me/'+CONTACT.wa+'?text='+encodeURIComponent(txt);
 }
 
+/* ============ Выбор языка при первом визите ============ */
+function mslpShow(){
+  try{
+    if(URL_LANG)return;
+    if(localStorage.getItem('ms_lang')!==null)return;
+    if(/admin/i.test(location.hash||''))return;
+    if(navigator.webdriver)return;
+    if(document.getElementById('mslp'))return;
+  }catch(e){return}
+  const css=`
+#mslp{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;
+ background:radial-gradient(120% 90% at 50% 0%,rgba(176,141,87,.28),rgba(10,10,10,.72) 60%);
+ -webkit-backdrop-filter:blur(12px) saturate(1.2);backdrop-filter:blur(12px) saturate(1.2);
+ opacity:0;transition:opacity .45s ease;font-family:inherit}
+#mslp.on{opacity:1}
+#mslp .lp-card{position:relative;width:100%;max-width:400px;border-radius:26px;padding:34px 22px 20px;text-align:center;color:#fff;overflow:hidden;
+ background:linear-gradient(160deg,#2A2B2D 0%,#161616 70%);box-shadow:0 30px 80px rgba(0,0,0,.55),inset 0 0 0 1px rgba(227,194,133,.35);
+ transform:translateY(40px) scale(.94);transition:transform .6s cubic-bezier(.2,.9,.25,1.15)}
+#mslp.on .lp-card{transform:none}
+#mslp .lp-card:before{content:"";position:absolute;inset:0;background:var(--pat);background-size:56px;opacity:.55;pointer-events:none}
+#mslp .lp-card:after{content:"";position:absolute;left:-40%;top:-60%;width:180%;height:70%;background:radial-gradient(closest-side,rgba(227,194,133,.22),transparent);pointer-events:none}
+#mslp .lp-emb{position:relative;width:92px;height:92px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center}
+#mslp .lp-ring{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,#B08D57,#F3DDA6,#8A6B3A,#F3DDA6,#B08D57);animation:lpspin 6s linear infinite;
+ -webkit-mask:radial-gradient(circle,transparent 41px,#000 42px);mask:radial-gradient(circle,transparent 41px,#000 42px)}
+#mslp .lp-in{position:relative;width:78px;height:78px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#3A3B3E,#141414);display:flex;align-items:center;justify-content:center;box-shadow:0 0 30px rgba(227,194,133,.35)}
+#mslp .lp-in svg{width:42px;height:42px;animation:lpglow 2.8s ease-in-out infinite}
+#mslp h2{position:relative;margin:0;font-family:var(--serif);font-size:30px;line-height:1.15;font-weight:700;
+ background:linear-gradient(90deg,#B08D57,#F7E3B0,#B08D57);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:lpsh 4s linear infinite}
+#mslp .lp-sub2{position:relative;font-family:var(--serif);font-size:20px;color:#EDE6D8;margin-top:4px}
+#mslp .lp-hint{position:relative;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.55);margin:16px 0 18px}
+#mslp .lp-btns{position:relative;display:grid;gap:12px}
+#mslp .lp-b{position:relative;overflow:hidden;display:flex;align-items:center;gap:14px;width:100%;padding:15px 16px;border-radius:18px;cursor:pointer;text-align:left;
+ border:1px solid rgba(227,194,133,.4);background:rgba(255,255,255,.05);color:#fff;font:inherit;
+ opacity:0;transform:translateY(14px);transition:transform .25s ease,background .25s ease,border-color .25s ease,opacity .5s ease}
+#mslp.on .lp-b{opacity:1;transform:none}
+#mslp.on .lp-b:nth-child(1){transition-delay:.25s,0s,0s,.25s}
+#mslp.on .lp-b:nth-child(2){transition-delay:.38s,0s,0s,.38s}
+#mslp .lp-b:hover,#mslp .lp-b:focus-visible{background:rgba(227,194,133,.14);border-color:#E3C285;outline:none}
+#mslp .lp-b:active{transform:scale(.97)}
+#mslp .lp-b:after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.18),transparent);transform:skewX(-20deg);animation:lpswipe 3.6s ease-in-out infinite}
+#mslp .lp-b:nth-child(2):after{animation-delay:1.8s}
+#mslp .lp-tag{flex:none;width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;letter-spacing:.04em;color:#141414;
+ background:linear-gradient(145deg,#F3DDA6,#B08D57)}
+#mslp .lp-b.kk .lp-tag{background:linear-gradient(145deg,#4FD1E8,#00A9C6);color:#fff}
+#mslp .lp-t{flex:1;min-width:0}
+#mslp .lp-t b{display:block;font-size:19px;font-weight:700}
+#mslp .lp-t small{display:block;font-size:13px;color:rgba(255,255,255,.6);margin-top:2px}
+#mslp .lp-arr{flex:none;font-size:20px;color:#E3C285;transition:transform .25s}
+#mslp .lp-b:hover .lp-arr{transform:translateX(4px)}
+#mslp .lp-foot{position:relative;font-size:12px;color:rgba(255,255,255,.45);margin-top:16px;line-height:1.4}
+#mslp.out{opacity:0}
+#mslp.out .lp-card{transform:translateY(-20px) scale(.96)}
+@keyframes lpspin{to{transform:rotate(360deg)}}
+@keyframes lpsh{to{background-position:-200% 0}}
+@keyframes lpglow{0%,100%{filter:drop-shadow(0 0 2px rgba(243,221,166,.4))}50%{filter:drop-shadow(0 0 10px rgba(243,221,166,.9))}}
+@keyframes lpswipe{0%,60%{left:-60%}100%{left:130%}}
+@media (prefers-reduced-motion:reduce){#mslp *{animation:none!important;transition:none!important}}
+`;
+  const st=document.createElement('style');st.id='mslp-css';st.textContent=css;document.head.appendChild(st);
+  const w=document.createElement('div');w.id='mslp';w.setAttribute('role','dialog');w.setAttribute('aria-modal','true');w.setAttribute('aria-label','Тілді таңдаңыз / Выберите язык');
+  w.innerHTML=`<div class="lp-card">
+  <div class="lp-emb"><div class="lp-ring"></div><div class="lp-in">
+   <svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="lpg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F7E3B0"/><stop offset="1" stop-color="#B08D57"/></linearGradient></defs>
+   <path fill="url(#lpg)" d="M27 6a18 18 0 1 0 15 28A15 15 0 1 1 27 6z"/><path fill="url(#lpg)" d="M36 14l1.9 4.6 5 .4-3.8 3.2 1.2 4.8-4.3-2.6-4.3 2.6 1.2-4.8-3.8-3.2 5-.4z"/></svg>
+  </div></div>
+  <h2>Қош келдіңіз!</h2>
+  <div class="lp-sub2">Добро пожаловать!</div>
+  <div class="lp-hint">Тілді таңдаңыз · Выберите язык</div>
+  <div class="lp-btns">
+   <button type="button" class="lp-b kk" data-l="kk"><span class="lp-tag">ҚАЗ</span><span class="lp-t"><b>Қазақша</b><small>Сайт қазақ тілінде</small></span><span class="lp-arr">→</span></button>
+   <button type="button" class="lp-b ru" data-l="ru"><span class="lp-tag">РУС</span><span class="lp-t"><b>Русский</b><small>Сайт на русском языке</small></span><span class="lp-arr">→</span></button>
+  </div>
+  <div class="lp-foot">Тілді кейін мәзірден ауыстыруға болады<br>Язык можно сменить в меню</div>
+ </div>`;
+  document.body.appendChild(w);
+  const prevOv=document.body.style.overflow;document.body.style.overflow='hidden';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>w.classList.add('on')));
+  function pick(l){
+    if(w.dataset.done)return;w.dataset.done='1';
+    try{lang=(l==='kk')?'kk':'ru';LS.set('ms_lang',lang);syncLangUrl();render()}catch(e){}
+    w.classList.add('out');document.removeEventListener('keydown',onKey);
+    setTimeout(()=>{w.remove();st.remove();document.body.style.overflow=prevOv},480);
+  }
+  function onKey(e){if(e.key==='Escape')pick(lang)}
+  w.addEventListener('click',e=>{const b=e.target.closest('.lp-b');if(b)pick(b.dataset.l)});
+  document.addEventListener('keydown',onKey);
+  setTimeout(()=>{try{w.querySelector('.lp-b').focus({preventScroll:true})}catch(e){}},700);
+}
+setTimeout(()=>{try{mslpShow()}catch(e){}},900);
+
 /* ============ Start ============ */
 (async()=>{
   render();started=true;
