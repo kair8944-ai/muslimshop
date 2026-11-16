@@ -5400,5 +5400,22 @@ html body .grid.rail.big .card.fl .favbtn svg{width:30px;height:30px}
 #bnav #bnf{position:absolute;top:-2px;left:calc(50% + 6px);min-width:18px;height:18px;border-radius:9px;background:#E53935;color:#fff;font:700 11px/18px Arial;font-style:normal;display:none;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 0 0 2px #151515}
 #bnav a.hasfav svg{fill:#E53935;stroke:#E53935}
 </style>
+<style id="hdrfix">
+/* hdrfix: чистая шапка на телефоне — корзина и избранное только в нижнем меню */
+@media(max-width:759px){
+ html body header .hbar{display:flex !important;flex-wrap:nowrap !important;align-items:center !important;justify-content:space-between !important;gap:8px !important;min-height:62px !important;padding:6px 0 !important}
+ html body header #cartbtn,html body header #favbtn{display:none !important}
+ html body header #menubtn{flex:none !important;flex-direction:column !important;gap:1px !important;width:52px !important;min-width:52px !important;min-height:50px !important;padding:0 !important;font-size:22px !important;line-height:1 !important;border-radius:14px !important;border:1px solid rgba(227,194,133,.45) !important;background:rgba(255,255,255,.03) !important;color:#E3C285 !important}
+ html body header #menubtn .m-t{display:block !important;margin:0 !important;font:600 10px/1.1 "PT Sans",Arial,sans-serif !important;letter-spacing:.06em !important;text-transform:uppercase;color:#cfcac0 !important}
+ html body header .logo{display:flex !important;flex:1 1 auto !important;min-width:0 !important;flex-direction:column !important;align-items:center !important;justify-content:center !important;text-align:center !important;overflow:hidden !important;font-size:clamp(15px,4.6vw,20px) !important;letter-spacing:.1em !important;line-height:1.1 !important;white-space:nowrap !important}
+ html body header .logo small{display:block !important;max-width:100% !important;margin-top:4px !important;padding-top:4px !important;border-top:1px solid rgba(227,194,133,.4);font:600 clamp(7px,2.05vw,9.5px)/1.2 "PT Sans",Arial,sans-serif !important;letter-spacing:.02em !important;color:#C9A66B !important;-webkit-text-fill-color:#C9A66B;white-space:nowrap !important;overflow:hidden !important;text-overflow:ellipsis !important}
+ html body header .langsw{flex:none !important;border-radius:14px !important;border:1px solid rgba(227,194,133,.45) !important;overflow:hidden !important}
+ html body header .langsw button{min-width:38px !important;min-height:44px !important;padding:0 7px !important;font-size:15px !important;font-weight:800 !important}
+ html body header #themebtn,html body header #admbtn{flex:none !important;width:44px !important;min-width:44px !important;min-height:44px !important;padding:0 !important;border-radius:14px !important;border:1px solid rgba(227,194,133,.45) !important;background:rgba(255,255,255,.03) !important;font-size:19px !important}
+ html body header .hbar > .hbtn:active{transform:scale(.95)}
+}
+@media(max-width:340px){html body header .logo small{display:none !important}}
+</style>
+
 </body>
 </html>
