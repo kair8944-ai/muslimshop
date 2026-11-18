@@ -750,6 +750,11 @@ body .findaddr b{font-size:23px}
 body .findvideo{display:block;width:100%;border-radius:16px;background:#000;max-height:80vh}
 body .findimg{display:block;width:100%;height:auto;border-radius:16px}
 /* ===== конец части 12 ===== */
+/* ===== часть 13: переключатель языка описания в карточке ===== */
+.dlang{display:flex;gap:8px;margin:0 0 12px}
+.dlang button{flex:1;min-height:48px;padding:10px 14px;font-size:18px;font-weight:700;font-family:inherit;border:2px solid #7A5A1E;background:#fff;color:#7A5A1E;border-radius:10px;cursor:pointer}
+.dlang button.on{background:#7A5A1E;color:#fff}
+/* ===== конец части 13 ===== */
 
 
 
@@ -2294,7 +2299,7 @@ function viewProduct(slug){
       </div>
     </div>
   </section>
-  ${desc?`<section id="descsec" style="padding-top:0;scroll-margin-top:84px"><h2>${t('desc')}</h2><div class="desc">${esc(desc)}</div></section>`:(p.lite&&(p.hasDesc||p.hasSp)?`<section style="padding-top:0"><div class="note">${FULLERR[p.id]?'Не удалось загрузить описание: '+esc(FULLERR[p.id]):'Загрузка описания…'}</div></section>`:'')}
+  ${desc?`<section id="descsec" style="padding-top:0;scroll-margin-top:84px"><h2>${t('desc')}</h2>${(p.desc&&p.desc.ru&&p.desc.kk)?`<div class="dlang"><button type="button" data-act="dlang" data-id="ru" class="${(p.desc[lang]?lang:'ru')==='ru'?'on':''}">Русский</button><button type="button" data-act="dlang" data-id="kk" class="${(p.desc[lang]?lang:'ru')==='kk'?'on':''}">Қазақша</button></div>`:''}<div class="desc" id="descbox">${esc(desc)}</div></section>`:(p.lite&&(p.hasDesc||p.hasSp)?`<section style="padding-top:0"><div class="note">${FULLERR[p.id]?'Не удалось загрузить описание: '+esc(FULLERR[p.id]):'Загрузка описания…'}</div></section>`:'')}
   ${false&&rows.length?`<section style="padding-top:0"><h2>${t('specs')}</h2><table class="specs">${rows.map(r=>`<tr>${r[0]?`<td>${esc(r[0])}</td><td>${esc(r[1])}</td>`:`<td colspan="2">${esc(r[1])}</td>`}</tr>`).join('')}</table></section>`:''}
   <div class="spacer"></div>
   <div class="sticky-buy"><div>${priceHtml(p)}</div><button class="btn gold" data-act="padd" data-id="${esc(p.id)}" ${p.status!=='in'?'disabled':''}>${p.status==='in'?t('tocart'):t('out')}</button></div>`;
@@ -3038,6 +3043,7 @@ document.addEventListener('click',e=>{
     case 'closemenu':closeMenu();break;
     case 'goto':e.preventDefault();closeMenu();if(location.hash!=='#/'&&location.hash!==''){location.hash='#/';setTimeout(()=>{const el=document.getElementById(id);el&&el.scrollIntoView()},60)}else{const el=document.getElementById(id);el&&el.scrollIntoView()}break;
     case 'lang':lang=id;LS.set('ms_lang',lang);syncLangUrl();render();break;
+    case 'dlang':{const bx=document.getElementById('descbox');if(bx&&CUR&&CUR.desc){const tx=CUR.desc[id];if(tx){bx.textContent=tx;document.querySelectorAll('.dlang button').forEach(x=>x.classList.toggle('on',x.dataset.id===id))}}break}
     case 'allcats':{const x=$('#catsx');x.classList.toggle('open');b.textContent=x.classList.contains('open')?t('hidecats'):t('allcats');break}
     case 'fav':{e.preventDefault();const sid=String(id),i=FAV.indexOf(sid);if(i>=0)FAV.splice(i,1);else FAV.push(sid);LS.set('ms_fav',FAV);favBadge();
       const on=FAV.includes(sid);
