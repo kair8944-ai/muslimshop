@@ -750,11 +750,6 @@ body .findaddr b{font-size:23px}
 body .findvideo{display:block;width:100%;border-radius:16px;background:#000;max-height:80vh}
 body .findimg{display:block;width:100%;height:auto;border-radius:16px}
 /* ===== конец части 12 ===== */
-/* ===== часть 13: кнопки языка РУС/ҚАЗ в карточке товара (переключают весь сайт) ===== */
-.dlang{display:flex;gap:8px;margin:12px 0 4px}
-.dlang button{flex:1;min-height:48px;padding:10px 14px;font-size:18px;font-weight:700;font-family:inherit;border:2px solid #7A5A1E;background:#fff;color:#7A5A1E;border-radius:10px;cursor:pointer}
-.dlang button.on{background:#7A5A1E;color:#fff}
-/* ===== конец части 13 ===== */
 
 
 
@@ -1036,6 +1031,14 @@ html[data-theme="dark"] .pvbar{background:rgba(25,23,21,.88);border-bottom-color
 #lb.on .lbx,#lb.on .lbn,#lb.on .lbmore{opacity:1}
 #lb.out .lbtrack,#lb.out .lbx,#lb.out .lbn,#lb.out .lbmore{opacity:0;transition:opacity .2s}
 @media (prefers-reduced-motion:reduce){#pv.pvan,#pv.pvout{animation-duration:.01s}}
+</style>
+<style>/* RU/KZ в карточке товара */
+.pcrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.pcrow .crumbs{min-width:0}
+.lsw button{min-height:36px;padding:0 12px;font-size:14px}
+.pvlang{margin-right:4px}
+.pvbar .pvt{margin-right:8px}
+@media(max-width:360px){.pvbar .pvt{display:none}.pvlang{margin-left:auto}}
 </style>
 </head>
 <body>
@@ -2262,6 +2265,9 @@ function updateCatalog(){
   try{ntSearch(CQ.q,arr.length,snote)}catch(e){}
 }
 
+/* быстрый переключатель RU / KZ прямо в карточке товара */
+let PV_IN=false,PV_LD=false;
+function langSw(extra){return `<div class="langsw lsw ${extra||''}" role="group" aria-label="${lang==='kk'?'Тіл':'Язык'}"><button type="button" data-act="lang" data-id="ru" class="${lang==='ru'?'on':''}" aria-pressed="${lang==='ru'}">RU</button><button type="button" data-act="lang" data-id="kk" class="${lang==='kk'?'on':''}" aria-pressed="${lang==='kk'}">KZ</button></div>`}
 function viewProduct(slug){
   const p0=prod(slug)||prod(String(slug).split(/[?&#]/)[0].replace(/\/+$/,''));
   if(!p0&&PENDING)return `<section><div class="empty">${lang==='kk'?'Жүктелуде…':'Загрузка…'}</div></section>`;
@@ -2276,8 +2282,7 @@ function viewProduct(slug){
   CUR=p;try{ntSeen(p)}catch(e){}
   const rows=specsRows(p.specs&&(p.specs[lang]||p.specs.ru));
   const desc=L(p.desc);
-  return `<div class="dlang"><button type="button" data-act="lang" data-id="ru" class="${lang==='ru'?'on':''}">Русский</button><button type="button" data-act="lang" data-id="kk" class="${lang==='kk'?'on':''}">Қазақша</button></div>
-  <div class="crumbs"><a href="#/">${t('home')}</a> / <a href="#/catalog?cat=${esc(p.cat)}">${esc(catName(p.cat))}</a></div>
+  return `<div class="pcrow"><div class="crumbs"><a href="#/">${t('home')}</a> / <a href="#/catalog?cat=${esc(p.cat)}">${esc(catName(p.cat))}</a></div></div>
   <section class="pp">
     <div>${imgBox(p)}${(p.images||[]).length>1?`<div class="thumbs">${p.images.map((x,i)=>`<button type="button" class="${i===0?'on':''}" data-act="gal" data-id="${i}" aria-label="${i+1}"><img src="${esc(x)}" alt=""></button>`).join('')}</div>`:''}</div>
     <div style="display:grid;gap:14px">
@@ -2840,7 +2845,7 @@ const PV={open:false,base:null};
 const pvCan=()=>DB.loaded&&!PV.open&&LAST_RH&&!/^#\/(product\/|admin)/.test(LAST_RH)&&!!$('#app')&&$('#app').children.length>0;
 function pvDim(){let d=document.getElementById('pvdim');if(!d){d=document.createElement('div');d.id='pvdim';document.body.appendChild(d)}return d}
 function pvRender(path,q){
-  const html=viewProduct(safeDec(path.slice(9)));
+  PV_IN=true;let html;try{html=viewProduct(safeDec(path.slice(9)))}finally{PV_IN=false}
   let el=document.getElementById('pv');const first=!PV.open||!el;
   if(first){
     if(el)el.remove();
@@ -2850,7 +2855,7 @@ function pvRender(path,q){
     void el.offsetWidth;document.body.classList.add('pvOn');
   }
   const newP=el.dataset.path!==path,bk=lang==='kk'?'Артқа':'Назад';
-  el.innerHTML=`<div class="pvbar"><button type="button" class="pvback" data-act="pvback" aria-label="${bk}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg><span>${bk}</span></button><div class="pvt">MUSLIM SHOP</div></div><div class="wrap pvin">${html}</div>`;
+  el.innerHTML=`<div class="pvbar"><button type="button" class="pvback" data-act="pvback" aria-label="${bk}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg><span>${bk}</span></button><div class="pvt">MUSLIM SHOP</div>${langSw('pvlang')}</div><div class="wrap pvin">${html}</div>`;
   el.dataset.path=path;
   if(first){el.classList.add('pvan');el.addEventListener('animationend',()=>el.classList.remove('pvan'),{once:true})}
   else if(newP)el.scrollTop=0;
@@ -2965,7 +2970,7 @@ function renderInner(){
   const keep=KEEP;KEEP=false;
   {const isP=path.startsWith('/product/');
    if(isP&&(PV.open||pvCan())){pvRender(path,q);return}
-   if(PV.open){const bk=(location.hash||'#/')===PV.base;pvClose(bk);if(bk){LAST_RH=location.hash||'#/';NAV_FLAG=false;RESTORE_Y=null;RESTORE_RX=null;renderChrome();pvSyncFav();return}}}
+   if(PV.open){const bk=(location.hash||'#/')===PV.base;pvClose(bk);if(bk&&!PV_LD){LAST_RH=location.hash||'#/';NAV_FLAG=false;RESTORE_Y=null;RESTORE_RX=null;renderChrome();pvSyncFav();return}if(PV_LD){syncLangUrl();if(bk){RESTORE_Y=Math.round(window.scrollY);RESTORE_RX=railsX()}}PV_LD=false;}}
   if(!DB.loaded&&(path==='/catalog'||path.startsWith('/product/')||path==='/cart'||path==='/favorites'))html='<div class="note" style="margin-top:20px">Загрузка…</div>';
   else if(path==='/'||path==='')html=viewHome();
   else if(path==='/catalog'){html=viewCatalog(q);after=updateCatalog}
@@ -3043,7 +3048,7 @@ document.addEventListener('click',e=>{
     case 'menu':$('#drawer').classList.add('open');break;
     case 'closemenu':closeMenu();break;
     case 'goto':e.preventDefault();closeMenu();if(location.hash!=='#/'&&location.hash!==''){location.hash='#/';setTimeout(()=>{const el=document.getElementById(id);el&&el.scrollIntoView()},60)}else{const el=document.getElementById(id);el&&el.scrollIntoView()}break;
-    case 'lang':lang=id;LS.set('ms_lang',lang);syncLangUrl();render();break;
+    case 'lang':{if(id===lang)break;lang=id;LS.set('ms_lang',lang);if(PV.open)PV_LD=true;else syncLangUrl();render();try{ymGoal('lang_'+lang+(PV.open||/^#\/product\//.test(location.hash)?'_product':''))}catch(e){}break}
     case 'allcats':{const x=$('#catsx');x.classList.toggle('open');b.textContent=x.classList.contains('open')?t('hidecats'):t('allcats');break}
     case 'fav':{e.preventDefault();const sid=String(id),i=FAV.indexOf(sid);if(i>=0)FAV.splice(i,1);else FAV.push(sid);LS.set('ms_fav',FAV);favBadge();
       const on=FAV.includes(sid);
