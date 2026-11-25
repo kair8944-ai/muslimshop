@@ -4079,7 +4079,7 @@ function vdUI(){
   const on=(sel,f)=>m.querySelectorAll(sel).forEach(b=>b.className='btn sm '+(f(b)?'gold':'line'));
   on('[data-vd="tpl"]',b=>b.dataset.v===VD.tpl);on('[data-vd="lang"]',b=>b.dataset.v===VD.lang);on('[data-vd="price"]',b=>(b.dataset.v==='1')===VD.price);
   on('[data-vd="opt"]',b=>!!VD.opt[b.dataset.v]);m.querySelectorAll('[data-vd="pi"]').forEach(b=>{const k=(VD.sel||[]).indexOf(+b.dataset.v);b.style.outline=k>=0?'3px solid #f0c66e':'none';b.style.opacity=k>=0?'1':'.45';b.textContent=k>=0?String(k+1):'';b.style.color='#111';b.style.fontWeight='800';b.style.fontSize='18px';b.style.textShadow='0 0 4px #fff'});
-  on('[data-vd="capc"]',b=>!!VD.capc);
+  on('[data-vd="capc"]',b=>!!VD.capc);m.querySelectorAll('[data-vd="capc"]').forEach(b=>{b.textContent=VD.capc?'✅ Адрес и телефон в тексте: ВКЛ':'📍 Адрес и телефон в тексте: ВЫКЛ'});
   on('[data-vd="dur"]',b=>+b.dataset.v===VD.dur);on('[data-vd="music"]',b=>(b.dataset.v==='1')===VD.music);
   m.querySelectorAll('[data-vd="col"]').forEach(b=>{b.style.outline=b.dataset.v===VD.col?'3px solid #f0c66e':'none';b.style.outlineOffset='2px'});
   const pw=m.querySelector('#vdpts');if(pw)pw.style.display=VD.tpl==='set'?'none':'flex';
@@ -4252,7 +4252,7 @@ function vdOpen0(){
     else if(a==='setadd'){const id=b.dataset.v,S=VD.setIds||(VD.setIds=[]);if(!S.includes(id)&&S.length<(VD.multi?VD_PER-1:3))S.push(id);const q=document.getElementById('vdsetq');if(q)q.value='';const r=document.getElementById('vdsetres');if(r)r.innerHTML='';vdUI();vdRebuild()}
     else if(a==='mpart'){VD.part=+b.dataset.v;vdMultiPart()}
     else if(a==='setdel'){VD.setIds=(VD.setIds||[]).filter(x=>x!==b.dataset.v);vdUI();vdRebuild()}
-    else if(a==='capc'){VD.capc=VD.capc?0:1;LS.set('ms_vd_capc',VD.capc);vdUI();const r=document.getElementById('vdcap');if(r&&r.style.display==='block')r.value=vdCaption()}
+    else if(a==='capc'){VD.capc=VD.capc?0:1;LS.set('ms_vd_capc',VD.capc);vdUI();const r=document.getElementById('vdcap');if(r&&r.style.display==='block')r.value=vdCaption();toast(VD.capc?'Адрес, WhatsApp и ссылка будут в «Тексте для поста»':'Адрес и телефон убраны из «Текста для поста»')}
     else if(a==='cap')vdCopyCap();
     else if(a==='tpl'){VD.tpl=b.dataset.v;LS.set('ms_vd_tpl',VD.tpl);vdUI();vdRebuild()}
     else if(a==='col'){VD.col=b.dataset.v;LS.set('ms_vd_col',VD.col);vdUI();vdRebuild()}
