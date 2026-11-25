@@ -2683,7 +2683,7 @@ function admSelect(){
   const cnt={};DB.products.forEach(p=>{cnt[p.cat]=(cnt[p.cat]||0)+1});
   return '<option value="">Все категории ('+DB.products.length+')</option>'+DB.cats.filter(c=>cnt[c.id]).map(c=>'<option value="'+esc(c.id)+'"'+(adminCat===c.id?' selected':'')+'>'+esc(L(c.name)||c.id)+' ('+cnt[c.id]+')</option>').join('');
 }
-function admRefresh(){const l=$('#admlist');if(!l)return;l.innerHTML=admRows();const c=$('#admchips');if(c)c.innerHTML=admChips();const n=$('#admcount');if(n)n.textContent=admCountTxt();const sel=$('#admcat');if(sel)sel.value=adminCat}
+function admRefresh(){const l=$('#admlist');if(!l)return;l.innerHTML=admRows();try{autoUI()}catch(e){}const c=$('#admchips');if(c)c.innerHTML=admChips();const n=$('#admcount');if(n)n.textContent=admCountTxt();const sel=$('#admcat');if(sel)sel.value=adminCat}
 document.addEventListener('input',e=>{if(e.target&&e.target.id==='admq'){adminQ=e.target.value;admRefresh()}});
 document.addEventListener('change',e=>{if(e.target&&e.target.id==='admcat'){adminCat=e.target.value;admRefresh()}});
 function adminList(){
@@ -2707,7 +2707,7 @@ function adminList(){
   <div class="two" style="margin-bottom:8px"><button class="btn sm line" data-act="asel-dup">🧹 Отметить дубликаты</button><button class="btn sm line" data-act="asel-demo">Отметить демо-товары</button></div>
   <button class="btn sm gold block" data-act="tg-bulk" style="margin-bottom:8px">✈ Отправить отмеченные в Telegram</button>
   <button class="btn sm gold block" id="vdmsel" data-act="vdmulti" style="margin-bottom:10px">${vdmLabel()}</button>
-  <button class="btn sm gold block" data-act="vdauto" style="margin-bottom:6px">🎲 Авто-сторис: 18 товаров без повторов</button>
+  <button class="btn sm gold block" id="vdautobtn" data-act="vdauto" style="margin-bottom:6px">${autoBtnLabel()}</button>
   <div class="note" style="margin:0 0 10px;font-size:13px;display:flex;gap:8px;align-items:center;justify-content:space-between"><span id="vdautonote">${autoNote()}</span><button type="button" class="btn sm line" data-act="vdautoreset">Начать заново</button></div>
   <button class="btn sm block" id="delsel" data-act="adel-sel" style="margin-bottom:14px">${selLabel()}</button>
   <div id="admlist">${admRows()}</div>`;
@@ -3104,7 +3104,7 @@ document.addEventListener('click',e=>{
     case 'reel':reelOpen(id);break;
     case 'vdmulti':vdMultiOpen([...SEL]);break;
     case 'vdauto':vdAutoStory();break;
-    case 'vdautoreset':LS.set('ms_auto_used',[]);{const n=$('#vdautonote');if(n)n.textContent=autoNote()}toast('Круг начат заново');break;
+    case 'vdautoreset':LS.set(autoKey(),[]);autoUI();toast(adminCat?'Круг по категории «'+autoCatName()+'» начат заново':'Круг по всем товарам начат заново');break;
     case 'video':videoOpen(id);break;
     case 'tg-fmt':tgSet('fmt',id);break;
     case 'tg-cap':tgSet('cap',id);break;
@@ -4274,19 +4274,36 @@ function vdOpen0(){
 }
 /* Авто-сторис: 18 случайных товаров с фото и в наличии, без повторов, пока не пройдёт весь каталог */
 const AUTO_SKIP=/themra|epimedyum|q7\s*gold|maximum\s*power/i;
-const autoPool=()=>DB.products.filter(p=>p.status!=='out'&&p.status!=='hidden'&&!isDemo(p)&&(p.img||(p.images&&p.images[0]))&&!AUTO_SKIP.test((p.name.ru||'')+' '+(p.name.kk||''))).map(p=>p.id);
-const autoNote=()=>{const pool=autoPool(),used=new Set(LS.get('ms_auto_used',[])||[]);const left=pool.filter(id=>!used.has(id)).length;return 'Ещё не было в сторис: '+left+' из '+pool.length+'.'};
+/* Авто-сторис: 18 товаров из выбранной в админке категории (или из всех), без повторов.
+   У каждой категории свой список «уже были»; у «Все категории» — свой. */
+const autoPool=(cat)=>DB.products.filter(p=>p.status!=='out'&&p.status!=='hidden'&&!isDemo(p)&&(p.img||(p.images&&p.images[0]))&&!AUTO_SKIP.test((p.name.ru||'')+' '+(p.name.kk||''))&&(!cat||p.cat===cat)).map(p=>p.id);
+const autoKey=()=>adminCat?'ms_auto_used_'+adminCat:'ms_auto_used';
+const autoCatName=()=>{const c=DB.cats.find(x=>x.id===adminCat);return c?(L(c.name)||c.id):adminCat};
+const autoNote=()=>{const pool=autoPool(adminCat),used=new Set(LS.get(autoKey(),[])||[]);const left=pool.filter(id=>!used.has(id)).length;return (adminCat?'«'+autoCatName()+'»: ':'Все товары: ')+'ещё не было в сторис '+left+' из '+pool.length+'.'};
+const autoBtnLabel=()=>'🎲 Авто-сторис: 18 товаров '+(adminCat?'из «'+esc(autoCatName())+'»':'из всех категорий');
+function autoUI(){const n=$('#vdautonote');if(n)n.textContent=autoNote();const b=$('#vdautobtn');if(b)b.innerHTML=autoBtnLabel()}
 const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+/* «Все категории»: берём по очереди из разных категорий, чтобы подборка была разнообразной */
+function autoMix(ids,n){
+  const by={};ids.forEach(id=>{const p=DB.products.find(x=>x.id===id);const k=(p&&p.cat)||'';(by[k]=by[k]||[]).push(id)});
+  const groups=shuf(Object.values(by).map(g=>shuf(g.slice())));const out=[];
+  while(out.length<n&&groups.some(g=>g.length)){for(const g of groups){if(out.length>=n)break;if(g.length)out.push(g.shift())}}
+  return out;
+}
 async function vdAutoStory(){
-  const pool=autoPool();if(!pool.length){toast('Нет товаров с фото в наличии');return}
-  let used=(LS.get('ms_auto_used',[])||[]).filter(id=>pool.includes(id));
-  let fresh=shuf(pool.filter(id=>!used.includes(id)));
-  let pick=fresh.slice(0,VD_PER),round=false;
-  if(pick.length<VD_PER){round=true;used=[];const rest=shuf(pool.filter(id=>!pick.includes(id)));const add=rest.slice(0,VD_PER-pick.length);used=add.slice();pick=pick.concat(add)}
+  const cat=adminCat,key=autoKey(),pool=autoPool(cat);
+  if(!pool.length){toast(cat?'В этой категории нет товаров с фото в наличии':'Нет товаров с фото в наличии');return}
+  const take=(ids,n)=>cat?shuf(ids.slice()).slice(0,n):autoMix(ids,n);
+  if(pool.length<=VD_PER){LS.set(key,[]);autoUI();toast((cat?'В «'+autoCatName()+'»':'В каталоге')+' всего '+pool.length+' товаров с фото — взяты все');await vdMultiOpen(take(pool,pool.length));return}
+  let used=(LS.get(key,[])||[]).filter(id=>pool.includes(id));
+  let pick=take(pool.filter(id=>!used.includes(id)),VD_PER),round=false;
+  if(pick.length<VD_PER&&pool.length>pick.length){round=true;const add=take(pool.filter(id=>!pick.includes(id)),VD_PER-pick.length);used=add.slice();pick=pick.concat(add)}
+  else if(pick.length<VD_PER){round=true;used=[]}
   else used=used.concat(pick);
-  LS.set('ms_auto_used',used);
-  const n=$('#vdautonote');if(n)n.textContent=autoNote();
-  toast(round?'Весь каталог уже был, начат новый круг':'Выбрано '+pick.length+' новых товаров');
+  LS.set(key,used);
+  autoUI();
+  const where=cat?'«'+autoCatName()+'»':'всех категорий';
+  toast(round?'Все товары из '+where+' уже были — начат новый круг':'Выбрано '+pick.length+' новых товаров из '+where);
   await vdMultiOpen(pick);
 }
 async function vdMultiOpen(ids){
