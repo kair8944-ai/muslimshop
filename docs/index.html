@@ -2668,7 +2668,7 @@ function admRows(){const arr=admFiltered();return arr.map(p=>`<div class="adm-ro
       <button class="btn sm gold" data-act="aedit" data-id="${esc(p.id)}">✏️ Редактировать</button>
       <button class="btn sm line" data-act="ahide" data-id="${esc(p.id)}">${p.status==='hidden'?'Показать':'Скрыть'}</button>
       <button class="btn sm line" data-act="adel" data-id="${esc(p.id)}">Удалить</button>
-      <button class="btn sm line" data-act="tg-send" data-id="${esc(p.id)}">${tgSent()[p.id]?'✓ В канале':'✈ В Telegram'}</button>
+      <button class="btn sm line" data-act="tg-send" data-id="${esc(p.id)}">${tgSent()[p.id]?'🔄 Обновить в Telegram':'✈ В Telegram'}</button>
       <button class="btn sm line" data-act="story" data-id="${esc(p.id)}">🎬 Сторис</button>
       <button class="btn sm line" data-act="reel" data-id="${esc(p.id)}">🎞 Рилс</button>
       <button class="btn sm gold" data-act="video" data-id="${esc(p.id)}">🎥 Видео</button>
@@ -4464,9 +4464,65 @@ async function tgSend(id){
     throw e;
   }
 }
-async function tgOne(id){
+/* обновление уже отправленного поста: меняем фото-карточку, цену, текст и кнопки прямо в старом сообщении, без дубликата */
+const tgMids=id=>{const a=LS.get('ms_tg_msgs',{}),ch=tgCfg().ch||'';return ((a[ch]||{})[id]||[]).slice()};
+function tgDropMid(id,mid){try{const a=LS.get('ms_tg_msgs',{}),ch=tgCfg().ch||'';if(a[ch]&&a[ch][id]){a[ch][id]=a[ch][id].filter(x=>x!==mid);LS.set('ms_tg_msgs',a)}}catch(e){}}
+async function tgEdit(id){
+  const p=await getFull(id);
+  if(!p)throw new Error('Товар не найден');
+  const mids=tgMids(id);
+  if(!mids.length)return {ok:0,gone:0,nomid:true};
+  const c=tgCfg(),kb=tgKb(p),src=(p.images&&p.images[0])||p.img||'';
+  let blob=null,carded=false;
+  if(src){
+    if(c.fmt==='card'){try{blob=await sgCardBlob(p,src);carded=!!blob}catch(e){blob=null}}
+    else if(c.fmt!=='orig'){try{blob=await sgPostBlob(src,c.fmt)}catch(e){blob=null}}
+    if(!blob)blob=await tgBlob(src);
+  }
+  const parts=tgParts(p,carded,c.cap);
+  let ok=0,gone=0;
+  for(const mid of mids){
+    try{
+      if(src&&(blob||/^https?:/i.test(src))){
+        const fd=new FormData();
+        fd.append('chat_id',c.ch);fd.append('message_id',String(mid));
+        fd.append('media',JSON.stringify({type:'photo',media:blob?'attach://ph':src,caption:parts.cap,parse_mode:'HTML'}));
+        if(blob)fd.append('ph',blob,'photo.jpg');
+        fd.append('reply_markup',JSON.stringify({inline_keyboard:kb}));
+        await tgApi('editMessageMedia',fd,true);
+      }else{
+        await tgApi('editMessageText',{chat_id:c.ch,message_id:mid,text:parts.cap,parse_mode:'HTML',link_preview_options:{is_disabled:true},reply_markup:{inline_keyboard:kb}});
+      }
+      ok++;
+    }catch(e){
+      const m=String(e&&e.message||e);
+      if(/not modified/i.test(m)){ok++;continue}
+      if(/not found|can't be edited|MESSAGE_ID_INVALID|there is no (media|text)/i.test(m)){gone++;tgDropMid(id,mid);continue}
+      throw e;
+    }
+    if(mids.length>1)await new Promise(r=>setTimeout(r,1500));
+  }
+  if(ok)tgMark(id);
+  return {ok,gone,nomid:false};
+}
+async function tgOneUpd(id){
+  tgBusy=true;toast('Обновляю пост в Telegram…');
+  try{
+    const r=await tgEdit(id);
+    if(r.ok){toast('Пост в Telegram обновлён ✓ Новая цена и текст уже в группе');tgBusy=false;try{admRefresh()}catch(e){}return}
+    tgBusy=false;
+    const k=await tgAsk('<b>Старый пост не найден</b><br><span style="font-size:14px">'+(r.nomid?'Этот товар отправляли раньше, чем сайт начал запоминать посты, или с другого телефона/компьютера. Изменить его нельзя.':'Похоже, пост удалили из группы.')+'<br>Можно отправить новый пост. Старый (если он есть) лучше удалить в группе вручную.</span>',[['new','Отправить новый пост',1],['no','Отмена']]);
+    if(k==='new')await tgOne(id,true);
+  }catch(e){tgBusy=false;toast('Telegram: '+tgErr(e))}
+}
+async function tgOne(id,force){
   if(tgBusy)return;
-  if(tgSent()[id]&&!confirm('Этот товар уже отправляли в канал. Отправить ещё раз?'))return;
+  if(tgSent()[id]&&!force){
+    const has=tgMids(id).length>0;
+    const k=await tgAsk('<b>Этот товар уже есть в группе</b><br><span style="font-size:14px">'+(has?'«Обновить» поменяет цену, картинку и текст прямо в старом посте, без дубликата.':'Старый пост отправлен с другого устройства или давно, сайт не знает его номер. Обновить его отсюда нельзя.')+'</span>',has?[['upd','🔄 Обновить старый пост',1],['new','Отправить ещё раз (будет дубликат)'],['no','Отмена']]:[['new','Отправить новый пост',1],['no','Отмена']]);
+    if(k==='upd')return tgOneUpd(id);
+    if(k!=='new')return;
+  }
   tgBusy=true;toast('Отправляю в Telegram…');
   try{await tgSend(id);toast('Опубликовано в канале ✓');try{admRefresh()}catch(e){}}
   catch(e){toast('Telegram: '+tgErr(e))}
