@@ -4941,6 +4941,7 @@ function ntVisit(path){
   const tm=setTimeout(()=>{if(!fired&&document.visibilityState==='visible')go()},10000);
 }
 function ntVisitSend(path){
+  NJ.on=true;
   let src='';try{src=stSrc()}catch(e){}
   const m=ntMem(),now=Date.now(),n=(m.n|0)+1;let rep='🆕 Первый визит';
   if(n>1){
@@ -4998,11 +4999,36 @@ function ntRestock(f,fd){
 /* ---- брошенная корзина: клиент положил товар и ушёл без заказа ---- */
 function ntAbandon(){
   try{
+    if(typeof njExit==='function'){njExit();return}
     if(NT_DONE||!NT_TOUCH||!cart.length)return;
     const lines=cartLines().filter(l=>l.p);if(!lines.length)return;
     const sig=lines.map(l=>l.p.id+'x'+l.q).join(',');if(sig===NT_ABSIG)return;NT_ABSIG=sig;
     const sum=lines.reduce((s,l)=>s+l.p.price*l.q,0);
     ntSend('🛒💤 Брошенная корзина: клиент ушёл без заказа\n'+lines.map(l=>'• '+cleanName(l.p.name.ru)+' — '+l.q+' шт.'+ntLink(l.p)).join('\n')+'\nНа сумму: '+money(sum)+'\nВремя: '+ntTime());
+  }catch(e){}
+}
+
+/* ---- путь клиента по сайту: что смотрел, сколько времени, с чем ушёл ---- */
+const NJ={t0:Date.now(),pages:[],sent:0,on:false};
+function njAdd(){try{const p=(location.hash||'#/').slice(1).split('?')[0]||'/';const l=NJ.pages[NJ.pages.length-1];if(l&&l.p===p)return;NJ.pages.push({p:p,t:Date.now()})}catch(e){}}
+window.addEventListener('hashchange',njAdd);njAdd();
+function njDur(ms){const s=Math.max(1,Math.round(ms/1000));return s<60?s+' с':Math.floor(s/60)+' мин'+(s%60?' '+(s%60)+' с':'')}
+function njExit(){
+  try{
+    if(!NJ.on||NJ.pages.length===NJ.sent)return;
+    const now=Date.now(),ps=NJ.pages;
+    const rows=ps.map((x,i)=>{const d=((ps[i+1]&&ps[i+1].t)||now)-x.t;let ln='';
+      if(x.p.startsWith('/product/')){const p=prodById(safeDec(x.p.slice(9)));if(p)ln=ntLink(p)}
+      return (i+1)+'. '+ntPageName(x.p)+' — '+njDur(d)+ln});
+    const shown=rows.length>12?['… ещё '+(rows.length-12)+' стр. раньше'].concat(rows.slice(-12)):rows;
+    const prods=ps.filter(x=>x.p.startsWith('/product/')).length;
+    let txt='🚪 Клиент ушёл с сайта (или свернул)\nНа сайте: '+njDur(now-NJ.t0)+' · страниц: '+ps.length+(prods?' · товаров: '+prods:'')+'\n\nЧто смотрел:\n'+shown.join('\n');
+    if(NT_DONE)txt+='\n\n✅ Оформил заказ';
+    else if(cart.length){const lines=cartLines().filter(l=>l.p);if(lines.length){const sum=lines.reduce((s,l)=>s+l.p.price*l.q,0);
+      txt+='\n\n🛒💤 Ушёл без заказа, в корзине:\n'+lines.map(l=>'• '+cleanName(l.p.name.ru)+' — '+l.q+' шт.'+ntLink(l.p)).join('\n')+'\nНа сумму: '+money(sum);
+      NT_ABSIG=lines.map(l=>l.p.id+'x'+l.q).join(',')}}
+    NJ.sent=ps.length;
+    ntSend(txt+'\nВремя: '+ntTime());
   }catch(e){}
 }
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')ntAbandon()});
