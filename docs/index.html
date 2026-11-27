@@ -4896,6 +4896,7 @@ function ntCfgOld(){
   })();
   return NT_P;
 }
+const ntLink=p=>'\n🔗 https://muslimshop.kz/p/'+encodeURIComponent(p.id)+'.html';
 const ntTime=()=>new Date(Date.now()+5*3600e3).toISOString().slice(11,16);
 const ntDev=()=>{const u=navigator.userAgent||'';return /iPhone|iPad/i.test(u)?'iPhone':/Android/i.test(u)?'Android':/Mobi/i.test(u)?'телефон':'компьютер'};
 async function ntSend(text,force){
@@ -4989,7 +4990,7 @@ function ntAbandon(){
     const lines=cartLines().filter(l=>l.p);if(!lines.length)return;
     const sig=lines.map(l=>l.p.id+'x'+l.q).join(',');if(sig===NT_ABSIG)return;NT_ABSIG=sig;
     const sum=lines.reduce((s,l)=>s+l.p.price*l.q,0);
-    ntSend('🛒💤 Брошенная корзина: клиент ушёл без заказа\n'+lines.map(l=>'• '+cleanName(l.p.name.ru)+' — '+l.q+' шт.').join('\n')+'\nНа сумму: '+money(sum)+'\nВремя: '+ntTime());
+    ntSend('🛒💤 Брошенная корзина: клиент ушёл без заказа\n'+lines.map(l=>'• '+cleanName(l.p.name.ru)+' — '+l.q+' шт.'+ntLink(l.p)).join('\n')+'\nНа сумму: '+money(sum)+'\nВремя: '+ntTime());
   }catch(e){}
 }
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')ntAbandon()});
@@ -5001,7 +5002,7 @@ document.addEventListener('click',e=>{
     const a=e.target.closest('a[href^="tel:"],a[href*="wa.me"],button[data-act="ask"]');if(!a)return;
     let kind,txt;const pg=ntPageName((location.hash||'#/').slice(1).split('?')[0]);
     if(a.matches('a[href^="tel:"]')){kind='tel';txt='📞 Нажали «Позвонить»'}
-    else if(a.matches('button[data-act="ask"]')){kind='ask';const p=prodById(a.dataset.id);txt='❓ Спрашивают про товар в WhatsApp'+(p?'\n'+cleanName(p.name.ru):'')}
+    else if(a.matches('button[data-act="ask"]')){kind='ask';const p=prodById(a.dataset.id);txt='❓ Спрашивают про товар в WhatsApp'+(p?'\n'+cleanName(p.name.ru)+ntLink(p):'')}
     else{kind='wa';txt='💬 Нажали «WhatsApp»'}
     /* клиент связывается сам, поэтому текущую корзину не считаем брошенной */
     NT_ABSIG=cart.length?cartLines().filter(l=>l.p).map(l=>l.p.id+'x'+l.q).join(','):NT_ABSIG;
@@ -5012,7 +5013,7 @@ document.addEventListener('click',e=>{
 function ntCart(id){
   const p=prodById(id);if(!p)return;NT_TOUCH=true;
   let n=0,sum=0;try{cartLines().forEach(x=>{n+=x.q;sum+=x.q*(x.p.price||0)})}catch(e){}
-  ntSend('🛒 Товар добавлен в корзину\n'+cleanName(p.name.ru||p.name.kk)+(p.price>0?' — '+money(p.price):'')+'\nВ корзине: '+n+' шт. на '+money(sum)+'\nВремя: '+ntTime());
+  ntSend('🛒 Товар добавлен в корзину\n'+cleanName(p.name.ru||p.name.kk)+(p.price>0?' — '+money(p.price):'')+ntLink(p)+'\nВ корзине: '+n+' шт. на '+money(sum)+'\nВремя: '+ntTime());
 }
 async function ntWrite(fields){
   const f={};const mask=[];
