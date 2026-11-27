@@ -2291,7 +2291,7 @@ function viewProduct(slug){
     else if(!FULLING[p0.id]&&!FULLERR[p0.id]&&fdb){FULLING[p0.id]=1;getFull(p0.id).then(()=>{delete FULLING[p0.id];KEEP=true;render()}).catch(e=>{delete FULLING[p0.id];FULLERR[p0.id]=String(e&&e.message||e);KEEP=true;render()})}
   }
   document.title=L(p.name)+' — MUSLIM SHOP';
-  CUR=p;try{ntSeen(p)}catch(e){}
+  CUR=p;try{ntSeen(p)}catch(e){}try{njProd(p)}catch(e){}
   const rows=specsRows(p.specs&&(p.specs[lang]||p.specs.ru));
   const desc=L(p.desc);
   return `<div class="pcrow"><div class="crumbs"><a href="#/">${t('home')}</a> / <a href="#/catalog?cat=${esc(p.cat)}">${esc(catName(p.cat))}</a></div></div>
@@ -2890,7 +2890,7 @@ let LB=null;
 function lbImgs(p){const f=FULLC[p.id]||p;let a=(f.images&&f.images.length?f.images:(p.images&&p.images.length?p.images:[p.img])).filter(Boolean);return a.length?a:[p.img]}
 function lbFit(ar,bw,bh){let w=bw,h=w/ar;if(h>bh){h=bh;w=h*ar}return {w,h,x:(bw-w)/2,y:(bh-h)/2}}
 function lbOpen(imgs,start,srcImg,more){
-  if(LB||!imgs.length)return;
+  if(LB||!imgs.length)return;try{njPhoto()}catch(e){}
   const kk=lang==='kk',o=document.createElement('div');o.id='lb';
   const th=srcImg&&srcImg.currentSrc;
   o.innerHTML=`<div class="lbbg"></div><div class="lbtrack">${imgs.map((s,i)=>`<div class="lbs"${i===start&&th?` style="background-image:url('${esc(th)}')"`:''}><img src="${esc(s)}" alt="" decoding="async"></div>`).join('')}</div><button type="button" class="lbx" aria-label="${kk?'Жабу':'Закрыть'}">×</button>${imgs.length>1?`<div class="lbn"><span>${start+1}</span> / ${imgs.length}</div>`:''}${more?`<button type="button" class="lbmore">${kk?'Тауар туралы толығырақ':'Подробнее о товаре'}  →</button>`:''}`;
@@ -5010,18 +5010,24 @@ function ntAbandon(){
 
 /* ---- путь клиента по сайту: что смотрел, сколько времени, с чем ушёл ---- */
 const NJ={t0:Date.now(),pages:[],sent:0,on:false};
-function njAdd(){try{const p=(location.hash||'#/').slice(1).split('?')[0]||'/';const l=NJ.pages[NJ.pages.length-1];if(l&&l.p===p)return;NJ.pages.push({p:p,t:Date.now()})}catch(e){}}
-window.addEventListener('hashchange',njAdd);njAdd();
+function njKey(){const h=(location.hash||'#/').slice(1);const p=h.split('?')[0]||'/';if(p.startsWith('/catalog')){const q=new URLSearchParams(h.split('?')[1]||'');return '/catalog'+(q.get('cat')?'?cat='+q.get('cat'):q.get('q')?'?q='+q.get('q'):q.get('pop')?'?pop=1':'')}return p}
+function njPush(k){const l=NJ.pages[NJ.pages.length-1];if(l&&l.p===k)return;NJ.pages.push({p:k,t:Date.now(),ph:0})}
+function njAdd(){try{njPush(njKey())}catch(e){}}
+function njProd(p){try{if(p){const k=njKey();njPush(k.startsWith('/product/')?k:'/product/'+p.id)}}catch(e){}}
+function njP(k){const x=safeDec(k.slice(9));return prodById(x)||DB.products.find(q=>q.slug===x)}
+function njPhoto(){try{const l=NJ.pages[NJ.pages.length-1];if(l)l.ph=(l.ph|0)+1}catch(e){}}
+function njName(k){try{if(k.startsWith('/catalog?cat=')){const c=safeDec(k.slice(13));return 'Категория: '+(catName(c)||c)}if(k.startsWith('/catalog?q='))return 'Поиск: «'+safeDec(k.slice(11))+'»';if(k==='/catalog?pop=1')return 'Хиты продаж'}catch(e){}if(k.startsWith('/product/')){const p=njP(k);if(p)return 'Товар: '+cleanName(p.name.ru||p.name.kk)}return ntPageName(k)}
+window.addEventListener('hashchange',njAdd);setInterval(njAdd,700);njAdd();
 function njDur(ms){const s=Math.max(1,Math.round(ms/1000));return s<60?s+' с':Math.floor(s/60)+' мин'+(s%60?' '+(s%60)+' с':'')}
 function njExit(){
   try{
     if(!NJ.on||NJ.pages.length===NJ.sent)return;
     const now=Date.now(),ps=NJ.pages;
     const rows=ps.map((x,i)=>{const d=((ps[i+1]&&ps[i+1].t)||now)-x.t;let ln='';
-      if(x.p.startsWith('/product/')){const p=prodById(safeDec(x.p.slice(9)));if(p)ln=ntLink(p)}
-      return (i+1)+'. '+ntPageName(x.p)+' — '+njDur(d)+ln});
+      if(x.p.startsWith('/product/')){const p=njP(x.p);if(p)ln=ntLink(p)}
+      return (i+1)+'. '+njName(x.p)+' — '+njDur(d)+(x.ph?' · 📷 фото: '+x.ph:'')+ln});
     const shown=rows.length>12?['… ещё '+(rows.length-12)+' стр. раньше'].concat(rows.slice(-12)):rows;
-    const prods=ps.filter(x=>x.p.startsWith('/product/')).length;
+    const prods=new Set(ps.filter(x=>x.p.startsWith('/product/')).map(x=>x.p)).size;
     let txt='🚪 Клиент ушёл с сайта (или свернул)\nНа сайте: '+njDur(now-NJ.t0)+' · страниц: '+ps.length+(prods?' · товаров: '+prods:'')+'\n\nЧто смотрел:\n'+shown.join('\n');
     if(NT_DONE)txt+='\n\n✅ Оформил заказ';
     else if(cart.length){const lines=cartLines().filter(l=>l.p);if(lines.length){const sum=lines.reduce((s,l)=>s+l.p.price*l.q,0);
