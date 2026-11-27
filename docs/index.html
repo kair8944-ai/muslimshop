@@ -1361,6 +1361,18 @@ function ghSeoFiles(dir,map){
     urls.push({loc:url,mod:today});
   }
   files.push({path:dir+'sitemap.xml',content:'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'+urls.map(u=>'<url><loc>'+esc(u.loc)+'</loc><lastmod>'+u.mod+'</lastmod></url>').join('\n')+'\n</urlset>\n'});
+  /* --- Google Merchant Center: feed-google.xml обновляется при каждой публикации --- */
+  try{
+    const g=x=>esc(x).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'');
+    const items=vis.map(id=>{
+      const d=GH.cols.products[id];const imgs=(d.images||[]).map(imgAbs).filter(Boolean);
+      const price=Number(d.price)||0,old=Number(d.oldPrice)||0;if(!imgs.length||price<=0)return '';
+      const bm=/Бренд:\s*([^\n]+)/.exec(d.specs||'');const brand=bm?clean(bm[1]):'MUSLIM SHOP';
+      const pr=old>price?'<g:price>'+old+' KZT</g:price><g:sale_price>'+price+' KZT</g:sale_price>':'<g:price>'+price+' KZT</g:price>';
+      return '<item><g:id>'+g(d.sku||id)+'</g:id><title>'+g(clean(d.titleRu).slice(0,150))+'</title><description>'+g(clean(d.description||d.titleRu).slice(0,4900))+'</description><link>'+g(SITE+'p/'+id+'.html')+'</link><g:image_link>'+g(imgs[0])+'</g:image_link>'+imgs.slice(1,10).map(u=>'<g:additional_image_link>'+g(u)+'</g:additional_image_link>').join('')+'<g:availability>'+(d.inStock===false?'out_of_stock':'in_stock')+'</g:availability>'+pr+'<g:brand>'+g(brand)+'</g:brand><g:identifier_exists>no</g:identifier_exists><g:condition>new</g:condition><g:product_type>'+g(cname(d.categoryId))+'</g:product_type></item>';
+    }).filter(Boolean);
+    files.push({path:dir+'feed-google.xml',content:'<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0"><channel>\n<title>MUSLIM SHOP</title><link>'+SITE+'</link><description>MUSLIM SHOP Атырау: БАДы, витамины, масло черного тмина, исламские товары</description>\n'+items.join('\n')+'\n</channel></rss>\n'});
+  }catch(e){}
   files.push({path:dir+'robots.txt',content:'User-agent: *\nAllow: /\n\nSitemap: '+SITE+'sitemap.xml\n'});
   return files;
 }
