@@ -1373,6 +1373,20 @@ function ghSeoFiles(dir,map){
     }).filter(Boolean);
     files.push({path:dir+'feed-google.xml',content:'<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0"><channel>\n<title>MUSLIM SHOP</title><link>'+SITE+'</link><description>MUSLIM SHOP Атырау: БАДы, витамины, масло черного тмина, исламские товары</description>\n'+items.join('\n')+'\n</channel></rss>\n'});
   }catch(e){}
+  /* --- Яндекс (Товары/Директ/Бизнес): feed-yandex.yml обновляется при каждой публикации --- */
+  try{
+    const y=x=>esc(x).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'');
+    const ycats=Object.keys(GH.cols.categories||{}).map(cid=>'<category id="'+y(cid)+'">'+y(cname(cid))+'</category>');
+    const offers=vis.map(id=>{
+      const d=GH.cols.products[id];const imgs=(d.images||[]).map(imgAbs).filter(Boolean);
+      const price=Number(d.price)||0,old=Number(d.oldPrice)||0;if(!imgs.length||price<=0)return '';
+      const oid=(String(d.sku||'').replace(/[^A-Za-z0-9]/g,'')||String(id).replace(/[^A-Za-z0-9]/g,'')).slice(0,20);
+      const bm=/Бренд:\s*([^\n]+)/.exec(d.specs||'');
+      return '<offer id="'+y(oid)+'" available="'+(d.inStock===false?'false':'true')+'"><url>'+y(SITE+'p/'+id+'.html')+'</url><price>'+price+'</price>'+(old>price?'<oldprice>'+old+'</oldprice>':'')+'<currencyId>KZT</currencyId><categoryId>'+y(d.categoryId||'cat-misc')+'</categoryId>'+imgs.slice(0,10).map(u=>'<picture>'+y(u)+'</picture>').join('')+'<pickup>true</pickup><delivery>true</delivery><name>'+y(clean(d.titleRu).slice(0,150))+'</name>'+(bm?'<vendor>'+y(clean(bm[1]))+'</vendor>':'')+'<description>'+y(clean(d.description||d.titleRu).slice(0,2900))+'</description></offer>';
+    }).filter(Boolean);
+    const now=new Date(),pad=n=>String(n).padStart(2,'0'),ds=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+'T'+pad(now.getHours())+':'+pad(now.getMinutes());
+    files.push({path:dir+'feed-yandex.yml',content:'<?xml version="1.0" encoding="UTF-8"?>\n<yml_catalog date="'+ds+'"><shop><name>MUSLIM SHOP</name><company>MUSLIM SHOP</company><url>'+SITE+'</url><currencies><currency id="KZT" rate="1"/></currencies><categories>\n'+ycats.join('\n')+'\n</categories><offers>\n'+offers.join('\n')+'\n</offers></shop></yml_catalog>\n'});
+  }catch(e){}
   files.push({path:dir+'robots.txt',content:'User-agent: *\nAllow: /\n\nSitemap: '+SITE+'sitemap.xml\n'});
   return files;
 }
